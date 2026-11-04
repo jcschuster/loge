@@ -16,7 +16,16 @@ defmodule Loge.Language do
   @doc "The language name Livebook's editor highlights the source as, or `nil` for plain text."
   @callback editor_language() :: String.t() | nil
 
-  @doc "Parses and checks a source. A source that does not parse still yields an analysis."
+  @typedoc """
+  The sources an include in a source can name, by the name it uses. Passed as the
+  `:includes` option of `c:analyze/2` and `c:Loge.Engine.run/2`.
+  """
+  @type includes :: %{String.t() => Loge.Input.t()}
+
+  @doc """
+  Parses and checks a source. A source that does not parse still yields an analysis.
+  The `:includes` option holds the `t:includes/0` the source may include.
+  """
   @callback analyze(binary(), keyword()) :: Loge.Analysis.t()
 
   @doc "Reformats a source."

@@ -20,6 +20,29 @@ defmodule Loge do
   """
 
   @doc """
+  Source text in a language, for another cell to include. See `Loge.Source`.
+
+      iex> Loge.source(:tptp, "fof(a, axiom, p).")
+      %Loge.Source{language: :tptp, text: "fof(a, axiom, p)."}
+  """
+  @spec source(atom(), binary()) :: Loge.Source.t()
+  def source(language, text) when is_atom(language) and is_binary(text),
+    do: %Loge.Source{language: language, text: text}
+
+  @doc """
+  Runs `engine` on `input` and returns the outcome, raising `Loge.Error` with the
+  engine's description of the failure otherwise. This is the call
+  `Loge.Engine.to_source/3` generates.
+  """
+  @spec run!(module(), Loge.Input.t(), keyword()) :: Loge.Outcome.t()
+  def run!(engine, input, options) do
+    case engine.run(input, options) do
+      {:ok, %Loge.Outcome{} = outcome} -> outcome
+      {:error, reason} -> raise Loge.Error, engine: engine, reason: reason
+    end
+  end
+
+  @doc """
   Registers a language, analyzer or engine module. See `Loge.Registry.register/1`.
   """
   @spec register(module()) :: :ok | {:error, Loge.Registry.error()}

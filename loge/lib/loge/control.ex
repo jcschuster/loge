@@ -3,8 +3,9 @@ defmodule Loge.Control do
   One per-run option of an engine, such as the prover or the time limit, rendered next
   to the editor. Its value reaches `c:Loge.Engine.run/2` under `key`.
 
-  A `:select` takes its `choices` from a list, or from a function called when the
-  control is rendered.
+  A `:select` takes its value from `choices`; a `:text` offers them as suggestions
+  and accepts any text. Choices are a list, or a function called when the control
+  is rendered.
   """
 
   @enforce_keys [:key, :type, :label]

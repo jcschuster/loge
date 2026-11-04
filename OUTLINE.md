@@ -88,9 +88,15 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 @callback verify(keyword()) :: :ok | {:error, term()}  # reachability probe
 @callback controls() :: [Loge.Control.t()]    # per-run controls rendered by the cell
 @callback run(Loge.Input.t(), keyword()) :: {:ok, Loge.Outcome.t()} | {:error, term()}
-@callback to_source(Loge.Input.t(), keyword()) :: binary()   # the Elixir the cell evaluates
-@callback session() :: module() | nil          # optional; see §5
+@callback format_error(term()) :: String.t()  # sentence for a reason run/verify returned
+@callback session() :: module() | nil          # optional; phase 3, see §5
 ```
+
+`Loge.run!/3` calls `run/2` and returns the outcome or raises `Loge.Error`, whose message
+is the engine's `format_error/1`. `Loge.Engine.to_source(engine, source, options, includes)`
+renders `Loge.run!(Engine, "source", key: value, includes: %{"defs" => defs})`, the one call
+the cell evaluates; it is the same for every engine, so it is a core function, not a
+callback. `includes` are binding variables, referenced by name.
 
 Cancellation contract (copied from AtpClient): death of the process calling `run/2`
 aborts the work and releases external resources.
@@ -99,7 +105,9 @@ aborts the work and releases external resources.
 group, default, label, doc, secret?}` (same shape as `AtpClient.Config.Field`).
 
 `Loge.Control`: `%{key, type: :select | :text | :integer | :boolean, label, choices:
-[term] | {:dynamic, (-> [term])}, default}`.
+[term] | {:dynamic, (-> [term])}, default}`. For `:text`, choices are suggestions. A
+control's value reaches `run/2` under `key`; TPTP engines use the `atp_client` option
+names as keys, so values pass through unchanged.
 
 ### `Loge.Input` (protocol)
 
@@ -108,8 +116,21 @@ group, default, label, doc, secret?}` (same shape as `AtpClient.Config.Field`).
 @spec language(t) :: atom() | nil
 ```
 
-Implemented for `BitString` in core; `Tptp.File`/`Tptp.Unit` in `loge_tptp`;
-`Egglog.Commands` in `loge_egglog`.
+Implemented for `BitString` (language `nil`) and `Loge.Source` in core; `Tptp.File`/`Tptp.Unit`
+in `loge_tptp`; `Egglog.Commands` in `loge_egglog`.
+
+### Includes
+
+A source can include sources other cells define. `Loge.source(:tptp, text)` builds a
+`Loge.Source`; a cell bound to a variable evaluates to one. `c:Loge.Language.analyze/2` and
+`c:Loge.Engine.run/2` accept `includes: %{name => Loge.Input.t()}`
+(`t:Loge.Language.includes/0`); an include names a source by the exact variable name.
+Each language package resolves its own include syntax against the map. TPTP:
+`Tptp.Resolver.Map` over the includes, then `:library` (default `Tptp.Resolver.Http`, which
+fetches from tptp.org and caches on disk). Findings inside an include are placed on the root
+directive that reaches it, prefixed `in '<name>': `. Engines receive the problem with every
+include inlined (a `Tptp.Unit`) when includes are given, the source as written otherwise; an
+unresolved include is `{:error, {:unresolved_includes, diagnostics}}`.
 
 ### `Loge.Diagnostic` (struct; fields of `Tptp.Diagnostic`, `range` for `span`)
 
@@ -159,10 +180,14 @@ work and so honours the engine cancellation contract.
 ## 4. Data flow in the cell (`kino_loge`)
 
 ```
-edit  → handle_editor_change/2 → Language.analyze + Analyzer.run_all → [Diagnostic]
+bind  → scan_binding/3 → variables whose Loge.Input.language/1 is the cell's language
+      → their names (and texts, for linting) sent to the cell server
+edit  → handle_editor_change/2 → Language.analyze(includes:) + Analyzer.run_all → [Diagnostic]
       → reconfigure_smart_cell(ctx, editor: [diagnostics: [...]]) → inline in the editor
         (livebook#3235 / kino#522; until they ship, a list under the editor)
-Solve → Engine.to_source/2 → cell source → evaluated by Livebook → Outcome
+Solve → Loge.Engine.to_source/4 → Loge.run!(..., includes: %{"defs" => defs}) → evaluated
+      by Livebook → Outcome. Referencing the variable makes Livebook mark the cell stale
+      when the defining cell changes.
       → Kino.Render impl for Loge.Outcome: SZS badge with gloss, views, opt-in raw text
 ```
 
@@ -178,15 +203,23 @@ Language.editor_language()]`) → diagnostics list → Solve.
   with a per-engine availability probe (`verify/1`). Generalises
   `KinoAtpClient.BackendConfig`.
 
+Persisted include names are strings; they are matched against the atoms `scan_binding/3`
+reports, never converted with `String.to_atom/1`. Kino asks `scan_binding/3` to stay light
+and send metadata, so only sources of the cell's language are sent.
+
 Robustness: `handle_event/3` must be total (no `String.to_existing_atom/1` on untrusted
 keys); persist the source attr on every change; supervised unlinked tasks only.
 
 ## 5. Sessions (phase 3)
 
 Stateless engines (AtpClient, `Clingo.solve!`, `Egglog.Program`) need nothing. Stateful
-ones (`SWI` session, `Egglog.EGraph`, Isabelle) declare `session/0`; `Loge.SessionSupervisor`
+ones (`SWI` session, `Egglog.EGraph`, a local Isabelle server) declare `session/0`; `Loge.SessionSupervisor`
 starts one process per owner (cell id / MCP connection), passes it as `opts[:session]` to
 `run/2`, and tears it down when the owner dies.
+
+Until then `Loge.Tptp.Engines.Isabelle` runs `AtpClient.Isabelle.query/2` against a
+configured server; KinoAtpClient's node-wide `IsabelleRuntime` (local server started on
+demand when `isabelle` is on PATH) is not ported and becomes this engine's session.
 
 ## 6. Verified facts per backend (diagnostics)
 

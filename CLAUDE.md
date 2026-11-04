@@ -16,8 +16,8 @@ contract or an upstream library, say so instead of routing around it.
   `loge`; consumers (`kino_loge`, `loge_mcp`) depend only on `loge`. Never cross-link
   language packages.
 - `kino_loge` contains no language-specific code. `grep -ri tptp kino_loge/lib` must stay empty.
-- Generated cell source (`Engine.to_source/2`) must run without `kino_loge` installed: one
-  engine call with named options, no helper modules.
+- Generated cell source (`Loge.Engine.to_source/4`) must run without `kino_loge` installed: one
+  `Loge.run!/3` call with named options, no helper modules.
 - Package name = module namespace (`loge_tptp` → `Loge.Tptp`).
 - Minimum Elixir 1.20.
 

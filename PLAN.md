@@ -36,25 +36,28 @@ in `kino_loge`.
 - [x] `Loge.Run` (`Task.Supervisor`; `async/1` cancels the work when the caller dies)
 - [x] `Loge.Application` registering configured modules and starting `Loge.Run`
 - [x] ExUnit: fake language + fake engine exercising registry, run_all containment, cancellation-on-death
+- [x] Includes: `Loge.Source`, `Loge.source/2`, `includes:` option, `Loge.Engine.to_source/4` with binding variables
+- [x] `Loge.run!/3`, `Loge.Error`, `Loge.Engine.to_source/4`; `format_error/1` callback replaces per-engine `to_source/2`
 - [x] Published docs skeleton (`ex_doc`), `mix format`, `--warnings-as-errors`
 
 ### `loge_tptp`
 
-- [ ] `Loge.Tptp.Language` over `Tptp.analyze/2` (`Tptp.Analysis` as `native`; spans via `Loge.Range.from_offsets/3`; `editor_language`: check whether Livebook matches `"tptp"` against #3234's `"TPTP"` case-insensitively)
-- [ ] Analyzers: `Loge.Tptp.Analyzers.Lint` (wraps `Tptp.Lint`), `Loge.Tptp.Analyzers.Tptp4x` (wraps `AtpClient.Analyzer.Tptp4x`; runs only when the local pass has no errors)
-- [ ] Engines, one per AtpClient backend: `Loge.Tptp.Engines.SystemOnTptp` (controls: system select, dynamic from `SystemOnTptp.systems/1`; time limit), `StarExec`, `LocalExec`, `Isabelle` (control: proof method with presets)
-- [ ] `to_source/2` per engine, generating one call with named options (port from `KinoAtpClient.AtpSolver.render_source/2`)
-- [ ] Error-message table ported from `KinoAtpClient.AtpSolver.format_reason/1`
-- [ ] `Loge.Input` impls for `Tptp.File`, `Tptp.Unit`
-- [ ] Isabelle runtime detection (port `KinoAtpClient.IsabelleRuntime` or depend on it)
-- [ ] `Application.start/2` registers language, analyzers, engines
-- [ ] Tests against fixtures; no network in CI (SystemOnTPTP calls mocked)
+- [x] `Loge.Tptp.Language` over `Tptp.analyze/2` (`Tptp.Analysis` as `native`; spans via `Loge.Range.from_offsets/3`; `editor_language`: check whether Livebook matches `"tptp"` against #3234's `"TPTP"` case-insensitively)
+- [x] No analyzers: `Tptp.analyze/2` applies `Tptp.Lint`, and `tptp` makes TPTP4X obsolete
+- [x] Engines, one per AtpClient backend: `Loge.Tptp.Engines.SystemOnTptp` (controls: system select, dynamic from `SystemOnTptp.systems/1`; time limit), `StarExec`, `LocalExec`, `Isabelle` (control: proof method with presets)
+- [x] Generated source: core `Loge.Engine.to_source/4` (replaces the per-engine port of `KinoAtpClient.AtpSolver.render_source/2`)
+- [x] Error-message table ported from `KinoAtpClient.AtpSolver.format_reason/1` (`Loge.Tptp.Backend.format_error/1`)
+- [x] `Loge.Input` impls for `Tptp.File`, `Tptp.Unit`
+- [x] Includes: `Loge.Tptp.Includes` (includes map, then `Tptp.Resolver.Http`); findings inside an include placed on its directive; engines send inlined units
+- [x] `Application.start/2` registers language, analyzers, engines
+- [x] Tests against fixtures; no network in CI (SystemOnTPTP against a local HTTP stub, LocalExec against a fixture prover script)
 
 ### `kino_loge`
 
 - [ ] `KinoLoge.Cell` (name "Logic Engine"): managed editor, language/engine selects, controls from `controls/0`, inline diagnostics via `reconfigure_smart_cell(editor: [diagnostics:])` (resent in `handle_connect/1`; list under the editor until #3235/#522 ship), Solve = evaluate
 - [ ] `KinoLoge.ConfigCell`: form from `config_schema/0` of every registered engine; `verify/1` probe with status indicator
 - [ ] `Kino.Render` impl for `Loge.Outcome`: SZS badge + gloss + ontology link (texts from KinoAtpClient `STATUS_LABELS`), views, opt-in raw output
+- [ ] Includes: `scan_binding/3` collects variables of the cell's language; definitions cell ("no engine", bound to a variable, source `name = Loge.source(...)`); include names resolved against binding atoms
 - [ ] Debounced lint via `Loge.Run`; total `handle_event/3`; source attr persisted on every change
 - [ ] Decide: can a smart cell request its own evaluation? If not, Solve button documents the shortcut
 - [ ] Minimal JS (Kino.JS for the cell chrome only; no editor bundle)
@@ -88,6 +91,7 @@ in `kino_loge`.
 ### `loge`
 
 - [ ] `session/0` callback, `Loge.SessionSupervisor` (owner-keyed, torn down with owner)
+- [ ] Isabelle engine session: local server started on demand when `isabelle` is on PATH (port of `KinoAtpClient.IsabelleRuntime`)
 
 ### `loge_prolog`
 

@@ -142,12 +142,35 @@ defmodule Loge.Fake.Engine do
     receive do
       :finish ->
         raw = IO.iodata_to_binary(Loge.Input.to_iodata(input))
-        {:ok, %Outcome{szs: :theorem, raw: raw, engine: :fake_engine}}
+        includes = Keyword.get(options, :includes, %{})
+
+        {:ok,
+         %Outcome{szs: :theorem, raw: raw, engine: :fake_engine, details: %{includes: includes}}}
     end
   end
 
   @impl true
-  def to_source(input, options) do
-    "Loge.Fake.Engine.run(#{inspect(input)}, #{inspect(options)})"
-  end
+  def format_error(:missing_token), do: "no token configured"
+end
+
+defmodule Loge.Fake.FailingEngine do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  @impl true
+  def id, do: :failing_engine
+  @impl true
+  def label, do: "Failing engine"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def verify(_options), do: :ok
+  @impl true
+  def controls, do: []
+  @impl true
+  def run(_input, options), do: {:error, {:refused, Keyword.fetch!(options, :why)}}
+  @impl true
+  def format_error({:refused, why}), do: "refused: " <> why
 end
