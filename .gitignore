@@ -6,3 +6,4 @@ erl_crash.dump
 .lexical/
 doc/
 cover/
+.claude/

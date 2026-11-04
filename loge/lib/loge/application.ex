@@ -1,20 +1,23 @@
 defmodule Loge.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Starts a worker by calling: Loge.Worker.start_link(arg)
-      # {Loge.Worker, arg}
-    ]
+    with :ok <- register_configured() do
+      Supervisor.start_link([Loge.Run], strategy: :one_for_one, name: Loge.Supervisor)
+    end
+  end
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Loge.Supervisor]
-    Supervisor.start_link(children, opts)
+  defp register_configured do
+    [:languages, :analyzers, :engines]
+    |> Enum.flat_map(&Application.get_env(:loge, &1, []))
+    |> Enum.reduce_while(:ok, fn module, :ok ->
+      case Loge.Registry.register(module) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
   end
 end

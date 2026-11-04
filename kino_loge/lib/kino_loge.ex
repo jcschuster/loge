@@ -1,18 +1,5 @@
 defmodule KinoLoge do
   @moduledoc """
-  Documentation for `KinoLoge`.
+  Livebook smart cells for the languages and engines registered with `Loge`.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> KinoLoge.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end

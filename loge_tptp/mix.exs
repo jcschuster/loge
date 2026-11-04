@@ -1,4 +1,4 @@
-defmodule LogeTptp.MixProject do
+defmodule Loge.Tptp.MixProject do
   use Mix.Project
 
   def project do
@@ -14,7 +14,7 @@ defmodule LogeTptp.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {LogeTptp.Application, []}
+      mod: {Loge.Tptp.Application, []}
     ]
   end
 

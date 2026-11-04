@@ -19,12 +19,12 @@ defmodule KinoLoge.MixProject do
   end
 
   defp deps do
-      [
-        loge_dep()
-      ]
-    end
+    [
+      loge_dep()
+    ]
+  end
 
-    defp loge_dep do
-      if System.get_env("LOGE_HEX"), do: {:loge, "~> 0.1"}, else: {:loge, path: "../loge"}
-    end
+  defp loge_dep do
+    if System.get_env("LOGE_HEX"), do: {:loge, "~> 0.1"}, else: {:loge, path: "../loge"}
+  end
 end

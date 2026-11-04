@@ -1,0 +1,3 @@
+%{
+  "tptp": {:hex, :tptp, "0.3.0", "a5e8554460b78a58aabe311cd5a1356fd0dba157b700f4876e13351d8beb7751", [:mix], [], "hexpm", "bb8e9fa98deb36ba9489fcdc187202bdfb95fbf4cd06ddf007c19e50492ba0ce"},
+}
