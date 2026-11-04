@@ -27,6 +27,9 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
   def config_schema, do: Backend.config_schema(SystemOnTptp)
 
   @impl true
+  def configure(settings), do: Backend.configure(SystemOnTptp, settings)
+
+  @impl true
   def verify(options), do: SystemOnTptp.verify(options)
 
   @impl true

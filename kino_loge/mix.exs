@@ -1,13 +1,18 @@
 defmodule KinoLoge.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/jcschuster/loge"
+
   def project do
     [
       app: :kino_loge,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.20",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      docs: docs()
     ]
   end
 
@@ -18,13 +23,28 @@ defmodule KinoLoge.MixProject do
     ]
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
+
   defp deps do
     [
-      loge_dep()
+      loge_dep(),
+      {:kino, "~> 0.19"},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
   defp loge_dep do
     if System.get_env("LOGE_HEX"), do: {:loge, "~> 0.1"}, else: {:loge, path: "../loge"}
+  end
+
+  defp docs do
+    [
+      main: "KinoLoge",
+      source_ref: "kino_loge-v#{@version}",
+      source_url: @source_url,
+      source_url_pattern: "#{@source_url}/blob/kino_loge-v#{@version}/kino_loge/%{path}#L%{line}"
+    ]
   end
 end

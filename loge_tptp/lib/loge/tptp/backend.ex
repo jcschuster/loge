@@ -15,6 +15,21 @@ defmodule Loge.Tptp.Backend do
   end
 
   @doc """
+  Merges `settings` into the backend's `:atp_client` application environment, where
+  every `atp_client` call reads them. Keys not in `settings` keep their values.
+  """
+  @spec configure(module(), keyword()) :: :ok
+  def configure(backend, settings) do
+    key = backend.config_key()
+
+    Application.put_env(
+      :atp_client,
+      key,
+      Keyword.merge(Application.get_env(:atp_client, key, []), settings)
+    )
+  end
+
+  @doc """
   The input to send and the options left for the backend once `:includes` and
   `:library` are taken out; see `Loge.Tptp.Includes.input/3`.
   """

@@ -30,6 +30,28 @@ defmodule Loge do
     do: %Loge.Source{language: language, text: text}
 
   @doc """
+  Every diagnostic about `source`: those of `c:Loge.Language.analyze/2`, then those
+  of the analyzers registered for the language.
+
+  Options other than `:analyzers` go to `analyze/2`; `:analyzers` are the options of
+  `Loge.Analyzer.run_all/3`.
+  """
+  @spec lint(module(), binary(), keyword()) :: [Loge.Diagnostic.t()]
+  def lint(language, source, options) do
+    {analyzer_options, options} = Keyword.pop(options, :analyzers, [])
+    analysis = language.analyze(source, options)
+    analyzers = Loge.Registry.analyzers_for(language.id())
+
+    findings =
+      for {_id, diagnostics} when is_list(diagnostics) <-
+            Loge.Analyzer.run_all(analysis, analyzers, analyzer_options),
+          diagnostic <- diagnostics,
+          do: diagnostic
+
+    analysis.diagnostics ++ findings
+  end
+
+  @doc """
   Runs `engine` on `input` and returns the outcome, raising `Loge.Error` with the
   engine's description of the failure otherwise. This is the call
   `Loge.Engine.to_source/3` generates.
@@ -39,6 +61,21 @@ defmodule Loge do
     case engine.run(input, options) do
       {:ok, %Loge.Outcome{} = outcome} -> outcome
       {:error, reason} -> raise Loge.Error, engine: engine, reason: reason
+    end
+  end
+
+  @doc """
+  Configures `engine` with `settings` for later runs; see `c:Loge.Engine.configure/1`.
+  Raises `ArgumentError` for a key the engine's `c:Loge.Engine.config_schema/0` does
+  not name. This is the call the configuration cell generates.
+  """
+  @spec configure!(module(), keyword()) :: :ok
+  def configure!(engine, settings) when is_list(settings) do
+    known = Enum.map(engine.config_schema(), & &1.key)
+
+    case Keyword.keys(settings) -- known do
+      [] -> engine.configure(settings)
+      unknown -> raise ArgumentError, "#{inspect(engine)} has no settings #{inspect(unknown)}"
     end
   end
 

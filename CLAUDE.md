@@ -40,7 +40,9 @@ contract or an upstream library, say so instead of routing around it.
 - Supervision: work runs under `Task.Supervisor.async_nolink`; callers monitor `:DOWN`.
   Never `Task.async` from a process whose death loses user state (a smart cell).
 - Avoid the documented anti-patterns (hexdocs "Code / Design / Process anti-patterns"):
-  no `String.to_atom/1` on external input, no boolean-blindness parameters, no
+  no `String.to_atom/1` on external input (sole exception: `Loge.Variable.parse/1`, which
+  parses an include or binding name the user typed as an Elixir variable, as evaluating the
+  generated source would), no boolean-blindness parameters, no
   primitive obsession, no unrelated multi-clause functions, no GenServer for pure
   computation, no agent-as-global-state, no `try/rescue` for control flow,
   no `Application.get_env` in hot paths (read at init).

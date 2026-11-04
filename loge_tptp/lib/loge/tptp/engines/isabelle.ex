@@ -52,6 +52,9 @@ defmodule Loge.Tptp.Engines.Isabelle do
   def config_schema, do: Backend.config_schema(Isabelle)
 
   @impl true
+  def configure(settings), do: Backend.configure(Isabelle, settings)
+
+  @impl true
   def verify(options), do: Isabelle.verify(options)
 
   @impl true

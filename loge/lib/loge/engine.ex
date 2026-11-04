@@ -26,6 +26,12 @@ defmodule Loge.Engine do
   @doc "Settings that hold across runs, such as credentials and binary paths."
   @callback config_schema() :: [Loge.Config.Field.t()]
 
+  @doc """
+  Makes `settings`, keys of `config_schema/0`, the engine's settings for later runs.
+  A run's own options still take precedence.
+  """
+  @callback configure(settings :: keyword()) :: :ok
+
   @doc "Checks with the given settings that the engine can be reached."
   @callback verify(keyword()) :: :ok | {:error, term()}
 
@@ -45,17 +51,17 @@ defmodule Loge.Engine do
   The Elixir a notebook evaluates for a run: one `Loge.run!/3` call with named
   options, which needs nothing but `loge` and the engine's package.
 
-  `includes` are variables of the notebook's binding; each is passed under
-  `:includes` by its own name, so an include names a source by the variable holding
-  it.
+  `includes` are the include names of the source (`c:Loge.Language.include_names/1`).
+  Each one that is a variable name (`Loge.Variable.parse/1`) is passed under
+  `:includes` as that variable; the others are left to the language to resolve.
 
       iex> Loge.Engine.to_source(MyEngine, "p.", time_limit_sec: 5)
       ~s|Loge.run!(MyEngine, "p.", time_limit_sec: 5)|
 
-      iex> Loge.Engine.to_source(MyEngine, "include('defs').", [], [:defs])
+      iex> Loge.Engine.to_source(MyEngine, "include('defs').", [], ["defs", "Axioms/SET001+0.ax"])
       ~s|Loge.run!(MyEngine, "include('defs').", includes: %{"defs" => defs})|
   """
-  @spec to_source(module(), binary(), keyword(), [atom()]) :: binary()
+  @spec to_source(module(), binary(), keyword(), [String.t()]) :: binary()
   def to_source(engine, source, options, includes \\ [])
       when is_binary(source) and is_list(options) and is_list(includes) do
     options = options ++ includes_option(includes)
@@ -64,9 +70,11 @@ defmodule Loge.Engine do
     |> Macro.to_string()
   end
 
-  defp includes_option([]), do: []
-
-  defp includes_option(variables) do
-    [includes: {:%{}, [], Enum.map(variables, &{Atom.to_string(&1), Macro.var(&1, nil)})}]
+  defp includes_option(names) do
+    case for {:ok, variable} <- names |> Enum.uniq() |> Enum.map(&Loge.Variable.parse/1),
+             do: {Atom.to_string(variable), Macro.var(variable, nil)} do
+      [] -> []
+      pairs -> [includes: {:%{}, [], pairs}]
+    end
   end
 end

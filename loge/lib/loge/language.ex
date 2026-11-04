@@ -23,6 +23,12 @@ defmodule Loge.Language do
   @type includes :: %{String.t() => Loge.Input.t()}
 
   @doc """
+  The names the includes in a source use, in order, whether or not they resolve. A
+  language without includes returns `[]`.
+  """
+  @callback include_names(binary()) :: [String.t()]
+
+  @doc """
   Parses and checks a source. A source that does not parse still yields an analysis.
   The `:includes` option holds the `t:includes/0` the source may include.
   """

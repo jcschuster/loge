@@ -54,17 +54,18 @@ in `kino_loge`.
 
 ### `kino_loge`
 
-- [ ] `KinoLoge.Cell` (name "Logic Engine"): managed editor, language/engine selects, controls from `controls/0`, inline diagnostics via `reconfigure_smart_cell(editor: [diagnostics:])` (resent in `handle_connect/1`; list under the editor until #3235/#522 ship), Solve = evaluate
-- [ ] `KinoLoge.ConfigCell`: form from `config_schema/0` of every registered engine; `verify/1` probe with status indicator
-- [ ] `Kino.Render` impl for `Loge.Outcome`: SZS badge + gloss + ontology link (texts from KinoAtpClient `STATUS_LABELS`), views, opt-in raw output
-- [ ] Includes: `scan_binding/3` collects variables of the cell's language; definitions cell ("no engine", bound to a variable, source `name = Loge.source(...)`); include names resolved against binding atoms
-- [ ] Debounced lint via `Loge.Run`; total `handle_event/3`; source attr persisted on every change
-- [ ] Decide: can a smart cell request its own evaluation? If not, Solve button documents the shortcut
-- [ ] Minimal JS (Kino.JS for the cell chrome only; no editor bundle)
+- [x] `KinoLoge.Cell` (name "Logic Engine"): managed editor, language/engine selects, controls from `controls/0`, diagnostics listed under the editor; state in `KinoLoge.Setup`
+- [ ] Inline diagnostics via `reconfigure_smart_cell(editor: [diagnostics:])`, resent in `handle_connect/1`, once #3235/#522 ship
+- [x] `KinoLoge.ConfigCell`: form from `config_schema/0` of every registered engine; `verify/1` probe with status indicator; `Loge.configure!/2` and the `configure/1` callback apply the settings; secrets by Livebook secret name
+- [x] `Kino.Render` impl for `Loge.Outcome`: verdict from core `Loge.Verdict` (tptp's SZS page texts), views, raw output in an Output tab
+- [x] Includes: definitions cell (no engine, `name = Loge.source(...)`); `scan_binding/3` for linting; generated includes from `include_names/1` + `Loge.Variable`
+- [x] Debounced lint via `Loge.Run` (`Loge.lint/3`); total `handle_event/3`; source attr persisted on every change
+- [x] Decided: Kino 0.19.1 has no self-evaluation API; the cell is evaluated as any cell, no Solve button
+- [x] Minimal JS (Kino.JS for the cell chrome only; no editor bundle)
 
 ### Gate
 
-- [ ] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd`
+- [ ] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd` (smoke-test notebook exists; to be checked in Livebook)
 - [ ] `grep -ri tptp kino_loge/lib` returns nothing
 - [ ] Publish `loge`, `loge_tptp`, `kino_loge` 0.1.0; KinoAtpClient README points here
 
@@ -140,7 +141,7 @@ in `kino_loge`.
 
 ## Open questions
 
-- [ ] Smart-cell self-evaluation API in Kino: exists or not?
+- [x] Smart-cell self-evaluation API in Kino: does not exist (0.19.1)
 - [ ] SZS vocabulary for non-ATP outcomes (egglog check, Prolog goal, bindings)
 - [ ] Livebook maintainers' stance on smart-cell-only languages (`diagnostics`: line/column, settled in #3235/#522)
 - [ ] `codemirror-lang-prolog` SWI coverage

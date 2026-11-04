@@ -14,6 +14,11 @@ defmodule Loge.Fake.Language do
   def editor_language, do: nil
 
   @impl true
+  def include_names(source) do
+    for [_, name] <- Regex.scan(~r/include\((\w+)\)/, source), do: name
+  end
+
+  @impl true
   def analyze(source, _options) do
     diagnostics =
       if source == "", do: [Diagnostic.new("FAKE0001", :warning, Range.new(1), "empty")], else: []
@@ -150,6 +155,9 @@ defmodule Loge.Fake.Engine do
   end
 
   @impl true
+  def configure(settings), do: Application.put_env(:loge, __MODULE__, settings)
+
+  @impl true
   def format_error(:missing_token), do: "no token configured"
 end
 
@@ -171,6 +179,8 @@ defmodule Loge.Fake.FailingEngine do
   def controls, do: []
   @impl true
   def run(_input, options), do: {:error, {:refused, Keyword.fetch!(options, :why)}}
+  @impl true
+  def configure(_settings), do: :ok
   @impl true
   def format_error({:refused, why}), do: "refused: " <> why
 end

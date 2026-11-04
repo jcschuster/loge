@@ -1,0 +1,118 @@
+# Loge: TPTP smoke test
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_tptp, path: Path.join(root, "loge_tptp")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+## Settings
+
+Nothing to set for SystemOnTPTP. To try another engine, fill in its fields and press
+**Verify**; a password field takes the name of a Livebook secret, not the password.
+
+<!-- livebook:{"attrs":"eyJ2YWx1ZXMiOnt9fQ","chunks":null,"kind":"Elixir.KinoLoge.ConfigCell","livebook_object":"smart_cell"} -->
+
+```elixir
+:ok
+```
+
+## Definitions
+
+A Logic Engine cell with no engine, bound to `set_theory`. Later cells include it by name.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOm51bGwsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJzb3VyY2UiOiJmb2Yoc3Vic2V0LCBheGlvbSwgIVtBLCBCXTogKHN1YnNldChBLCBCKSA8PT4gIVtYXTogKG1lbWJlcihYLCBBKSA9PiBtZW1iZXIoWCwgQikpKSkuXG5mb2YoZXF1YWxfc2V0LCBheGlvbSwgIVtBLCBCXTogKGVxdWFsX3NldChBLCBCKSA8PT4gKHN1YnNldChBLCBCKSAmIHN1YnNldChCLCBBKSkpKS5cbmZvZihpbnRlcnNlY3Rpb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIGludGVyc2VjdGlvbihBLCBCKSkgPD0+IChtZW1iZXIoWCwgQSkgJiBtZW1iZXIoWCwgQikpKSkuXG5mb2YodW5pb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIHVuaW9uKEEsIEIpKSA8PT4gKG1lbWJlcihYLCBBKSB8IG1lbWJlcihYLCBCKSkpKS4iLCJ2YXJpYWJsZSI6InNldF90aGVvcnkifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+set_theory =
+  Loge.source(
+    :tptp,
+    "fof(subset, axiom, ![A, B]: (subset(A, B) <=> ![X]: (member(X, A) => member(X, B)))).\nfof(equal_set, axiom, ![A, B]: (equal_set(A, B) <=> (subset(A, B) & subset(B, A)))).\nfof(intersection, axiom, ![X, A, B]: (member(X, intersection(A, B)) <=> (member(X, A) & member(X, B)))).\nfof(union, axiom, ![X, A, B]: (member(X, union(A, B)) <=> (member(X, A) | member(X, B))))."
+  )
+```
+
+## Including a cell
+
+Expected: **Theorem**. Edit the definitions above and this cell turns stale.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cblxuZm9mKGludGVyc2VjdGlvbl9jb21tdXRlcywgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiBlcXVhbF9zZXQoaW50ZXJzZWN0aW9uKEEsIEIpLCBpbnRlcnNlY3Rpb24oQiwgQSkpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('set_theory').\n\nfof(intersection_commutes, conjecture,\n    ![A, B]: equal_set(intersection(A, B), intersection(B, A))).",
+  system: "E",
+  time_limit_sec: 10,
+  includes: %{"set_theory" => set_theory}
+)
+```
+
+A selection includes only the named formulae. Expected: **Theorem**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknLCBbc3Vic2V0LCB1bmlvbl0pLlxuXG5mb2YodW5pb25fdXBwZXJfYm91bmQsIGNvbmplY3R1cmUsICFbQSwgQl06IHN1YnNldChBLCB1bmlvbihBLCBCKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('set_theory', [subset, union]).\n\nfof(union_upper_bound, conjecture, ![A, B]: subset(A, union(A, B))).",
+  system: "E",
+  time_limit_sec: 10,
+  includes: %{"set_theory" => set_theory}
+)
+```
+
+## Including the TPTP library
+
+A name that is not a cell is fetched from tptp.org (cached under `~/.cache/tptp`).
+Expected: **Theorem**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ0F4aW9tcy9TRVQwMDYrMC5heCcpLlxuXG5mb2YocG93ZXJfc2V0X29mX3N1YnNldCwgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiAoc3Vic2V0KEEsIEIpID0+IHN1YnNldChwb3dlcl9zZXQoQSksIHBvd2VyX3NldChCKSkpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('Axioms/SET006+0.ax').\n\nfof(power_set_of_subset, conjecture,\n    ![A, B]: (subset(A, B) => subset(power_set(A), power_set(B)))).",
+  system: "E",
+  time_limit_sec: 10
+)
+```
+
+## A false conjecture
+
+Expected: **CounterSatisfiable** (or **GaveUp**/**Timeout**, depending on the system).
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cblxuZm9mKHVuaW9uX2lzX2ludGVyc2VjdGlvbiwgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiBlcXVhbF9zZXQodW5pb24oQSwgQiksIGludGVyc2VjdGlvbihBLCBCKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('set_theory').\n\nfof(union_is_intersection, conjecture,\n    ![A, B]: equal_set(union(A, B), intersection(A, B))).",
+  system: "Vampire",
+  time_limit_sec: 10,
+  includes: %{"set_theory" => set_theory}
+)
+```
+
+## Diagnostics
+
+The list under the editor should show: `no_such_cell` cannot be resolved (line 2),
+`subset` names two statements (line 4, the first one is inside `set_theory`), the
+unfinished last statement (line 5), and, on the include of `set_theory`, that it has no
+conjecture. Evaluating fails with `undefined variable "no_such_cell"`: an include that
+names a variable is a reference to it.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cbmluY2x1ZGUoJ25vX3N1Y2hfY2VsbCcpLlxuXG5mb2Yoc3Vic2V0LCBheGlvbSwgJHRydWUpLlxuZm9mKHVuZmluaXNoZWQsIGNvbmplY3R1cmUsICFbQV06IHN1YnNldChBLCBBKSIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('set_theory').\ninclude('no_such_cell').\n\nfof(subset, axiom, $true).\nfof(unfinished, conjecture, ![A]: subset(A, A)",
+  system: "E",
+  time_limit_sec: 10,
+  includes: %{"set_theory" => set_theory, "no_such_cell" => no_such_cell}
+)
+```

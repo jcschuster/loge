@@ -25,6 +25,9 @@ defmodule Loge.Tptp.Engines.LocalExec do
   def config_schema, do: Backend.config_schema(LocalExec)
 
   @impl true
+  def configure(settings), do: Backend.configure(LocalExec, settings)
+
+  @impl true
   def verify(options), do: LocalExec.verify(options)
 
   @impl true

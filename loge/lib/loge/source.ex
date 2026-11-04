@@ -14,6 +14,29 @@ defmodule Loge.Source do
 
   @typedoc "Text and the id of the language it is written in."
   @type t :: %__MODULE__{language: atom(), text: binary()}
+
+  @doc """
+  The Elixir a notebook evaluates for a cell that defines a source: a
+  `Loge.source/2` call, bound to `variable` unless it is empty. Raises
+  `ArgumentError` when `variable` is not a variable name.
+
+      iex> Loge.Source.to_source(:tptp, "fof(a, axiom, p).", "defs")
+      ~s|defs = Loge.source(:tptp, "fof(a, axiom, p).")|
+  """
+  @spec to_source(atom(), binary(), String.t()) :: binary()
+  def to_source(language, text, variable) when is_atom(language) and is_binary(text) do
+    call = quote(do: Loge.source(unquote(language), unquote(text)))
+    variable |> bind(call) |> Macro.to_string()
+  end
+
+  defp bind("", call), do: call
+
+  defp bind(variable, call) do
+    case Loge.Variable.parse(variable) do
+      {:ok, name} -> quote(do: unquote(Macro.var(name, nil)) = unquote(call))
+      :error -> raise ArgumentError, "not a variable name: #{inspect(variable)}"
+    end
+  end
 end
 
 defimpl Loge.Input, for: Loge.Source do

@@ -20,6 +20,10 @@ defmodule Loge.StructsTest do
     assert %Control{key: :k, type: :text, label: "K"}.choices == []
   end
 
+  test "the fake language names its includes" do
+    assert Loge.Fake.Language.include_names("include(a) p. include(b)") == ["a", "b"]
+  end
+
   test "the fake modules implement the behaviours" do
     assert Loge.Fake.Language.analyze("", []).diagnostics |> length() == 1
     assert Loge.Fake.Engine.verify(token: "t") == :ok

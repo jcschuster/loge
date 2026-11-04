@@ -30,6 +30,15 @@ defmodule Loge.Tptp.LanguageTest do
              Language.analyze("fof(a, conjecture, p).\nfof(b, axiom, ", [])
   end
 
+  test "names the includes a source uses" do
+    source = "include('defs').\nfof(a, axiom, p).\ninclude('Axioms/SET001+0.ax', [x])."
+    assert Language.include_names(source) == ["defs", "Axioms/SET001+0.ax"]
+  end
+
+  test "names the includes of a source that does not parse to the end" do
+    assert Language.include_names("include('defs').\nfof(a, axiom, ") == ["defs"]
+  end
+
   describe "includes" do
     @library {Tptp.Resolver.Map, files: %{"Axioms/SET001+0.ax" => "fof(lib, axiom, s)."}}
 

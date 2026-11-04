@@ -25,6 +25,14 @@ defmodule Loge.Tptp.Language do
   def editor_language, do: "tptp"
 
   @impl true
+  def include_names(source) when is_binary(source) do
+    {:ok, %Tptp.File{statements: statements}, _diagnostics} = Tptp.from_string(source)
+
+    for %Tptp.Statement.Include{} = include <- statements,
+        do: Tptp.Statement.Include.path(include)
+  end
+
+  @impl true
   def analyze(source, options) when is_binary(source) do
     {includes, options} = Keyword.pop(options, :includes, %{})
     {library, options} = Keyword.pop(options, :library, Tptp.Resolver.Http)

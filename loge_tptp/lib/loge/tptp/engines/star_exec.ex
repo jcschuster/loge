@@ -25,6 +25,9 @@ defmodule Loge.Tptp.Engines.StarExec do
   def config_schema, do: Backend.config_schema(StarExec)
 
   @impl true
+  def configure(settings), do: Backend.configure(StarExec, settings)
+
+  @impl true
   def verify(options), do: StarExec.verify(options)
 
   @impl true

@@ -16,7 +16,7 @@ This file is the design reference. `PLAN.md` holds the phased execution plan.
 | Positions         | Diagnostics carry line/column ranges in Kino's smart-cell diagnostics format (kino#522): 1-based, columns in UTF-16 code units.                |
 | Linting / solving | Extensible from Elixir through behaviours; each language is its own Hex package.                                                               |
 | Verdicts          | Every `Loge.Outcome` carries an SZS status (`Tptp.Szs.Ontology.t()`).                                                                          |
-| Solve button      | Triggers cell evaluation of the generated source. Highlighted raw output is an opt-in checkbox.                                                |
+| Solve             | Livebook's own cell evaluation (Kino has no API for a cell to evaluate itself). Raw output is the outcome's Output tab.                          |
 | Input             | `Loge.Input` protocol (mirrors `AtpClient.Input`).                                                                                             |
 | Minimum Elixir    | `~> 1.20`.                                                                                                                                     |
 | Naming            | Hex package name = module namespace: `loge` → `Loge`, `loge_tptp` → `Loge.Tptp`, `kino_loge` → `KinoLoge`.                                     |
@@ -85,6 +85,7 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 @callback label() :: String.t()
 @callback languages() :: [atom()]              # language ids it accepts
 @callback config_schema() :: [Loge.Config.Field.t()]   # cross-cutting settings (credentials, binaries)
+@callback configure(keyword()) :: :ok                  # makes settings the engine's for later runs
 @callback verify(keyword()) :: :ok | {:error, term()}  # reachability probe
 @callback controls() :: [Loge.Control.t()]    # per-run controls rendered by the cell
 @callback run(Loge.Input.t(), keyword()) :: {:ok, Loge.Outcome.t()} | {:error, term()}
@@ -92,7 +93,9 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 @callback session() :: module() | nil          # optional; phase 3, see §5
 ```
 
-`Loge.run!/3` calls `run/2` and returns the outcome or raises `Loge.Error`, whose message
+`Loge.configure!/2` checks the keys against `config_schema/0` and calls `configure/1`; the
+TPTP engines merge the settings into `:atp_client`'s application environment under the
+backend's `config_key/0`. `Loge.run!/3` calls `run/2` and returns the outcome or raises `Loge.Error`, whose message
 is the engine's `format_error/1`. `Loge.Engine.to_source(engine, source, options, includes)`
 renders `Loge.run!(Engine, "source", key: value, includes: %{"defs" => defs})`, the one call
 the cell evaluates; it is the same for every engine, so it is a core function, not a
@@ -180,32 +183,42 @@ work and so honours the engine cancellation contract.
 ## 4. Data flow in the cell (`kino_loge`)
 
 ```
-bind  → scan_binding/3 → variables whose Loge.Input.language/1 is the cell's language
-      → their names (and texts, for linting) sent to the cell server
-edit  → handle_editor_change/2 → Language.analyze(includes:) + Analyzer.run_all → [Diagnostic]
-      → reconfigure_smart_cell(ctx, editor: [diagnostics: [...]]) → inline in the editor
-        (livebook#3235 / kino#522; until they ship, a list under the editor)
-Solve → Loge.Engine.to_source/4 → Loge.run!(..., includes: %{"defs" => defs}) → evaluated
-      by Livebook → Outcome. Referencing the variable makes Livebook mark the cell stale
-      when the defining cell changes.
-      → Kino.Render impl for Loge.Outcome: SZS badge with gloss, views, opt-in raw text
+bind  → scan_binding/3 → every bound Loge.Input with a language, as Loge.Source
+      → the cell keeps those of its language, for linting only
+edit  → handle_editor_change/2 → debounced (300 ms) Loge.lint/3 under Loge.Run
+      → diagnostics in Kino's editor format, listed under the editor; inline once
+        reconfigure_smart_cell(editor: [diagnostics:]) ships (livebook#3235 / kino#522)
+eval  → KinoLoge.Setup.to_source/1 → Loge.run!(..., includes: %{"defs" => defs}), or
+        `defs = Loge.source(:lang, "...")` for a definitions cell → Outcome
+      → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name, mnemonic, description in
+        the tone's colour, SZS link; then the views), Output tab (raw output)
 ```
 
 Only `to_attrs/1` output is persisted (base64 JSON in the `.livemd`). The generated source
 must run without `kino_loge`: one engine call with named options, no helper modules.
 
+The generated source is a function of the attrs alone. Includes come from the source text
+(`c:Loge.Language.include_names/1`), not from the binding: `scan_binding/3` runs
+asynchronously after the parents evaluate (Livebook `runtime_server.ex`,
+`scan_binding_after_evaluation/2`), so source derived from it could lag the evaluation.
+Each include name that `Loge.Variable.parse/1` accepts becomes a variable reference; a
+missing one is Elixir's "undefined variable". Ids, control keys and select choices in attrs
+are matched by their string form (`KinoLoge.Setup`); no atom is made from them.
+
 Cells:
 
-- `KinoLoge.Cell` ("Logic Engine"): language select → engine select (`engines_for/1`)
-  → controls from `controls/0` → managed editor (`editor: [source:, language:
-Language.editor_language()]`) → diagnostics list → Solve.
-- `KinoLoge.ConfigCell`: form generated from every registered engine's `config_schema/0`,
-  with a per-engine availability probe (`verify/1`). Generalises
-  `KinoAtpClient.BackendConfig`.
-
-Persisted include names are strings; they are matched against the atoms `scan_binding/3`
-reports, never converted with `String.to_atom/1`. Kino asks `scan_binding/3` to stay light
-and send metadata, so only sources of the cell's language are sent.
+- `KinoLoge.Cell` ("Logic Engine"): language select → engine select (`engines_for/1`, or
+  none for a definitions cell with a variable) → controls from `controls/0` → managed editor
+  (`editor: [source:, language: Language.editor_language()]`) → diagnostics list. Kino cannot
+  reconfigure the editor language, so a language change is highlighted after the cell
+  restarts.
+- `KinoLoge.ConfigCell` ("Logic Engine Settings"): form generated from every registered
+  engine's `config_schema/0`, grouped by field group, with a per-engine probe (`verify/1`
+  under `Loge.Run`). Its source is one `Loge.configure!/2` call per engine with values.
+  A `secret?` field holds a Livebook secret name; the source reads
+  `System.fetch_env!("LB_<name>")`, as Livebook exposes secrets to the runtime
+  (`session.ex`, `set_runtime_secrets/2`), so no secret is written into the notebook.
+  Generalises `KinoAtpClient.BackendConfig`, without its directory browser.
 
 Robustness: `handle_event/3` must be total (no `String.to_existing_atom/1` on untrusted
 keys); persist the source attr on every change; supervised unlinked tasks only.

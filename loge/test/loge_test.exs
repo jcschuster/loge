@@ -1,5 +1,5 @@
 defmodule LogeTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Loge.Fake
 
@@ -17,6 +17,33 @@ defmodule LogeTest do
       assert error.engine == Fake.FailingEngine
       assert error.reason == {:refused, "busy"}
       assert Exception.message(error) == "refused: busy"
+    end
+  end
+
+  describe "lint/3" do
+    test "the language's diagnostics followed by those of its registered analyzers" do
+      :ok = Loge.register(Fake.Analyzer)
+
+      assert [%Loge.Diagnostic{code: "FAKE0001"}, %Loge.Diagnostic{code: "FAKE0002"} | _] =
+               Loge.lint(Fake.Language, "", [])
+    end
+
+    test "passes the analyzers their options" do
+      :ok = Loge.register(Fake.Analyzer)
+      diagnostics = Loge.lint(Fake.Language, "src", analyzers: [fake_analyzer: [say: "hi"]])
+
+      assert %Loge.Diagnostic{message: "hi"} = Enum.find(diagnostics, &(&1.code == "FAKE0002"))
+    end
+  end
+
+  describe "configure!/2" do
+    test "hands the engine its settings" do
+      assert :ok = Loge.configure!(Fake.Engine, token: "t")
+      assert Application.get_env(:loge, Fake.Engine) == [token: "t"]
+    end
+
+    test "rejects a key the engine's schema does not name" do
+      assert_raise ArgumentError, ~r/:tokn/, fn -> Loge.configure!(Fake.Engine, tokn: "t") end
     end
   end
 end

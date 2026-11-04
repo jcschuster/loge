@@ -23,7 +23,7 @@ defmodule Loge.EngineTest do
   end
 
   test "to_source/4 passes include variables by their names" do
-    assert Loge.Engine.to_source(Loge.Fake.Engine, "p.", [mode: :a], [:set_theory, :groups]) ==
+    assert Loge.Engine.to_source(Loge.Fake.Engine, "p.", [mode: :a], ["set_theory", "groups"]) ==
              """
              Loge.run!(Loge.Fake.Engine, "p.",
                mode: :a,
@@ -35,9 +35,18 @@ defmodule Loge.EngineTest do
   test "the generated source reads the include variables from the binding", %{test: name} do
     Process.register(self(), name)
     send(self(), :finish)
-    source = Loge.Engine.to_source(Loge.Fake.Engine, "p.", [notify: name], [:defs])
+    source = Loge.Engine.to_source(Loge.Fake.Engine, "p.", [notify: name], ["defs"])
 
     assert {%Loge.Outcome{details: %{includes: %{"defs" => "q."}}}, _binding} =
              Code.eval_string(source, defs: "q.")
+  end
+
+  test "to_source/4 leaves out include names that are not variable names" do
+    assert Loge.Engine.to_source(Loge.Fake.Engine, "p.", [], [
+             "Axioms/SET001+0.ax",
+             "defs",
+             "defs"
+           ]) ==
+             ~s|Loge.run!(Loge.Fake.Engine, "p.", includes: %{"defs" => defs})|
   end
 end
