@@ -8,7 +8,7 @@ defmodule KinoLoge.ConfigCell do
   `KinoLoge.Settings` for how secrets are kept out of the notebook.
   """
 
-  use Kino.JS, assets_path: "lib/assets/config_cell"
+  use Kino.JS, assets_path: "lib/assets", entrypoint: "config_cell.js"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Logic Engine Settings"
 

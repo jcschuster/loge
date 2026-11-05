@@ -1,3 +1,3 @@
 # Loge
 
-Logic engines for Livebook.
+Loge [ˈloːʒə] is a collection of **log**ic **e**ngines for Elixir.

@@ -213,9 +213,11 @@ Cells:
   reconfigure the editor language, so a language change is highlighted after the cell
   restarts.
 - `KinoLoge.ConfigCell` ("Logic Engine Settings"): form generated from every registered
-  engine's `config_schema/0`, grouped by field group, with a per-engine probe (`verify/1`
-  under `Loge.Run`). Its source is one `Loge.configure!/2` call per engine with values.
-  A `secret?` field holds a Livebook secret name; the source reads
+  engine's `config_schema/0`, one engine shown at a time, grouped by field group
+  (`:advanced` collapsed), with a per-engine probe (`verify/1` under `Loge.Run`). Its
+  source is one `Loge.configure!/2` call per engine with values. A `secret?` field holds
+  a Livebook secret name, typed or chosen with Livebook's picker (`ctx.selectSecret`); the
+  source reads
   `System.fetch_env!("LB_<name>")`, as Livebook exposes secrets to the runtime
   (`session.ex`, `set_runtime_secrets/2`), so no secret is written into the notebook.
   Generalises `KinoAtpClient.BackendConfig`, without its directory browser.

@@ -12,7 +12,7 @@ defmodule KinoLoge.Cell do
   listed under the editor.
   """
 
-  use Kino.JS, assets_path: "lib/assets/cell"
+  use Kino.JS, assets_path: "lib/assets", entrypoint: "cell.js"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Logic Engine"
 
