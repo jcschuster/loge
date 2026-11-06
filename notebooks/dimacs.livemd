@@ -14,28 +14,28 @@ Mix.install([
 
 Expected: **Satisfiable**, one model, `1 -2 3`.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxfSwic291cmNlIjoiYyB4MSwgbm90IHgyLCB4MiBvciB4M1xucCBjbmYgMyAzXG4xIDBcbi0yIDBcbjIgMyAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJjIHgxLCBub3QgeDIsIHgyIG9yIHgzXG5wIGNuZiAzIDNcbjEgMFxuLTIgMFxuMiAzIDBcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clingo, "c x1, not x2, x2 or x3\np cnf 3 3\n1 0\n-2 0\n2 3 0\n",
+Loge.run!(Loge.Dimacs.Engines.Clasp, "c x1, not x2, x2 or x3\np cnf 3 3\n1 0\n-2 0\n2 3 0\n",
   models: 1
 )
 ```
 
 Models `0` enumerates all of them. Expected: **Satisfiable**, three models.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjowfSwic291cmNlIjoicCBjbmYgMiAxXG4xIDIgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjB9LCJzb3VyY2UiOiJwIGNuZiAyIDFcbjEgMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clingo, "p cnf 2 1\n1 2 0\n", models: 0)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 1\n1 2 0\n", models: 0)
 ```
 
 Expected: **Unsatisfiable**, no models.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxfSwic291cmNlIjoicCBjbmYgMSAyXG4xIDBcbi0xIDBcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJwIGNuZiAxIDJcbjEgMFxuLTEgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clingo, "p cnf 1 2\n1 0\n-1 0\n", models: 1)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 1 2\n1 0\n-1 0\n", models: 1)
 ```
 
 ## Linting
@@ -43,9 +43,9 @@ Loge.run!(Loge.Dimacs.Engines.Clingo, "p cnf 1 2\n1 0\n-1 0\n", models: 1)
 Expected: under the editor, variable 4 exceeds the header and the clause count
 differs from it; evaluating raises `Loge.Error` with both findings.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxfSwic291cmNlIjoicCBjbmYgMyAzXG4xIC00IDBcbjIgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJwIGNuZiAzIDNcbjEgLTQgMFxuMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clingo, "p cnf 3 3\n1 -4 0\n2 0\n", models: 1)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 3 3\n1 -4 0\n2 0\n", models: 1)
 ```
 

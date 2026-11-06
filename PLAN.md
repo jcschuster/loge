@@ -14,7 +14,8 @@ Open these first; every item has a fallback inside Loge.
 | livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs                                    | —                                                            | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open |
 | livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile                               | plain-text editor for TPTP                                   | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), open |
 | livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                                              | —                                                            | [ ]    |
-| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | `Control.new!(logger:)` + `add!` + `ground!`                 | [ ]    |
+| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | not needed: `loge_asp` lints through the executable            | [ ]    |
+| davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so | report | `loge_asp` runs the executable | [ ] |
 | davfuenmayor/egglog_elixir | Return spans structurally from the NIF: `ParseError(Span::Egglog{i,j}, msg)` → `{:error, {:invalid_theory, msg, %{from: i, to: j}}}`; same for span-carrying type errors                                                                                                                                                                                                                            | ~40 lines Rust in `native/egglog_nif/src/error.rs` | regex on `In L:C-C2:` / `In L:C-L2:C2:`                      | [ ]    |
 | davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog                                       | not needed (lint via `SWI.query`)                            | [ ]    |
 | davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only) | release | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI | [ ] |
@@ -76,19 +77,23 @@ in `kino_loge`.
 ### `loge_dimacs`
 
 - [x] Lexer/linter in Elixir (header, clause terminators, variable range) with offsets: `Loge.Dimacs.Cnf.parse/1`, codes `DIMACS001`–`DIMACS007`
-- [x] Engine `Loge.Dimacs.Engines.Clingo` (`Clingo.Dimacs.solve!` on the formula as `Loge.Dimacs.Cnf` renders it; `models` control, `0` for all); cancellation tested
+- [x] Engine `Loge.Dimacs.Engines.Clasp` (`Clingo.Dimacs.solve!` on the formula as `Loge.Dimacs.Cnf` renders it; `models` control, `0` for all); cancellation tested
 - [ ] Engine `Loge.Dimacs.Engines.Picosat`: blocked on the picosat_elixir row of phase 0 (no cancellation)
 - [x] SZS mapping: satisfiable/unsatisfiable/unknown + `{:models, …}` view (a literal per variable); raw output in SAT competition format
 
 ### `loge_asp`
 
-- [ ] Linter: `Control.new!(logger:)` + `add!` + `ground!`; regex `^<block>:(\d+):(\d+)(?:-(?:(\d+):)?(\d+))?: (error|warning|info): (.*)` → diagnostics (multi-line bodies joined)
-- [ ] Engine over `Clingo.solve!/2` with `models:` control; models view
-- [ ] `to_source/2`
+- [x] Linter: grounding by the bundled `clingo` executable (`--outf=3 --solve-limit=0 --time-limit=10`), not the NIF (OUTLINE §6); `Loge.Asp.Messages` reads its messages, `note:` lines as related positions, codes from clingo's `--warn` classes
+- [x] `Loge.Asp.Executable`: Port + guardian killing clingo with its caller; tested against an endless grounding
+- [x] Engine `Loge.Asp.Engines.Clingo` (`--outf=2`): `models` control (unset: clingo's default, which runs an optimisation to its optimum), `time_limit` (`:timeout`); models view of shown atoms
+- [x] `to_source/2`: covered by core `Loge.Engine.to_source/4`
+- [x] Engine ids unique across packages: the DIMACS engine is `Loge.Dimacs.Engines.Clasp` (`:clasp`)
+- [ ] Includes: `#include` resolves files only; a definitions cell cannot be included yet (needs a language-side resolution like TPTP's)
+- [ ] Highlighting: none in Livebook (`editor_language/0` is `nil`)
 
 ### Gate
 
-- [ ] A second language works with one added dependency and no change to `loge` or `kino_loge` (DIMACS: `notebooks/dimacs.livemd`'s cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
+- [ ] A second language works with one added dependency and no change to `loge` or `kino_loge` (ASP needed one language-neutral fix in `kino_loge`: an empty integer field unsets a control without a default. Both: `notebooks/dimacs.livemd` and `notebooks/asp.livemd` cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
 
 ## Phase 3 — Sessions: Prolog, egglog
 
@@ -141,6 +146,7 @@ in `kino_loge`.
 - [ ] `notebooks/<language>.livemd` template per language with a pinned `Mix.install`
 - [ ] CI matrix: package × {ubuntu x86_64, ubuntu aarch64, macos}; NIF-bundled engines (clingo, SWI) exercised per OS
 - [ ] Clean-machine smoke test before each course
+- [ ] Phase 4 (first Port-only engines): move `Loge.Asp.Executable`'s guardian into `loge` as the shared way to run an OS process that dies with its caller; then consider running DIMACS through the `clingo` executable too (clasp's own DIMACS reader, cancellable grounding)
 
 ## Open questions
 
@@ -148,5 +154,5 @@ in `kino_loge`.
 - [ ] SZS vocabulary for non-ATP outcomes (egglog check, Prolog goal, bindings)
 - [ ] Livebook maintainers' stance on smart-cell-only languages (`diagnostics`: line/column, settled in #3235/#522)
 - [ ] `codemirror-lang-prolog` SWI coverage
-- [ ] Exact clingo message text at runtime (read from source only)
+- [x] Exact clingo message text at runtime: observed, OUTLINE §6
 - [ ] setup-beam elixir/OTP pair for 1.20 in CI

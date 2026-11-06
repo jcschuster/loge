@@ -101,7 +101,10 @@ defmodule KinoLoge.Setup do
     end
   end
 
-  @doc "Sets the control whose key is `key` to `value`, if the value suits the control."
+  @doc """
+  Sets the control whose key is `key` to `value`, if the value suits the control. An
+  empty integer field unsets a control without a default.
+  """
   @spec put_option(t(), String.t(), term()) :: t()
   def put_option(%__MODULE__{engine: nil} = setup, _key, _value), do: setup
 
@@ -150,6 +153,7 @@ defmodule KinoLoge.Setup do
   defp options(engine, _stored), do: options(engine, %{})
 
   defp cast(%Control{type: :integer}, value) when is_integer(value), do: {:ok, value}
+  defp cast(%Control{type: :integer, default: nil}, ""), do: {:ok, nil}
 
   defp cast(%Control{type: :integer}, value) when is_binary(value) do
     case Integer.parse(value) do

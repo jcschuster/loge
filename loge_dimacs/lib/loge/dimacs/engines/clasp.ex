@@ -1,4 +1,4 @@
-defmodule Loge.Dimacs.Engines.Clingo do
+defmodule Loge.Dimacs.Engines.Clasp do
   @moduledoc """
   The clasp solver bundled with `clingo_elixir`, over `Clingo.Dimacs.solve!/2`.
 
@@ -6,7 +6,8 @@ defmodule Loge.Dimacs.Engines.Clingo do
   `:models` option is the number of models to find, `0` for all, as clasp's `-n`.
   The outcome's raw output is in the SAT competition format, one `v` line per model,
   and its `{:models, models}` view lists each model as a literal for every variable.
-  A cancelled run aborts the solver.
+  A cancelled run aborts the search; grounding the translated formula, which is linear
+  in its size, runs to its end first.
   """
 
   @behaviour Loge.Engine
@@ -15,10 +16,10 @@ defmodule Loge.Dimacs.Engines.Clingo do
   alias Loge.Dimacs.Cnf
 
   @impl true
-  def id, do: :clingo
+  def id, do: :clasp
 
   @impl true
-  def label, do: "clasp (clingo)"
+  def label, do: "clasp"
 
   @impl true
   def languages, do: [:dimacs]

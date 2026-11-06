@@ -113,6 +113,7 @@ defmodule KinoLoge.Fake.Engine do
       },
       %Control{key: :mode, type: :select, label: "Mode", choices: [:fast, :slow], default: :fast},
       %Control{key: :limit, type: :integer, label: "Limit", default: 5},
+      %Control{key: :count, type: :integer, label: "Count"},
       %Control{key: :method, type: :text, label: "Method", choices: ["by auto"]},
       %Control{key: :verbose, type: :boolean, label: "Verbose", default: false}
     ]

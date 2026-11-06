@@ -9,7 +9,16 @@ defmodule KinoLoge.SetupTest do
 
     assert setup.language == Fake.Language
     assert setup.engine == Fake.Engine
-    assert setup.options == [system: "A", mode: :fast, limit: 5, method: nil, verbose: false]
+
+    assert setup.options == [
+             system: "A",
+             mode: :fast,
+             limit: 5,
+             count: nil,
+             method: nil,
+             verbose: false
+           ]
+
     assert setup.source == ""
   end
 
@@ -74,9 +83,17 @@ defmodule KinoLoge.SetupTest do
       assert Setup.put_option(setup, "mode", "slow").options[:mode] == :slow
     end
 
+    test "an empty integer field unsets a control without a default", %{setup: setup} do
+      setup = Setup.put_option(setup, "count", "3")
+
+      assert setup.options[:count] == 3
+      assert Setup.put_option(setup, "count", "").options[:count] == nil
+    end
+
     test "ignores a value outside the control's type or choices", %{setup: setup} do
       for {key, value} <- [
             {"limit", "7x"},
+            {"limit", ""},
             {"verbose", "yes"},
             {"system", "C"},
             {"mode", "medium"},

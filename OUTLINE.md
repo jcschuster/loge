@@ -81,7 +81,7 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 ### `Loge.Engine` (behaviour; generalises `AtpClient.Backend`)
 
 ```elixir
-@callback id() :: atom()                       # :sotptp, :clingo, ...
+@callback id() :: atom()                       # :sotptp, :clingo, ...; unique among registered engines
 @callback label() :: String.t()
 @callback languages() :: [atom()]              # language ids it accepts
 @callback config_schema() :: [Loge.Config.Field.t()]   # cross-cutting settings (credentials, binaries)
@@ -243,7 +243,7 @@ All read from source, not executed. Links in §8.
 | Tool                 | Positions come from                                                                                                                                               | Message shape                                                                        | Line/col base                        | Count                                                             | Severities                                                                        |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | tptp                 | `Tptp.Diagnostic` byte spans                                                                                                                                      | structured                                                                           | offsets                              | all                                                               | error/warning/info/hint                                                           |
-| clingo 5.8.2         | logger callback (`logger:` option on `Clingo.solve!`/`Control.new!`); API-added programs are file `<block>`                                                       | `<block>:L:C[-C2 \| -L2:C2]: error\|warning\|info: msg` (multi-line bodies possible) | 1/1                                  | all, capped by `message_limit` (clingo_elixir passes 20)          | error, warning, info                                                              |
+| clingo 5.8.2 (executed) | stderr of the bundled `clingo` executable (`--outf=3 --solve-limit=0`), the same text the `logger:` callback receives; the file is the one clingo read | `<file>:L:C-[L2:]C2: error\|warning\|info: msg`, body lines indented by two spaces, then `note:` lines with their own positions; a closing `*** ERROR: (clingo): …` summary | 1/1, bytes, end exclusive | all, capped by `message_limit` | error, warning, info; a grounding error stops before the infos of the rest |
 | egglog (rev b912caa) | `Egglog.parse/1` → `{:error, {:invalid_theory, msg}}`; run errors `{:error, {:native_error, msg}}`                                                                | `In L:C-C2: <quote>\nparse error: msg` or `In L:C-L2:C2: …`; type errors `In …\nmsg` | 1/1, char-counted, end inclusive     | first only                                                        | error                                                                             |
 | SWI-Prolog 10.0.1    | `error(syntax_error(Culprit), Loc)`; `Loc` ∈ `file(F,Line,LinePos,CharNo)`, `stream(S,Line,LinePos,CharNo)` (incl. `open_string/2` streams), `string(Str,CharNo)` | term; the bridge serialises with `term_string/3`                                     | 1-based line, 0-based linepos/charno | all via a `read_term/3` loop; swi_elixir's `load` keeps the first | error; `singletons(Term,Names)` / `discontiguous/2` as warnings without positions |
 | z3                   | stdout                                                                                                                                                            | `(error "line L column C: msg")`, exit 1                                             | 1/0                                  | first per command                                                 | error                                                                             |
@@ -252,15 +252,25 @@ All read from source, not executed. Links in §8.
 
 Notes:
 
-- ASP lint needs `Control.new!(logger:)` + `add!` + `ground!`; grounding surfaces undefined
-  atoms and unsafe variables. `Clingo.Ast.parse!/2` passes `nil` as logger (positions lost).
+- ASP runs the `clingo` executable, not the NIF: libclingo cannot interrupt grounding, so a
+  program whose grounding does not end (`p(X+1) :- p(X).`, easily typed mid-edit) is
+  stopped only by killing its process. With the NIF, killing the session owner during
+  grounding leaves the grounder running, and the VM segfaults when the session closes under
+  it (observed with clingo_elixir 1b5d4ab). `Loge.Asp.Executable` runs it under a Port with
+  a guardian that SIGKILLs it when the caller dies; `--time-limit` bounds a clingo that
+  outlives a halted VM, which the guardian does not survive. A Port merges stderr into
+  stdout or leaves it to the BEAM's: the lint reads both (`--outf=3` writes nothing to
+  stdout); the engine reads stdout only, since clingo's stderr can land inside a JSON line.
+  On exit 65 the engine runs the lint for diagnostics. Exit codes are clasp's `ExitCode`
+  bits (1 interrupted, 10 a model, 20 exhausted, 65 error).
 - `Clingo.Dimacs.solve!/2` rewrites CNF as a choice-rule ASP program in Elixir; it does not
   call clasp's DIMACS reader, and raises `ArgumentError` on input it does not read; the
   engine sends only what `Loge.Dimacs.Cnf` accepts and renders. `picosat_elixir` and
   `simple_sat` accept clause lists only; `picosat_elixir` 0.2.3 solves on a normal
   scheduler without interrupt, so it cannot meet the cancellation contract.
 - clingo_elixir's dispatcher monitors the process that opened the session and aborts the
-  native solve when it dies (`Clingo.Dispatcher.terminate/2`), which meets the contract.
+  native search when it dies (`Clingo.Dispatcher.terminate/2`). Grounding is not aborted;
+  for a CNF, whose translation grounds in time linear in its size, it ends late but ends.
 - Prolog linting lives in Prolog: `open_string/2` + `read_term/3` with `syntax_errors(dec10)`
   under a local `message_hook`, `singletons(warning)`, `term_position`, `subterm_positions`,
   `variable_names`, `comments`, `module(M)`; run through `SWI.query`. No swi_elixir change needed.

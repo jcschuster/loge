@@ -1,8 +1,8 @@
-defmodule Loge.Dimacs.Engines.ClingoCancellationTest do
+defmodule Loge.Dimacs.Engines.ClaspCancellationTest do
   use ExUnit.Case, async: false
 
   alias Loge.Dimacs.Cnf
-  alias Loge.Dimacs.Engines.Clingo
+  alias Loge.Dimacs.Engines.Clasp
 
   defp pigeonhole(holes) do
     pigeons = holes + 1
@@ -29,7 +29,7 @@ defmodule Loge.Dimacs.Engines.ClingoCancellationTest do
     formula = pigeonhole(10)
 
     caller =
-      spawn(fn -> Loge.Run.async(fn -> Clingo.run(formula, []) end) |> Task.await(:infinity) end)
+      spawn(fn -> Loge.Run.async(fn -> Clasp.run(formula, []) end) |> Task.await(:infinity) end)
 
     assert cpu_milliseconds(500) > 300
     Process.exit(caller, :kill)
