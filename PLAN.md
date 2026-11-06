@@ -17,6 +17,8 @@ Open these first; every item has a fallback inside Loge.
 | davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | `Control.new!(logger:)` + `add!` + `ground!`                 | [ ]    |
 | davfuenmayor/egglog_elixir | Return spans structurally from the NIF: `ParseError(Span::Egglog{i,j}, msg)` → `{:error, {:invalid_theory, msg, %{from: i, to: j}}}`; same for span-carrying type errors                                                                                                                                                                                                                            | ~40 lines Rust in `native/egglog_nif/src/error.rs` | regex on `In L:C-C2:` / `In L:C-L2:C2:`                      | [ ]    |
 | davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog                                       | not needed (lint via `SWI.query`)                            | [ ]    |
+| davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only) | release | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI | [ ] |
+| bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies | small C | no Picosat engine; clasp covers DIMACS | [ ] |
 
 Not PR targets: `codemirror/legacy-modes` (ports CM5 modes only), `SirBogman/codemirror-lang-prolog`
 (fork after evaluation), potassco/clingo, egraphs-good/egglog.
@@ -66,16 +68,17 @@ in `kino_loge`.
 ### Gate
 
 - [ ] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd` (smoke-test notebook exists; to be checked in Livebook)
-- [ ] `grep -ri tptp kino_loge/lib` returns nothing
+- [x] `grep -ri tptp kino_loge/lib` returns nothing
 - [ ] Publish `loge`, `loge_tptp`, `kino_loge` 0.1.0; KinoAtpClient README points here
 
 ## Phase 2 — DIMACS, ASP (cheap breadth)
 
 ### `loge_dimacs`
 
-- [ ] Lexer/linter in Elixir (header, clause terminators, variable range) with offsets
-- [ ] Engines: `Loge.Dimacs.Engines.Clingo` (`Clingo.Dimacs.solve!`), `Loge.Dimacs.Engines.Picosat` (clause-list adapter over `picosat_elixir`)
-- [ ] SZS mapping: satisfiable/unsatisfiable + `{:models, …}` view
+- [x] Lexer/linter in Elixir (header, clause terminators, variable range) with offsets: `Loge.Dimacs.Cnf.parse/1`, codes `DIMACS001`–`DIMACS007`
+- [x] Engine `Loge.Dimacs.Engines.Clingo` (`Clingo.Dimacs.solve!` on the formula as `Loge.Dimacs.Cnf` renders it; `models` control, `0` for all); cancellation tested
+- [ ] Engine `Loge.Dimacs.Engines.Picosat`: blocked on the picosat_elixir row of phase 0 (no cancellation)
+- [x] SZS mapping: satisfiable/unsatisfiable/unknown + `{:models, …}` view (a literal per variable); raw output in SAT competition format
 
 ### `loge_asp`
 
@@ -85,7 +88,7 @@ in `kino_loge`.
 
 ### Gate
 
-- [ ] A second language works with one added dependency and no change to `loge` or `kino_loge`
+- [ ] A second language works with one added dependency and no change to `loge` or `kino_loge` (DIMACS: `notebooks/dimacs.livemd`'s cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
 
 ## Phase 3 — Sessions: Prolog, egglog
 

@@ -30,7 +30,7 @@ loge/                       this repo
   loge/                     core: behaviours, registry, structs, run supervision. Deps: tptp (SZS ontology).
   loge_tptp/                Language + analyzers + engines for TPTP. Deps: loge, tptp, atp_client.
   kino_loge/                Smart cells and Kino.Render. Deps: loge, kino.
-  loge_dimacs/  (phase 2)   Deps: loge, clingo_elixir and/or picosat_elixir.
+  loge_dimacs/  (phase 2)   Deps: loge, clingo_elixir.
   loge_asp/     (phase 2)   Deps: loge, clingo_elixir.
   loge_prolog/  (phase 3)   Deps: loge, swi_elixir.
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
@@ -255,7 +255,12 @@ Notes:
 - ASP lint needs `Control.new!(logger:)` + `add!` + `ground!`; grounding surfaces undefined
   atoms and unsafe variables. `Clingo.Ast.parse!/2` passes `nil` as logger (positions lost).
 - `Clingo.Dimacs.solve!/2` rewrites CNF as a choice-rule ASP program in Elixir; it does not
-  call clasp's DIMACS reader. `picosat_elixir` and `simple_sat` accept clause lists only.
+  call clasp's DIMACS reader, and raises `ArgumentError` on input it does not read; the
+  engine sends only what `Loge.Dimacs.Cnf` accepts and renders. `picosat_elixir` and
+  `simple_sat` accept clause lists only; `picosat_elixir` 0.2.3 solves on a normal
+  scheduler without interrupt, so it cannot meet the cancellation contract.
+- clingo_elixir's dispatcher monitors the process that opened the session and aborts the
+  native solve when it dies (`Clingo.Dispatcher.terminate/2`), which meets the contract.
 - Prolog linting lives in Prolog: `open_string/2` + `read_term/3` with `syntax_errors(dec10)`
   under a local `message_hook`, `singletons(warning)`, `term_position`, `subterm_positions`,
   `variable_names`, `comments`, `module(M)`; run through `SWI.query`. No swi_elixir change needed.
