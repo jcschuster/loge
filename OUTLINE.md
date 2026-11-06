@@ -36,7 +36,8 @@ loge/                       this repo
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
   loge_smtlib/  (phase 4)   Deps: loge only; z3/cvc5 executables via Loge.Executable.
   loge_mcp/     (phase 5)   Deps: loge + MCP transport.
-  notebooks/                one template notebook per language (pinned Mix.install).
+  notebooks/                demo.livemd (guided tour of every package), and one smoke-test
+                            notebook per language (pinned Mix.install).
   .github/workflows/ci.yml  matrix: package × {linux x86_64, linux aarch64, macos}.
 ```
 
@@ -160,7 +161,8 @@ shows the SZS verdict only when there is one.
 
 `view` is a closed set the frontend knows how to render:
 `{:text, binary, lang_id | nil}`, `{:badge, label, tone}`, `{:table, columns, rows}`,
-`{:models, [...]}`, `{:graph, dot}`, `{:diagnostics, [Loge.Diagnostic.t]}`.
+`{:models, [...]}`, `{:graph, mermaid}` (Mermaid flowchart source, drawn by `Kino.Mermaid`
+without custom JS), `{:diagnostics, [Loge.Diagnostic.t]}`.
 Adding a view kind is a core change; adding an engine is not.
 
 ### `Loge.Registry`
@@ -213,7 +215,8 @@ edit  → handle_editor_change/2 → debounced (300 ms) Loge.lint/3 under Loge.R
 eval  → KinoLoge.Setup.to_source/1 → Loge.run!(..., includes: %{"defs" => defs}), or
         `defs = Loge.source(:lang, "...")` for a definitions cell → Outcome
       → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name, mnemonic, description in
-        the tone's colour, SZS link; then the views), Output tab (raw output)
+        the tone's colour, SZS link; then the views), Output tab (raw output as terminal
+        text: monospace, at most 300 px high with scrolling, as Livebook draws stdout)
 ```
 
 Only `to_attrs/1` output is persisted (base64 JSON in the `.livemd`). The generated source

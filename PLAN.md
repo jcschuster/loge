@@ -68,6 +68,7 @@ in `kino_loge`.
 - [x] Debounced lint via `Loge.Run` (`Loge.lint/3`); total `handle_event/3`; source attr persisted on every change
 - [x] Decided: Kino 0.19.1 has no self-evaluation API; the cell is evaluated as any cell, no Solve button
 - [x] Minimal JS (Kino.JS for the cell chrome only; no editor bundle)
+- [x] Outcome rendering: raw output and text views as terminal text (monospace, bounded height); graph views drawn by `Kino.Mermaid`
 
 ### Gate
 
@@ -119,7 +120,7 @@ in `kino_loge`.
 ### `loge_egglog`
 
 - [x] Linter via `Egglog.parse/1` with its structured location (first parse error; no type errors, see phase 0)
-- [x] Engine `Loge.Egglog.Engines.Egglog` over `Egglog.Program` in a `Loge.Peer`; `{:graph, dot}` view with the `graph` control; badge `completed`/`check failed`, no SZS status; cancellation tested
+- [x] Engine `Loge.Egglog.Engines.Egglog` over `Egglog.Program` in a `Loge.Peer`; `{:graph, mermaid}` view (`Egglog.Snapshot.to_mermaid/1` of a JSON snapshot) with the `graph` control; badge `completed`/`check failed`, no SZS status; cancellation tested
 - [ ] Includes (`(include "…")`) from definitions cells
 
 ### Gate
@@ -156,6 +157,7 @@ in `kino_loge`.
 ## Cross-cutting (from day one)
 
 - [ ] `notebooks/<language>.livemd` template per language with a pinned `Mix.install`
+- [x] `notebooks/demo.livemd`: guided tour (cell anatomy, settings, TPTP with includes and local Isabelle, one puzzle in ASP/SMT-LIB/Prolog, egglog e-graph, linting, the Elixir API with a CNF built as data); imported with Livebook's own `LiveMarkdown.Import` and every cell evaluated in order (z3 from a scratch download); to be checked in Livebook
 - [ ] CI matrix: package × {ubuntu x86_64, ubuntu aarch64, macos}; NIF-bundled engines (clingo, SWI) exercised per OS
 - [ ] Clean-machine smoke test before each course
 - [x] Shared kill-with-caller in `loge`: `Loge.Executable` for command-line tools, `Loge.Guard` for processes holding a Port (`loge_prolog`, `Loge.Peer`)

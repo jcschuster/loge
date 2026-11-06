@@ -78,4 +78,3 @@ With `X` removed, `c` and `d` occur in no rule head (info).
 ```elixir
 Loge.run!(Loge.Asp.Engines.Clingo, "a :- b.\nb :- c d.\np(X) :- a.\n", time_limit: 10)
 ```
-

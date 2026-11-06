@@ -42,7 +42,7 @@ Loge.run!(
 
 What the program prints is the Output tab. Expected: **true**, Output `hello, world`.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JlZXQod29ybGQpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJncmVldChOYW1lKSA6LSBmb3JtYXQoXCJoZWxsbywgfnd-blwiLCBbTmFtZV0pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JlZXQod29ybGQpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJncmVldChOYW1lKSA6LSBmb3JtYXQoXCJoZWxsbywgfnd+blwiLCBbTmFtZV0pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(Loge.Prolog.Engines.Swipl, "greet(Name) :- format(\"hello, ~w~n\", [Name]).\n",
@@ -74,4 +74,3 @@ Loge.run!(Loge.Prolog.Engines.Swipl, "p(X) :- q(X, Y).\nq(a, b).\nr( :- s.\n",
   time_limit: 10
 )
 ```
-

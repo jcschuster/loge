@@ -41,8 +41,8 @@ defmodule Loge.Egglog.Engines.EgglogTest do
     assert raw =~ "Check failed"
   end
 
-  test "the e-graph as a Graphviz view" do
-    assert {:ok, %Outcome{views: [{:badge, _, _}, {:graph, "digraph" <> _}]}} =
+  test "the e-graph as a Mermaid flowchart" do
+    assert {:ok, %Outcome{views: [{:badge, _, _}, {:graph, "flowchart TB\n" <> _}]}} =
              Egglog.run(@math, graph: true)
   end
 

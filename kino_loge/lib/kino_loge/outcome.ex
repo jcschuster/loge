@@ -2,6 +2,8 @@ defmodule KinoLoge.Outcome do
   @moduledoc """
   A `Loge.Outcome` as kinos: a Result tab with the verdict, when the outcome has an
   SZS status, and the outcome's views, and an Output tab with the engine's raw output.
+  Raw output and text views are shown as a terminal shows them, in a monospace font;
+  a graph view is drawn by `Kino.Mermaid`.
 
   The verdict is the status's name and mnemonic in its tone's colour, its
   description, and a link to the SZS ontology. `Kino.Render` is implemented for
@@ -15,7 +17,7 @@ defmodule KinoLoge.Outcome do
   def kino(%Outcome{} = outcome) do
     Kino.Layout.tabs(
       Result: Kino.Layout.grid(verdict(outcome.szs) ++ Enum.map(outcome.views, &view/1)),
-      Output: Kino.Text.new(outcome.raw)
+      Output: Kino.Text.new(outcome.raw, terminal: true)
     )
   end
 
@@ -36,14 +38,14 @@ defmodule KinoLoge.Outcome do
     ])
   end
 
-  defp view({:text, text, _language}), do: Kino.Text.new(text)
+  defp view({:text, text, _language}), do: Kino.Text.new(text, terminal: true)
   defp view({:badge, text, tone}), do: label(text, tone)
 
   defp view({:table, columns, rows}),
     do: Kino.DataTable.new(Enum.map(rows, &row(columns, &1)), keys: columns)
 
   defp view({:models, models}), do: Kino.Tree.new(models)
-  defp view({:graph, dot}), do: Kino.Text.new(dot)
+  defp view({:graph, mermaid}), do: Kino.Mermaid.new(mermaid)
 
   defp view({:diagnostics, diagnostics}),
     do: Kino.Markdown.new(Enum.map_join(diagnostics, "\n", &item/1))

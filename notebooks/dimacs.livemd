@@ -48,4 +48,3 @@ differs from it; evaluating raises `Loge.Error` with both findings.
 ```elixir
 Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 3 3\n1 -4 0\n2 0\n", models: 1)
 ```
-

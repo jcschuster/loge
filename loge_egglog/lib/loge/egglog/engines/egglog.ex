@@ -7,8 +7,8 @@ defmodule Loge.Egglog.Engines.Egglog do
   states whether the program ran to its end, `completed`, or a `(check …)` stopped it,
   `check failed`, with egglog's message as the raw output. Otherwise the raw output is
   what the program's commands printed, such as `(extract …)`, also shown as a text
-  view. With the `:graph` option the outcome has a `{:graph, dot}` view of the final
-  e-graph.
+  view. With the `:graph` option the outcome has a `{:graph, mermaid}` view of the final
+  e-graph, each e-class a subgraph of its e-nodes (`Egglog.Snapshot.to_mermaid/1`).
 
   A program that does not parse is `{:error, {:invalid_program, diagnostics}}`, with
   the diagnostics of `Loge.Egglog.Language`; any other error egglog reports, such as a
@@ -46,7 +46,7 @@ defmodule Loge.Egglog.Engines.Egglog do
   @impl true
   def run(input, options) do
     program = input |> Loge.Input.to_iodata() |> IO.iodata_to_binary()
-    snapshot = if Keyword.get(options, :graph, false), do: :dot, else: :none
+    snapshot = if Keyword.get(options, :graph, false), do: :json, else: :none
 
     case Language.analyze(program, []).diagnostics do
       [] -> Runner |> Loge.Peer.call(:run, [program, snapshot]) |> outcome()
@@ -81,6 +81,8 @@ defmodule Loge.Egglog.Engines.Egglog do
 
   defp outcome({:error, {_reason, message}}), do: {:error, {:egglog, message}}
 
-  defp graph(%{snapshot: %{format: :dot, text: dot}}), do: [{:graph, dot}]
+  defp graph(%{snapshot: %{format: :json} = snapshot}),
+    do: [{:graph, Egglog.Snapshot.to_mermaid!(snapshot)}]
+
   defp graph(_result), do: []
 end

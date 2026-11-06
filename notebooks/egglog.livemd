@@ -24,7 +24,7 @@ Loge.run!(
 )
 ```
 
-With **Show the e-graph** on, the Result tab also has the e-graph in Graphviz DOT.
+With **Show the e-graph** on, the Result tab also draws the e-graph: each e-class a box of its e-nodes.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOnRydWV9LCJzb3VyY2UiOiIoZGF0YXR5cGUgTWF0aCAoTnVtIGk2NCkgKEFkZCBNYXRoIE1hdGgpIChNdWwgTWF0aCBNYXRoKSlcbihyZXdyaXRlIChBZGQgYSBiKSAoQWRkIGIgYSkpXG4ocmV3cml0ZSAoTXVsIGEgKE51bSAxKSkgYSlcblxuKGxldCBlIChBZGQgKE11bCAoTnVtIDIpIChOdW0gMSkpIChOdW0gMykpKVxuKHJ1biA1KVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -69,4 +69,3 @@ Expected: under the editor, a parse error at the extra `)` on line 2.
 ```elixir
 Loge.run!(Loge.Egglog.Engines.Egglog, "(datatype M (Num i64))\n(let x (Num 1)))\n", graph: false)
 ```
-

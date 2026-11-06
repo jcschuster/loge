@@ -18,8 +18,8 @@ defmodule Loge.Outcome do
 
   @typedoc """
   One renderable part of an outcome: text in an editor language (or plain), a
-  badge, a table of rows under column headings, models, a Graphviz DOT graph, or
-  diagnostics.
+  badge, a table of rows under column headings, models, a graph in Mermaid's flowchart
+  syntax (https://mermaid.js.org/syntax/flowchart.html), or diagnostics.
   """
   @type view ::
           {:text, binary(), String.t() | nil}

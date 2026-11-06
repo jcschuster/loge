@@ -10,9 +10,6 @@ Mix.install([
 ])
 ```
 
-z3 and cvc5 are not bundled: put them on `PATH`, or set their executables in a
-**Logic Engine Settings** cell.
-
 ## Solving
 
 Expected: **Satisfiable**, a model with `x` and `y` summing to 10.
@@ -54,7 +51,7 @@ Loge.run!(
 
 Expected: **Timeout** after two seconds.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoyfSwic291cmNlIjoiKHNldC1sb2dpYyBOSUEpXG4oZGVjbGFyZS1jb25zdCB4IEludClcbihkZWNsYXJlLWNvbnN0IHkgSW50KVxuKGRlY2xhcmUtY29uc3QgeiBJbnQpXG4oYXNzZXJ0IChhbmQgKD4geCAwKSAoPiB5IDApICg-IHogMCkpKVxuKGFzc2VydCAoPSAoKyAoKiB4IHggeCkgKCogeSB5IHkpKSAoKiB6IHogeikpKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoyfSwic291cmNlIjoiKHNldC1sb2dpYyBOSUEpXG4oZGVjbGFyZS1jb25zdCB4IEludClcbihkZWNsYXJlLWNvbnN0IHkgSW50KVxuKGRlY2xhcmUtY29uc3QgeiBJbnQpXG4oYXNzZXJ0IChhbmQgKD4geCAwKSAoPiB5IDApICg+IHogMCkpKVxuKGFzc2VydCAoPSAoKyAoKiB4IHggeCkgKCogeSB5IHkpKSAoKiB6IHogeikpKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
@@ -86,4 +83,3 @@ Loge.run!(Loge.Smtlib.Engines.Z3, "(declare-const x Int)\n(assert (> y 1))\n(che
   time_limit: 10
 )
 ```
-

@@ -5,11 +5,11 @@ defmodule Loge.Egglog.Runner do
   """
 
   @doc """
-  Runs `source` in a fresh `Egglog.Program`, with a Graphviz snapshot of the e-graph
-  when `snapshot` is `:dot`. Returns what `Egglog.Program.run/3` returns.
+  Runs `source` in a fresh `Egglog.Program`, with a JSON snapshot of the e-graph
+  when `snapshot` is `:json`. Returns what `Egglog.Program.run/3` returns.
   """
-  @spec run(binary(), :dot | :none) :: {:ok, map()} | {:error, term()}
-  def run(source, snapshot) when is_binary(source) and snapshot in [:dot, :none] do
+  @spec run(binary(), :json | :none) :: {:ok, map()} | {:error, term()}
+  def run(source, snapshot) when is_binary(source) and snapshot in [:json, :none] do
     Egglog.Program.with_program("", &Egglog.Program.run(&1, source, snapshot: snapshot))
   end
 end

@@ -21,7 +21,7 @@ defmodule KinoLoge.OutcomeTest do
     assert text == Verdict.of(:theorem).description
     assert %Kino.Markdown{text: markdown} = link
     assert markdown =~ "(#{Verdict.of(:theorem).source})"
-    assert output == Kino.Text.new(@outcome.raw)
+    assert output == Kino.Text.new(@outcome.raw, terminal: true)
   end
 
   test "the tone colours the name" do
@@ -49,7 +49,7 @@ defmodule KinoLoge.OutcomeTest do
       {:badge, "SAT", :neutral},
       {:table, ["Lemma", "Status"], [["a", :theorem]]},
       {:models, [%{p: true}]},
-      {:graph, "digraph {}"},
+      {:graph, "flowchart TB\n  a --> b\n"},
       {:diagnostics, [Diagnostic.new("X", :warning, Range.new(2, column: 3), "careful")]}
     ]
 
@@ -57,11 +57,11 @@ defmodule KinoLoge.OutcomeTest do
       KinoLoge.Outcome.kino(%{@outcome | views: views})
 
     assert [
-             %Kino.Text{text: "model"},
+             %Kino.Text{text: "model", terminal: true},
              %Kino.Text{text: "SAT", style: [color: _, font_weight: :bold]},
              %Kino.JS.Live{module: Kino.Table},
              %Kino.Layout{},
-             %Kino.Text{text: "digraph {}"},
+             %Kino.JS{module: Kino.Mermaid},
              %Kino.Markdown{text: diagnostics}
            ] = kinos
 

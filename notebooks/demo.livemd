@@ -1,0 +1,291 @@
+# Loge: a guided tour
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_tptp, path: Path.join(root, "loge_tptp")},
+  {:loge_dimacs, path: Path.join(root, "loge_dimacs")},
+  {:loge_asp, path: Path.join(root, "loge_asp")},
+  {:loge_prolog, path: Path.join(root, "loge_prolog")},
+  {:loge_egglog, path: Path.join(root, "loge_egglog")},
+  {:loge_smtlib, path: Path.join(root, "loge_smtlib")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+## What Loge is
+
+Loge ("logic engines") lets a notebook write problems in several logic languages and
+hand them to provers and solvers. Each language is its own package; this notebook
+installs all of them:
+
+| Package       | Language               | Engines                                          |
+| ------------- | ---------------------- | ------------------------------------------------ |
+| `loge_tptp`   | TPTP                   | SystemOnTPTP, StarExec, a local prover, Isabelle |
+| `loge_dimacs` | DIMACS CNF             | clasp                                            |
+| `loge_asp`    | Answer Set Programming | clingo                                           |
+| `loge_prolog` | Prolog                 | SWI-Prolog                                       |
+| `loge_egglog` | egglog                 | egglog                                           |
+| `loge_smtlib` | SMT-LIB 2.6            | z3, cvc5                                         |
+
+Every problem below sits in a **Logic Engine** smart cell (`+ Smart` → *Logic Engine*).
+From top to bottom, a cell has:
+
+1. a **language** and an **engine** select;
+2. the engine's **controls**, such as a time limit;
+3. the **editor**, and under it the problems the linter finds as you type;
+4. once evaluated, the outcome: a **Result** tab with the verdict and the details the
+   engine reports, and an **Output** tab with what the engine printed.
+
+Evaluating a cell runs ordinary Elixir. Open a cell's source (the `<>` toggle) to see
+it: one `Loge.run!/3` call, which works without the smart cell installed.
+
+## Settings
+
+Some engines need settings that hold across cells: a server, a password, the path to
+a binary. The **Logic Engine Settings** cell holds them, one engine at a time, and
+**Verify** checks that the engine can be reached. A password field takes the name of
+a Livebook secret, never the password itself.
+
+None of the engines in this tour need settings if their programs are on `PATH`:
+SystemOnTPTP is a public web service; clingo and SWI-Prolog come bundled; Isabelle,
+z3 and cvc5 are found on `PATH`. If z3 lives elsewhere, set its executable here.
+
+<!-- livebook:{"attrs":"eyJ2YWx1ZXMiOnt9fQ","chunks":null,"kind":"Elixir.KinoLoge.ConfigCell","livebook_object":"smart_cell"} -->
+
+```elixir
+:ok
+```
+
+## Proving theorems: TPTP
+
+TPTP is the language of automated theorem provers. A cell with no engine and a
+variable name is a **definitions** cell: it holds axioms that later cells include by
+that name. This one defines groups:
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOm51bGwsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJzb3VyY2UiOiJmb2YoYXNzb2NpYXRpdml0eSwgYXhpb20sICFbWCwgWSwgWl06IG11bHQobXVsdChYLCBZKSwgWikgPSBtdWx0KFgsIG11bHQoWSwgWikpKS5cbmZvZihsZWZ0X2lkZW50aXR5LCBheGlvbSwgIVtYXTogbXVsdChlLCBYKSA9IFgpLlxuZm9mKGxlZnRfaW52ZXJzZSwgYXhpb20sICFbWF06IG11bHQoaW52KFgpLCBYKSA9IGUpLlxuIiwidmFyaWFibGUiOiJncm91cHMifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+groups =
+  Loge.source(
+    :tptp,
+    "fof(associativity, axiom, ![X, Y, Z]: mult(mult(X, Y), Z) = mult(X, mult(Y, Z))).\nfof(left_identity, axiom, ![X]: mult(e, X) = X).\nfof(left_inverse, axiom, ![X]: mult(inv(X), X) = e).\n"
+  )
+```
+
+A classic exercise: in a group where every element is its own inverse, multiplication
+commutes. The cell includes `groups` and asks the E prover on SystemOnTPTP.
+Expected: **Theorem**. If you edit the definitions above, this cell becomes stale, as
+any cell that reads a variable does.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2Yoc2VsZl9pbnZlcnNlLCBoeXBvdGhlc2lzLCAhW1hdOiBtdWx0KFgsIFgpID0gZSkuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('groups').\n\nfof(self_inverse, hypothesis, ![X]: mult(X, X) = e).\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).\n",
+  system: "E",
+  time_limit_sec: 10,
+  includes: %{"groups" => groups}
+)
+```
+
+Without that hypothesis, commutativity does not follow. Vampire can tell, and
+expected is **CounterSatisfiable** (or **GaveUp** within the time limit). The SZS
+status is the standard vocabulary of these verdicts; the Result tab links to its
+definitions.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.SystemOnTptp,
+  "include('groups').\n\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).",
+  system: "Vampire",
+  time_limit_sec: 10,
+  includes: %{"groups" => groups}
+)
+```
+
+Higher-order problems (THF) can also go to Isabelle. With `isabelle` on `PATH` and no
+server configured, Loge starts a local Isabelle server on first use, about six seconds
+for the first proof, and stops it with the notebook's runtime. Each formula becomes a
+lemma; the table lists their statuses. Expected: **Theorem** for both.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJpc2FiZWxsZSIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsicHJvb2ZfbWV0aG9kIjoiYnkgYXV0byJ9LCJzb3VyY2UiOiJ0aGYoZXhjbHVkZWRfbWlkZGxlLCBjb25qZWN0dXJlLCAhW1A6ICRvXTogKFAgfCB+IFApKS5cbnRoZihkcmlua2VyLCBjb25qZWN0dXJlLCA/W1g6ICRpXTogIVtZOiAkaV06ICgoZCBAIFgpID0+IChkIEAgWSkpKS5cbnRoZihkX3R5cGUsIHR5cGUsIGQ6ICRpID4gJG8pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Tptp.Engines.Isabelle,
+  "thf(excluded_middle, conjecture, ![P: $o]: (P | ~ P)).\nthf(drinker, conjecture, ?[X: $i]: ![Y: $i]: ((d @ X) => (d @ Y))).\nthf(d_type, type, d: $i > $o).\n",
+  proof_method: "by auto"
+)
+```
+
+## Colouring a map, three ways
+
+Can the seven regions of Australia be coloured with three colours so that no two
+neighbours share one? The same puzzle reads differently in each language.
+
+In **ASP**, a choice rule picks one colour per region and a constraint rules out equal
+neighbours. clingo returns the stable models. Expected: **Satisfiable**, one painting.
+Set *Models* to `0` to see all 18.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImFzcCIsIm9wdGlvbnMiOnsibW9kZWxzIjpudWxsLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6InJlZ2lvbih3YTsgbnQ7IHNhOyBxOyBuc3c7IHY7IHQpLlxuYm9yZGVyKHdhLCBudCkuIGJvcmRlcih3YSwgc2EpLiBib3JkZXIobnQsIHNhKS4gYm9yZGVyKG50LCBxKS5cbmJvcmRlcihzYSwgcSkuIGJvcmRlcihzYSwgbnN3KS4gYm9yZGVyKHNhLCB2KS4gYm9yZGVyKHEsIG5zdykuIGJvcmRlcihuc3csIHYpLlxuY29sb3VyKHJlZDsgZ3JlZW47IGJsdWUpLlxuXG4xIHsgcGFpbnQoUiwgQykgOiBjb2xvdXIoQykgfSAxIDotIHJlZ2lvbihSKS5cbjotIGJvcmRlcihBLCBCKSwgcGFpbnQoQSwgQyksIHBhaW50KEIsIEMpLlxuXG4jc2hvdyBwYWludC8yLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Asp.Engines.Clingo,
+  "region(wa; nt; sa; q; nsw; v; t).\nborder(wa, nt). border(wa, sa). border(nt, sa). border(nt, q).\nborder(sa, q). border(sa, nsw). border(sa, v). border(q, nsw). border(nsw, v).\ncolour(red; green; blue).\n\n1 { paint(R, C) : colour(C) } 1 :- region(R).\n:- border(A, B), paint(A, C), paint(B, C).\n\n#show paint/2.\n",
+  time_limit: 10
+)
+```
+
+In **SMT-LIB**, each region is an integer from 1 to 3, and neighbours are `distinct`.
+z3 answers `sat` and the model table gives each region's number. Expected:
+**Satisfiable**. This cell needs `z3` on `PATH` or set in the Settings cell; choose
+*cvc5* in the engine select to use cvc5 instead.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihzZXQtbG9naWMgUUZfTElBKVxuKGRlY2xhcmUtY29uc3Qgd2EgSW50KSAoZGVjbGFyZS1jb25zdCBudCBJbnQpIChkZWNsYXJlLWNvbnN0IHNhIEludCkgKGRlY2xhcmUtY29uc3QgcSBJbnQpXG4oZGVjbGFyZS1jb25zdCBuc3cgSW50KSAoZGVjbGFyZS1jb25zdCB2IEludCkgKGRlY2xhcmUtY29uc3QgdCBJbnQpXG4oYXNzZXJ0IChhbmQgKDw9IDEgd2EgMykgKDw9IDEgbnQgMykgKDw9IDEgc2EgMykgKDw9IDEgcSAzKSAoPD0gMSBuc3cgMykgKDw9IDEgdiAzKSAoPD0gMSB0IDMpKSlcbihhc3NlcnQgKGRpc3RpbmN0IHdhIG50KSkgKGFzc2VydCAoZGlzdGluY3Qgd2Egc2EpKSAoYXNzZXJ0IChkaXN0aW5jdCBudCBzYSkpXG4oYXNzZXJ0IChkaXN0aW5jdCBudCBxKSkgKGFzc2VydCAoZGlzdGluY3Qgc2EgcSkpIChhc3NlcnQgKGRpc3RpbmN0IHNhIG5zdykpXG4oYXNzZXJ0IChkaXN0aW5jdCBzYSB2KSkgKGFzc2VydCAoZGlzdGluY3QgcSBuc3cpKSAoYXNzZXJ0IChkaXN0aW5jdCBuc3cgdikpXG4oY2hlY2stc2F0KVxuKGdldC1tb2RlbClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Z3,
+  "(set-logic QF_LIA)\n(declare-const wa Int) (declare-const nt Int) (declare-const sa Int) (declare-const q Int)\n(declare-const nsw Int) (declare-const v Int) (declare-const t Int)\n(assert (and (<= 1 wa 3) (<= 1 nt 3) (<= 1 sa 3) (<= 1 q 3) (<= 1 nsw 3) (<= 1 v 3) (<= 1 t 3)))\n(assert (distinct wa nt)) (assert (distinct wa sa)) (assert (distinct nt sa))\n(assert (distinct nt q)) (assert (distinct sa q)) (assert (distinct sa nsw))\n(assert (distinct sa v)) (assert (distinct q nsw)) (assert (distinct nsw v))\n(check-sat)\n(get-model)\n",
+  time_limit: 10
+)
+```
+
+In **Prolog**, the colouring is a predicate and the question is a goal. The engine
+consults the program and asks the goal; the table shows the bindings of its
+variables, one row per answer. Expected: **true**, one row.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiYXVzdHJhbGlhKFdBLCBOVCwgU0EsIFEsIE5TVywgViwgVCkiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLiBjb2xvdXIoYmx1ZSkuXG5cbmF1c3RyYWxpYShXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFQpIDotXG4gICAgbWFwbGlzdChjb2xvdXIsIFtXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFRdKSxcbiAgICBXQSBcXD09IE5ULCBXQSBcXD09IFNBLCBOVCBcXD09IFNBLCBOVCBcXD09IFEsIFNBIFxcPT0gUSxcbiAgICBTQSBcXD09IE5TVywgU0EgXFw9PSBWLCBRIFxcPT0gTlNXLCBOU1cgXFw9PSBWLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  "colour(red). colour(green). colour(blue).\n\naustralia(WA, NT, SA, Q, NSW, V, T) :-\n    maplist(colour, [WA, NT, SA, Q, NSW, V, T]),\n    WA \\== NT, WA \\== SA, NT \\== SA, NT \\== Q, SA \\== Q,\n    SA \\== NSW, SA \\== V, Q \\== NSW, NSW \\== V.\n",
+  goal: "australia(WA, NT, SA, Q, NSW, V, T)",
+  answers: 1,
+  time_limit: 10
+)
+```
+
+Prolog answers are not SZS statuses, so the verdict is the toplevel's: `true` or
+`false`. A timeout is still SZS **Timeout**.
+
+## Rewriting: egglog
+
+egglog saturates an e-graph with rewrite rules and extracts the cheapest equivalent
+term. Here `x · 1 + 0` simplifies to `x`. Expected: **completed**, the extracted term
+`(Var "x")` and, with *Show the e-graph* on, the e-graph: each box an e-class, holding
+the e-nodes found equal.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOnRydWV9LCJzb3VyY2UiOiIoZGF0YXR5cGUgTWF0aCAoTnVtIGk2NCkgKFZhciBTdHJpbmcpIChBZGQgTWF0aCBNYXRoKSAoTXVsIE1hdGggTWF0aCkpXG5cbihyZXdyaXRlIChBZGQgYSBiKSAoQWRkIGIgYSkpXG4ocmV3cml0ZSAoTXVsIGEgYikgKE11bCBiIGEpKVxuKHJld3JpdGUgKEFkZCBhIChOdW0gMCkpIGEpXG4ocmV3cml0ZSAoTXVsIGEgKE51bSAxKSkgYSlcbihyZXdyaXRlIChNdWwgYSAoQWRkIGIgYykpIChBZGQgKE11bCBhIGIpIChNdWwgYSBjKSkpXG5cbihsZXQgZXhwciAoQWRkIChNdWwgKFZhciBcInhcIikgKE51bSAxKSkgKE51bSAwKSkpXG4ocnVuIDUpXG4oZXh0cmFjdCBleHByKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(datatype Math (Num i64) (Var String) (Add Math Math) (Mul Math Math))\n\n(rewrite (Add a b) (Add b a))\n(rewrite (Mul a b) (Mul b a))\n(rewrite (Add a (Num 0)) a)\n(rewrite (Mul a (Num 1)) a)\n(rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))\n\n(let expr (Add (Mul (Var \"x\") (Num 1)) (Num 0)))\n(run 5)\n(extract expr)\n",
+  graph: true
+)
+```
+
+## Linting as you type
+
+Every language has a linter, run as you type. The program below has two problems:
+`Region` occurs only once in its clause (a warning, placed on the variable), and the
+last clause is missing a parenthesis (an error). Evaluating it raises `Loge.Error`
+naming the error; fix the clause and it runs.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJnb2FsIjoicGFpbnQod2EsIEMpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJjb2xvdXIocmVkKS4gY29sb3VyKGdyZWVuKS5cblxucGFpbnQoUmVnaW9uLCBDKSA6LSBjb2xvdXIoQykuXG5wYWludCh3YSwgcmVkIDotIHRydWUuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  "colour(red). colour(green).\n\npaint(Region, C) :- colour(C).\npaint(wa, red :- true.\n",
+  goal: "paint(wa, C)",
+  answers: 0,
+  time_limit: 10
+)
+```
+
+## Loge from Elixir
+
+The smart cell is optional: everything it does is a function call. The registry knows
+every installed language and engine:
+
+```elixir
+for language <- Loge.Registry.languages() do
+  {language.id(), Enum.map(Loge.Registry.engines_for(language.id()), & &1.id())}
+end
+```
+
+`Loge.lint/3` is what runs under the editor. Each diagnostic has a code, a severity,
+a range in the source and a message:
+
+```elixir
+Loge.lint(Loge.Smtlib.Language, "(declare-const x)\n(check-sat)", [])
+```
+
+Problems can also be built as data. This builds the map-colouring puzzle as a
+propositional formula, one variable per region and colour, for the DIMACS package.
+Expected: `{21, 55}`, 21 variables and 55 clauses.
+
+```elixir
+regions = ~w(wa nt sa q nsw v t)a
+borders = [wa: :nt, wa: :sa, nt: :sa, nt: :q, sa: :q, sa: :nsw, sa: :v, q: :nsw, nsw: :v]
+colours = ~w(red green blue)a
+
+variable = fn region, colour ->
+  Enum.find_index(regions, &(&1 == region)) * length(colours) +
+    Enum.find_index(colours, &(&1 == colour)) + 1
+end
+
+some_colour = for r <- regions, do: for(c <- colours, do: variable.(r, c))
+one_colour = for r <- regions, c <- colours, d <- colours, c < d, do: [-variable.(r, c), -variable.(r, d)]
+differ = for {a, b} <- borders, c <- colours, do: [-variable.(a, c), -variable.(b, c)]
+
+cnf = %Loge.Dimacs.Cnf{
+  variables: length(regions) * length(colours),
+  clauses: some_colour ++ one_colour ++ differ
+}
+
+{cnf.variables, length(cnf.clauses)}
+```
+
+`Loge.run!/3` solves it, here with clasp asked for every model, and the models
+decode back into paintings. Expected: `{:satisfiable, 18, [...]}`, Tasmania being free.
+
+```elixir
+outcome = Loge.run!(Loge.Dimacs.Engines.Clasp, cnf, models: 0)
+{:models, models} = List.keyfind(outcome.views, :models, 0)
+
+paintings =
+  for model <- models do
+    for literal <- model, literal > 0 do
+      region = Enum.at(regions, div(literal - 1, length(colours)))
+      {region, Enum.at(colours, rem(literal - 1, length(colours)))}
+    end
+  end
+
+{outcome.szs, length(paintings), hd(paintings)}
+```
+
+The `Loge.Outcome` holds the SZS status, the raw output and the views the Result tab
+draws; it renders as a cell's result does:
+
+```elixir
+outcome
+```
+
+## Where to go next
+
+Each language has a notebook of its own beside this one (`tptp.livemd`,
+`dimacs.livemd`, `asp.livemd`, `prolog.livemd`, `egglog.livemd`, `smtlib.livemd`),
+with more cases per engine. A language or engine of your own is an Elixir module
+implementing `Loge.Language` or `Loge.Engine`, registered with `Loge.register/1`;
+the smart cells pick it up with no change.
