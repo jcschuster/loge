@@ -1,7 +1,7 @@
 defmodule KinoLoge.Outcome do
   @moduledoc """
-  A `Loge.Outcome` as kinos: a Result tab with the verdict and the outcome's views,
-  and an Output tab with the engine's raw output.
+  A `Loge.Outcome` as kinos: a Result tab with the verdict, when the outcome has an
+  SZS status, and the outcome's views, and an Output tab with the engine's raw output.
 
   The verdict is the status's name and mnemonic in its tone's colour, its
   description, and a link to the SZS ontology. `Kino.Render` is implemented for
@@ -14,8 +14,7 @@ defmodule KinoLoge.Outcome do
   @spec kino(Outcome.t()) :: Kino.Layout.t()
   def kino(%Outcome{} = outcome) do
     Kino.Layout.tabs(
-      Result:
-        Kino.Layout.grid([verdict(Verdict.of(outcome.szs)) | Enum.map(outcome.views, &view/1)]),
+      Result: Kino.Layout.grid(verdict(outcome.szs) ++ Enum.map(outcome.views, &view/1)),
       Output: Kino.Text.new(outcome.raw)
     )
   end
@@ -26,7 +25,10 @@ defmodule KinoLoge.Outcome do
   def color(:negative), do: "#c0392b"
   def color(:neutral), do: "#5d6d7e"
 
-  defp verdict(%Verdict{} = verdict) do
+  defp verdict(nil), do: []
+  defp verdict(status), do: [verdict_kino(Verdict.of(status))]
+
+  defp verdict_kino(%Verdict{} = verdict) do
     Kino.Layout.grid([
       label("#{verdict.name} (#{verdict.mnemonic})", verdict.tone),
       Kino.Text.new(verdict.description),

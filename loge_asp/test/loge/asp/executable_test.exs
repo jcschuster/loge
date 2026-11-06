@@ -15,7 +15,6 @@ defmodule Loge.Asp.ExecutableTest do
 
   test "removes the program file once clingo exits" do
     {_output, _status, file} = Executable.run("a.", ["--outf=3"], :stdout_and_stderr)
-    Process.sleep(50)
     refute File.exists?(file)
   end
 
@@ -30,12 +29,13 @@ defmodule Loge.Asp.ExecutableTest do
       end)
 
     Process.sleep(200)
-    [os_pid] = clingo_pids(endless)
+    [{os_pid, file}] = clingo_pids(endless)
     Process.exit(caller, :kill)
     Process.sleep(200)
 
     refute_received :returned
     refute alive?(os_pid)
+    refute File.exists?(file)
   end
 
   defp clingo_pids(program) do
@@ -43,7 +43,7 @@ defmodule Loge.Asp.ExecutableTest do
         {:ok, cmdline} <- [File.read("/proc/#{dir}/cmdline")],
         [_executable, _outf, file] <- [String.split(cmdline, <<0>>, trim: true)],
         File.read(file) == {:ok, program},
-        do: dir
+        do: {dir, file}
   end
 
   defp alive?(os_pid), do: File.exists?("/proc/#{os_pid}")

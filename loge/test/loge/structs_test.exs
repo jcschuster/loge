@@ -6,6 +6,7 @@ defmodule Loge.StructsTest do
   test "an outcome defaults to no views and no details" do
     assert %Outcome{szs: :theorem, raw: "", engine: :e}.views == []
     assert %Outcome{szs: :theorem, raw: "", engine: :e}.details == %{}
+    assert %Outcome{raw: "", engine: :e}.szs == nil
   end
 
   test "an analysis has no native analysis unless the language provides one" do

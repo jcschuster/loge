@@ -15,7 +15,7 @@ This file is the design reference. `PLAN.md` holds the phased execution plan.
 | Highlighting      | Editor-side only; provided by Livebook's language list. TPTP via livebook#3234 (`codemirror-lang-tptp`); others later. No per-package JS.      |
 | Positions         | Diagnostics carry line/column ranges in Kino's smart-cell diagnostics format (kino#522): 1-based, columns in UTF-16 code units.                |
 | Linting / solving | Extensible from Elixir through behaviours; each language is its own Hex package.                                                               |
-| Verdicts          | Every `Loge.Outcome` carries an SZS status (`Tptp.Szs.Ontology.t()`).                                                                          |
+| Verdicts          | A `Loge.Outcome` carries an SZS status (`Tptp.Szs.Ontology.t()`) where the ontology describes the result, `nil` otherwise (a badge view states it). |
 | Solve             | Livebook's own cell evaluation (Kino has no API for a cell to evaluate itself). Raw output is the outcome's Output tab.                          |
 | Input             | `Loge.Input` protocol (mirrors `AtpClient.Input`).                                                                                             |
 | Minimum Elixir    | `~> 1.20`.                                                                                                                                     |
@@ -90,7 +90,6 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 @callback controls() :: [Loge.Control.t()]    # per-run controls rendered by the cell
 @callback run(Loge.Input.t(), keyword()) :: {:ok, Loge.Outcome.t()} | {:error, term()}
 @callback format_error(term()) :: String.t()  # sentence for a reason run/verify returned
-@callback session() :: module() | nil          # optional; phase 3, see §5
 ```
 
 `Loge.configure!/2` checks the keys against `config_schema/0` and calls `configure/1`; the
@@ -152,7 +151,12 @@ byte offsets (tptp, Elixir lexers). The cell passes ranges through unchanged, re
 
 ### `Loge.Outcome` (struct)
 
-`%{szs: Tptp.Szs.Ontology.t(), raw: binary, engine: atom, views: [view], details: map}`
+`%{szs: Tptp.Szs.Ontology.t() | nil, raw: binary, engine: atom, views: [view], details: map}`
+
+`szs` is set where the SZS ontology describes the result exactly: an ATP verdict,
+SAT/UNSAT, a timeout. A Prolog answer (`true`/`false`) or an egglog run
+(`completed`/`check failed`) has `szs: nil` and a `{:badge, label, tone}` view; the cell
+shows the SZS verdict only when there is one.
 
 `view` is a closed set the frontend knows how to render:
 `{:text, binary, lang_id | nil}`, `{:badge, label, tone}`, `{:table, columns, rows}`,
@@ -179,6 +183,17 @@ process (a linked task exit kills the editor).
 An `async_nolink` task outlives its caller, so the supervised task monitors the caller
 and runs the work in a linked child; on the caller's `:DOWN` it exits, which kills the
 work and so honours the engine cancellation contract.
+
+Work outside the BEAM's reach needs more, and core provides two pieces:
+
+- `Loge.Guard.start(release)`: a process monitoring its starter that calls `release`
+  when the starter dies, unless dismissed. Used to SIGKILL an OS process
+  (`loge_asp`'s clingo) or kill a process holding a Port (`loge_prolog`'s SWI session,
+  whose `swipl` exits when its stdin closes).
+- `Loge.Peer.call(m, f, a)`: applies `m.f(a)` in a fresh `:peer` node (`standard_io`
+  connection, this node's code path, about 130 ms to start), stopped by a guard when the
+  caller dies. For NIFs on dirty schedulers, which nothing in the BEAM can interrupt
+  (`loge_egglog`). Arguments and results are copied; NIF resources cannot cross.
 
 ## 4. Data flow in the cell (`kino_loge`)
 
@@ -225,16 +240,28 @@ Cells:
 Robustness: `handle_event/3` must be total (no `String.to_existing_atom/1` on untrusted
 keys); persist the source attr on every change; supervised unlinked tasks only.
 
-## 5. Sessions (phase 3)
+## 5. State across runs
 
-Stateless engines (AtpClient, `Clingo.solve!`, `Egglog.Program`) need nothing. Stateful
-ones (`SWI` session, `Egglog.EGraph`, a local Isabelle server) declare `session/0`; `Loge.SessionSupervisor`
-starts one process per owner (cell id / MCP connection), passes it as `opts[:session]` to
-`run/2`, and tears it down when the owner dies.
+There are no engine sessions: every run starts from its input alone, as notebook
+re-evaluation needs. A fresh `swipl` per Prolog run starts in about 60 ms, and
+`Egglog.Program.run/3` clones its base per run; an `Egglog.EGraph` carried across cells
+would make a cell's result depend on how often earlier cells ran. The generated source
+also has no owner to key a session on: it runs in Livebook's evaluator, not the cell.
 
-Until then `Loge.Tptp.Engines.Isabelle` runs `AtpClient.Isabelle.query/2` against a
-configured server; KinoAtpClient's node-wide `IsabelleRuntime` (local server started on
-demand when `isabelle` is on PATH) is not ported and becomes this engine's session.
+What is shared is node-wide and supervised by its language package. `loge_tptp` has
+`Loge.Tptp.IsabelleServer`, the local Isabelle server `Loge.Tptp.Engines.Isabelle`
+uses when no password is configured (generalising KinoAtpClient's `IsabelleRuntime`):
+
+- started on the first run or verify, with `isabelle` from `ISABELLE_TOOL` or `PATH`
+  (`IsabelleClient.start_server/1`, about 1 s); nothing runs before;
+- every run opens its own HOL session on it through `AtpClient.Isabelle.query/2`
+  (about 2.5 s; `IsabelleRuntime` kept one session, but a cancelled run closes its
+  session, so a shared one would end every concurrent run with it);
+- killed with the node however it ends: a `/bin/sh` watchdog reading from a Port of
+  the server process runs `isabelle server -n <name> -x` when the pipe closes. Without
+  it, a node that exits without `terminate/2` (`mix test`, `System.halt/0`, a stopped
+  Livebook runtime) leaves the server running (observed). The server inherits the
+  node's stderr.
 
 ## 6. Verified facts per backend (diagnostics)
 
@@ -244,8 +271,8 @@ All read from source, not executed. Links in §8.
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | tptp                 | `Tptp.Diagnostic` byte spans                                                                                                                                      | structured                                                                           | offsets                              | all                                                               | error/warning/info/hint                                                           |
 | clingo 5.8.2 (executed) | stderr of the bundled `clingo` executable (`--outf=3 --solve-limit=0`), the same text the `logger:` callback receives; the file is the one clingo read | `<file>:L:C-[L2:]C2: error\|warning\|info: msg`, body lines indented by two spaces, then `note:` lines with their own positions; a closing `*** ERROR: (clingo): …` summary | 1/1, bytes, end exclusive | all, capped by `message_limit` | error, warning, info; a grounding error stops before the infos of the rest |
-| egglog (rev b912caa) | `Egglog.parse/1` → `{:error, {:invalid_theory, msg}}`; run errors `{:error, {:native_error, msg}}`                                                                | `In L:C-C2: <quote>\nparse error: msg` or `In L:C-L2:C2: …`; type errors `In …\nmsg` | 1/1, char-counted, end inclusive     | first only                                                        | error                                                                             |
-| SWI-Prolog 10.0.1    | `error(syntax_error(Culprit), Loc)`; `Loc` ∈ `file(F,Line,LinePos,CharNo)`, `stream(S,Line,LinePos,CharNo)` (incl. `open_string/2` streams), `string(Str,CharNo)` | term; the bridge serialises with `term_string/3`                                     | 1-based line, 0-based linepos/charno | all via a `read_term/3` loop; swi_elixir's `load` keeps the first | error; `singletons(Term,Names)` / `discontiguous/2` as warnings without positions |
+| egglog (rev b912caa, egglog_elixir 45e8e55, executed) | `Egglog.parse/1` → `{:error, {:invalid_theory, msg, location}}`, `location` with `start_byte`/`end_byte` (end exclusive) and 1-based line/column; type and unbound-name errors only at run time, `{:error, {:native_error, msg}}` without location | `In L:C-C2: <quote>\nparse error: msg`; run errors `In …\nmsg`; failed check `{:error, {:check_failed, msg}}` | bytes, from the NIF | first only | error |
+| SWI-Prolog 10.0.1 (executed) | `read_term/3` on a UTF-8 file stream with `subterm_positions`, `singletons`; `error(syntax_error(M), stream(S, Line, LinePos, CharNo))` | `message_to_string/2` of the error | character offsets (`char_count`), 0-based | all: after a syntax error `read_term/3` resumes after the next full stop | error; singletons as warnings positioned on the variable |
 | z3                   | stdout                                                                                                                                                            | `(error "line L column C: msg")`, exit 1                                             | 1/0                                  | first per command                                                 | error                                                                             |
 | cvc5                 | stdout                                                                                                                                                            | `(error "Parse Error: <stdin>:L.C: msg")`, exit 1                                    | 1/0                                  | first                                                             | error                                                                             |
 | kissat / CaDiCaL     | stderr                                                                                                                                                            | `<name>:<line>: parse error: msg`, exit 1                                            | line only                            | first                                                             | error                                                                             |
@@ -271,13 +298,19 @@ Notes:
 - clingo_elixir's dispatcher monitors the process that opened the session and aborts the
   native search when it dies (`Clingo.Dispatcher.terminate/2`). Grounding is not aborted;
   for a CNF, whose translation grounds in time linear in its size, it ends late but ends.
-- Prolog linting lives in Prolog: `open_string/2` + `read_term/3` with `syntax_errors(dec10)`
-  under a local `message_hook`, `singletons(warning)`, `term_position`, `subterm_positions`,
-  `variable_names`, `comments`, `module(M)`; run through `SWI.query`. No swi_elixir change needed.
+- Prolog linting lives in Prolog, `loge_prolog/priv/loge.pl`, loaded into a fresh `swipl`:
+  `read_term/3` over the program file in a temporary module, executing `op/3` directives;
+  singletons located by walking `subterm_positions`; `_`-prefixed names skipped. The
+  bridge runs each query in a Prolog engine whose stream aliases are its own: output is
+  captured by redirecting in the worker thread (a loaded directive) and again in each
+  `solve/2`. `SWI.query/3` raises on timeouts and Prolog errors; `Loge.Prolog.Swipl`
+  rescues `SWI.Error` once per answer pull to keep earlier answers.
 - SMT-LIB lint cannot come from the solvers (first error, full run); write an S-expression
   lexer + command-level lint in Elixir.
 - egglog: `EGraph::parse_program` is separate from `run_program`; the NIF calls it with
-  filename `None`.
+  filename `None`. Runs are not interruptible: a run whose caller died kept a core busy
+  (measured); egglog's own early stop is only triggered from primitives. Hence
+  `Loge.Peer`.
 
 ## 7. Editor facts (Kino 0.19.1, Livebook main @ ef1b666)
 

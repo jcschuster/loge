@@ -1,4 +1,12 @@
 [
   inputs: ["*.exs"],
-  subdirectories: ["loge", "loge_tptp", "loge_dimacs", "loge_asp", "kino_loge"]
+  subdirectories: [
+    "loge",
+    "loge_tptp",
+    "loge_dimacs",
+    "loge_asp",
+    "loge_prolog",
+    "loge_egglog",
+    "kino_loge"
+  ]
 ]

@@ -1,0 +1,72 @@
+# Loge: egglog smoke test
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_egglog, path: Path.join(root, "loge_egglog")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+## Running
+
+Expected: **completed**, the extracted term `(Add (Num 2) (Num 3))` or `(Add (Num 3) (Num 2))`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIE1hdGggKE51bSBpNjQpIChBZGQgTWF0aCBNYXRoKSAoTXVsIE1hdGggTWF0aCkpXG4ocmV3cml0ZSAoQWRkIGEgYikgKEFkZCBiIGEpKVxuKHJld3JpdGUgKE11bCBhIChOdW0gMSkpIGEpXG5cbihsZXQgZSAoQWRkIChNdWwgKE51bSAyKSAoTnVtIDEpKSAoTnVtIDMpKSlcbihydW4gNSlcbihjaGVjayAoPSBlIChBZGQgKE51bSAzKSAoTnVtIDIpKSkpXG4oZXh0cmFjdCBlKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(datatype Math (Num i64) (Add Math Math) (Mul Math Math))\n(rewrite (Add a b) (Add b a))\n(rewrite (Mul a (Num 1)) a)\n\n(let e (Add (Mul (Num 2) (Num 1)) (Num 3)))\n(run 5)\n(check (= e (Add (Num 3) (Num 2))))\n(extract e)\n",
+  graph: false
+)
+```
+
+With **Show the e-graph** on, the Result tab also has the e-graph in Graphviz DOT.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOnRydWV9LCJzb3VyY2UiOiIoZGF0YXR5cGUgTWF0aCAoTnVtIGk2NCkgKEFkZCBNYXRoIE1hdGgpIChNdWwgTWF0aCBNYXRoKSlcbihyZXdyaXRlIChBZGQgYSBiKSAoQWRkIGIgYSkpXG4ocmV3cml0ZSAoTXVsIGEgKE51bSAxKSkgYSlcblxuKGxldCBlIChBZGQgKE11bCAoTnVtIDIpIChOdW0gMSkpIChOdW0gMykpKVxuKHJ1biA1KVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(datatype Math (Num i64) (Add Math Math) (Mul Math Math))\n(rewrite (Add a b) (Add b a))\n(rewrite (Mul a (Num 1)) a)\n\n(let e (Add (Mul (Num 2) (Num 1)) (Num 3)))\n(run 5)\n",
+  graph: true
+)
+```
+
+A failed check: expected **check failed**, egglog's message in the Output tab.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIE1hdGggKE51bSBpNjQpIChBZGQgTWF0aCBNYXRoKSAoTXVsIE1hdGggTWF0aCkpXG4ocmV3cml0ZSAoQWRkIGEgYikgKEFkZCBiIGEpKVxuKHJld3JpdGUgKE11bCBhIChOdW0gMSkpIGEpXG5cbihsZXQgZSAoQWRkIChNdWwgKE51bSAyKSAoTnVtIDEpKSAoTnVtIDMpKSlcbihydW4gNSlcbihjaGVjayAoPSBlIChOdW0gNSkpKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(datatype Math (Num i64) (Add Math Math) (Mul Math Math))\n(rewrite (Add a b) (Add b a))\n(rewrite (Mul a (Num 1)) a)\n\n(let e (Add (Mul (Num 2) (Num 1)) (Num 3)))\n(run 5)\n(check (= e (Num 5)))\n",
+  graph: false
+)
+```
+
+This run grows without bound. Expected: it runs until stopped; stopping the evaluation ends it.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIEUgKE51bSBpNjQpIChBZGQgRSBFKSlcbihydWxlICgoPSB4IChBZGQgYSBiKSkgKD0geSAoQWRkIGMgZCkpKSAoKEFkZCB4IHkpKSlcbihsZXQgZSAoQWRkIChOdW0gMSkgKE51bSAyKSkpXG4ocnVuIDEwKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(datatype E (Num i64) (Add E E))\n(rule ((= x (Add a b)) (= y (Add c d))) ((Add x y)))\n(let e (Add (Num 1) (Num 2)))\n(run 10)\n",
+  graph: false
+)
+```
+
+## Linting
+
+Expected: under the editor, a parse error at the extra `)` on line 2.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIE0gKE51bSBpNjQpKVxuKGxldCB4IChOdW0gMSkpKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Egglog.Engines.Egglog, "(datatype M (Num i64))\n(let x (Num 1)))\n", graph: false)
+```
+

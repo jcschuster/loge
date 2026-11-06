@@ -6,8 +6,8 @@ defmodule Loge.Asp.Executable do
   Grounding in libclingo cannot be interrupted, so a program whose grounding does not
   end is stopped only by killing the process that grounds it. The program is written
   to a temporary file; clingo resolves its `#include` paths against the working
-  directory first. A guardian process SIGKILLs clingo when the caller dies, and
-  removes the file once clingo is gone.
+  directory first. A `Loge.Guard` SIGKILLs clingo and removes the file when the
+  caller dies.
   """
 
   @typedoc """
@@ -35,9 +35,10 @@ defmodule Loge.Asp.Executable do
       )
 
     {:os_pid, os_pid} = Port.info(port, :os_pid)
-    guardian = guard(os_pid, file)
+    guard = Loge.Guard.start(fn -> release(os_pid, file) end)
     {output, status} = collect(port, [])
-    send(guardian, :exited)
+    Loge.Guard.dismiss(guard)
+    File.rm(file)
     {output, status, file}
   end
 
@@ -51,19 +52,9 @@ defmodule Loge.Asp.Executable do
     end
   end
 
-  defp guard(os_pid, file) do
-    caller = self()
-
-    spawn(fn ->
-      monitor = Process.monitor(caller)
-
-      receive do
-        {:DOWN, ^monitor, :process, _pid, _reason} -> kill(os_pid)
-        :exited -> :ok
-      end
-
-      File.rm(file)
-    end)
+  defp release(os_pid, file) do
+    kill(os_pid)
+    File.rm(file)
   end
 
   defp kill(os_pid) do

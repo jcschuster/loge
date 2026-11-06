@@ -1,0 +1,77 @@
+# Loge: Prolog smoke test
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_prolog, path: Path.join(root, "loge_prolog")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+## Solving
+
+Expected: **true**, a table with `Z` = `ann` and `pat`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJnb2FsIjoiZ3JhbmRwYXJlbnQodG9tLCBaKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n",
+  goal: "grandparent(tom, Z)",
+  answers: 0,
+  time_limit: 10
+)
+```
+
+Expected: **false**, no table.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JhbmRwYXJlbnQoYW5uLCBfKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n",
+  goal: "grandparent(ann, _)",
+  answers: 1,
+  time_limit: 10
+)
+```
+
+What the program prints is the Output tab. Expected: **true**, Output `hello, world`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JlZXQod29ybGQpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJncmVldChOYW1lKSA6LSBmb3JtYXQoXCJoZWxsbywgfnd-blwiLCBbTmFtZV0pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Prolog.Engines.Swipl, "greet(Name) :- format(\"hello, ~w~n\", [Name]).\n",
+  goal: "greet(world)",
+  answers: 1,
+  time_limit: 10
+)
+```
+
+Expected: **Timeout** after two seconds.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoibG9vcCIsInRpbWVfbGltaXQiOjJ9LCJzb3VyY2UiOiJsb29wIDotIGxvb3AuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Prolog.Engines.Swipl, "loop :- loop.\n", goal: "loop", answers: 1, time_limit: 2)
+```
+
+## Linting
+
+Expected: under the editor, `Y` is a singleton (warning, on `Y`) and line 3 has a syntax
+error; evaluating raises `Loge.Error` with the syntax error.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoicChhKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicChYKSA6LSBxKFgsIFkpLlxucShhLCBiKS5cbnIoIDotIHMuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Prolog.Engines.Swipl, "p(X) :- q(X, Y).\nq(a, b).\nr( :- s.\n",
+  goal: "p(a)",
+  answers: 1,
+  time_limit: 10
+)
+```
+

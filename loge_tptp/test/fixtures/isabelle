@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stands in for `isabelle server`: records each call, prints a started server and,
+# like the real one, stays in the foreground until its stdin closes.
+echo "$*" >> "$LOGE_FAKE_ISABELLE_LOG"
+case "$*" in
+  *-x*) ;;
+  *) echo "server \"$3\" = 127.0.0.1:4711 (password \"secret\")"; read -r _ ;;
+esac

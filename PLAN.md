@@ -16,8 +16,11 @@ Open these first; every item has a fallback inside Loge.
 | livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                                              | —                                                            | [ ]    |
 | davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | not needed: `loge_asp` lints through the executable            | [ ]    |
 | davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so | report | `loge_asp` runs the executable | [ ] |
-| davfuenmayor/egglog_elixir | Return spans structurally from the NIF: `ParseError(Span::Egglog{i,j}, msg)` → `{:error, {:invalid_theory, msg, %{from: i, to: j}}}`; same for span-carrying type errors                                                                                                                                                                                                                            | ~40 lines Rust in `native/egglog_nif/src/error.rs` | regex on `In L:C-C2:` / `In L:C-L2:C2:`                      | [ ]    |
+| davfuenmayor/egglog_elixir | Return spans structurally from the NIF | — | — | [x] parse errors carry `location` since 45e8e55; type errors still text only |
+| davfuenmayor/egglog_elixir | Structured locations for type and unbound-name errors, so a lint could report them; and a type-check-only entry point (today types are checked only while running) | small Rust | parse errors only | [ ] |
+| davfuenmayor/egglog_elixir | An interruptible run (a flag checked between rule iterations), so an engine can cancel without a peer node | small Rust | `Loge.Peer` (130 ms per run) | [ ] |
 | davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog                                       | not needed (lint via `SWI.query`)                            | [ ]    |
+| davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests | small | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard` | [ ] |
 | davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only) | release | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI | [ ] |
 | bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies | small C | no Picosat engine; clasp covers DIMACS | [ ] |
 
@@ -95,28 +98,35 @@ in `kino_loge`.
 
 - [ ] A second language works with one added dependency and no change to `loge` or `kino_loge` (ASP needed one language-neutral fix in `kino_loge`: an empty integer field unsets a control without a default. Both: `notebooks/dimacs.livemd` and `notebooks/asp.livemd` cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
 
-## Phase 3 — Sessions: Prolog, egglog
+## Phase 3 — Prolog, egglog, local Isabelle
 
 ### `loge`
 
-- [ ] `session/0` callback, `Loge.SessionSupervisor` (owner-keyed, torn down with owner)
-- [ ] Isabelle engine session: local server started on demand when `isabelle` is on PATH (port of `KinoAtpClient.IsabelleRuntime`)
+- [x] Decided: no `session/0` callback and no `Loge.SessionSupervisor`; runs are independent, shared resources are node-wide (OUTLINE §5)
+- [x] `Loge.Tptp.IsabelleServer`: local Isabelle server started on first use when no password is configured, killed with the node by a Port watchdog; a session per run; Isabelle settings no longer required
+- [x] `Loge.Guard`: release outside-BEAM resources when the caller dies (now also used by `loge_asp`)
+- [x] `Loge.Peer`: call in a fresh peer node stopped with the caller, for uninterruptible NIFs
+- [x] `Loge.Outcome.szs` optional (`nil` where SZS does not describe the result; badge view instead); the cell shows the verdict only when present
 
 ### `loge_prolog`
 
-- [ ] Linter as a Prolog goal: `open_string/2` + `read_term/3` loop (`syntax_errors(dec10)` under a local `message_hook`, `singletons(warning)`, `term_position`, `subterm_positions`, `variable_names`, `comments`, `module`) run via `SWI.query`; convert `stream(_,Line,LinePos,CharNo)` to offsets
-- [ ] Engine: consult temp file + goal control; true/false/bindings → SZS + table view
+- [x] Linter in Prolog (`priv/loge.pl`): `read_term/3` loop over the program file, `op/3` directives applied, syntax errors (all) and singletons on the variable; character offsets converted to byte offsets
+- [x] Engine `Loge.Prolog.Engines.Swipl`: fresh `swipl` per run, lint then consult then goal; controls `goal`, `answers` (0 = all), `time_limit` (per answer); badge `true`/`false`/`consulted`, SZS only for `:timeout`; table of bindings written by `term_string/3`; printed output captured as raw
+- [x] Cancellation: `Loge.Guard` kills the `swipl` process; tested
 - [ ] Decide on highlighting: evaluate `codemirror-lang-prolog` on SWI syntax; fork or write a mode
+- [ ] Includes (`:- [defs].`, `:- include(defs).`) from definitions cells
 
 ### `loge_egglog`
 
-- [ ] Linter via `Egglog.parse/1` (structured span after the upstream PR; regex fallback)
-- [ ] Engines: `Program` (stateless), `EGraph` (session); `{:graph, dot}` view via `Egglog.Graphviz`
-- [ ] SZS mapping for check passed/failed — decide before freezing `Loge.Outcome`
+- [x] Linter via `Egglog.parse/1` with its structured location (first parse error; no type errors, see phase 0)
+- [x] Engine `Loge.Egglog.Engines.Egglog` over `Egglog.Program` in a `Loge.Peer`; `{:graph, dot}` view with the `graph` control; badge `completed`/`check failed`, no SZS status; cancellation tested
+- [ ] Includes (`(include "…")`) from definitions cells
 
 ### Gate
 
-- [ ] A session dies with its owning cell; non-TPTP outcomes render through the closed view set
+- [ ] A cancelled run ends: met for every engine but the DIMACS one (grounding runs to its end); to be checked in Livebook
+- [ ] The local Isabelle server is gone after the Livebook runtime stops: tested with `System.halt/0`; to be checked in Livebook
+- [ ] Non-TPTP outcomes render through the closed view set: `notebooks/prolog.livemd` and `notebooks/egglog.livemd` cells rendered through `KinoLoge.Outcome` under `Mix.install` with all language packages; to be checked in Livebook
 
 ## Phase 4 — SMT-LIB
 
@@ -146,12 +156,14 @@ in `kino_loge`.
 - [ ] `notebooks/<language>.livemd` template per language with a pinned `Mix.install`
 - [ ] CI matrix: package × {ubuntu x86_64, ubuntu aarch64, macos}; NIF-bundled engines (clingo, SWI) exercised per OS
 - [ ] Clean-machine smoke test before each course
-- [ ] Phase 4 (first Port-only engines): move `Loge.Asp.Executable`'s guardian into `loge` as the shared way to run an OS process that dies with its caller; then consider running DIMACS through the `clingo` executable too (clasp's own DIMACS reader, cancellable grounding)
+- [x] Shared kill-with-caller in `loge`: `Loge.Guard` (used by `loge_asp`, `loge_prolog`, `Loge.Peer`)
+- [ ] Run DIMACS through the `clingo` executable or a `Loge.Peer`, so grounding is cancellable too
 
 ## Open questions
 
 - [x] Smart-cell self-evaluation API in Kino: does not exist (0.19.1)
-- [ ] SZS vocabulary for non-ATP outcomes (egglog check, Prolog goal, bindings)
+- [x] SZS vocabulary for non-ATP outcomes: not everything maps; `szs: nil` with a badge for Prolog answers and egglog runs
+- [x] Sessions: dropped (OUTLINE §5)
 - [ ] Livebook maintainers' stance on smart-cell-only languages (`diagnostics`: line/column, settled in #3235/#522)
 - [ ] `codemirror-lang-prolog` SWI coverage
 - [x] Exact clingo message text at runtime: observed, OUTLINE §6

@@ -11,7 +11,30 @@ defmodule Loge.Tptp.Engines.IsabelleTest do
     assert "sledgehammer oops" in presets
   end
 
+  test "no setting is required: without a password the local server is used" do
+    assert Enum.all?(Isabelle.config_schema(), &(not &1.required?))
+
+    assert %Loge.Config.Field{secret?: true} =
+             Enum.find(Isabelle.config_schema(), &(&1.key == :password))
+  end
+
   test "a filesystem error names the directory setting" do
     assert Isabelle.format_error(:eacces) =~ "local_dir"
+  end
+
+  test "a missing isabelle executable names both ways to provide a server" do
+    message = Isabelle.format_error(:isabelle_not_found)
+    assert message =~ "password"
+    assert message =~ "ISABELLE_TOOL"
+  end
+
+  @tag :isabelle
+  @tag timeout: 300_000
+  test "without a configured server, runs on the node's local server" do
+    problem = "thf(excluded_middle, conjecture, ![X: $o]: (X | ~ X))."
+
+    assert {:ok,
+            %Loge.Outcome{szs: :theorem, views: [{:table, _, [["excluded_middle", :theorem]]}]}} =
+             Isabelle.run(problem, [])
   end
 end

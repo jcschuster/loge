@@ -184,3 +184,12 @@ defmodule Loge.Fake.FailingEngine do
   @impl true
   def format_error({:refused, why}), do: "refused: " <> why
 end
+
+defmodule Loge.PeerTest.Report do
+  @moduledoc false
+
+  def pid_and_sleep(file) do
+    File.write!(file, System.pid())
+    Process.sleep(:infinity)
+  end
+end

@@ -34,6 +34,15 @@ defmodule KinoLoge.OutcomeTest do
     end
   end
 
+  test "an outcome without an SZS status shows only its views" do
+    outcome = %Outcome{raw: "", engine: :fake_engine, views: [{:badge, "true", :positive}]}
+
+    assert %Kino.Layout{items: [%Kino.Layout{type: :grid, items: [badge]}, _output]} =
+             KinoLoge.Outcome.kino(outcome)
+
+    assert %Kino.Text{text: "true", style: [color: _, font_weight: :bold]} = badge
+  end
+
   test "views follow the verdict, in order" do
     views = [
       {:text, "model", nil},
