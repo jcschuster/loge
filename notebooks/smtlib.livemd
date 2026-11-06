@@ -1,0 +1,89 @@
+# Loge: SMT-LIB smoke test
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_smtlib, path: Path.join(root, "loge_smtlib")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+z3 and cvc5 are not bundled: put them on `PATH`, or set their executables in a
+**Logic Engine Settings** cell.
+
+## Solving
+
+Expected: **Satisfiable**, a model with `x` and `y` summing to 10.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihzZXQtbG9naWMgUUZfTElBKVxuKGRlY2xhcmUtY29uc3QgeCBJbnQpXG4oZGVjbGFyZS1jb25zdCB5IEludClcbihhc3NlcnQgKD4geCAyKSlcbihhc3NlcnQgKD0gKCsgeCB5KSAxMCkpXG4oY2hlY2stc2F0KVxuKGdldC1tb2RlbClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Z3,
+  "(set-logic QF_LIA)\n(declare-const x Int)\n(declare-const y Int)\n(assert (> x 2))\n(assert (= (+ x y) 10))\n(check-sat)\n(get-model)\n",
+  time_limit: 10
+)
+```
+
+The same script with cvc5. Expected: **Satisfiable**, possibly another model.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjdmM1IiwibGFuZ3VhZ2UiOiJzbXRsaWIiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiKHNldC1sb2dpYyBRRl9MSUEpXG4oZGVjbGFyZS1jb25zdCB4IEludClcbihkZWNsYXJlLWNvbnN0IHkgSW50KVxuKGFzc2VydCAoPiB4IDIpKVxuKGFzc2VydCAoPSAoKyB4IHkpIDEwKSlcbihjaGVjay1zYXQpXG4oZ2V0LW1vZGVsKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Cvc5,
+  "(set-logic QF_LIA)\n(declare-const x Int)\n(declare-const y Int)\n(assert (> x 2))\n(assert (= (+ x y) 10))\n(check-sat)\n(get-model)\n",
+  time_limit: 10
+)
+```
+
+Several `check-sat` commands give a table of results and no single verdict.
+Expected: `sat`, `unsat`, `sat`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihkZWNsYXJlLWNvbnN0IHAgQm9vbClcbihjaGVjay1zYXQpXG4ocHVzaCAxKVxuKGFzc2VydCAoYW5kIHAgKG5vdCBwKSkpXG4oY2hlY2stc2F0KVxuKHBvcCAxKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Z3,
+  "(declare-const p Bool)\n(check-sat)\n(push 1)\n(assert (and p (not p)))\n(check-sat)\n(pop 1)\n(check-sat)\n",
+  time_limit: 10
+)
+```
+
+Expected: **Timeout** after two seconds.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoyfSwic291cmNlIjoiKHNldC1sb2dpYyBOSUEpXG4oZGVjbGFyZS1jb25zdCB4IEludClcbihkZWNsYXJlLWNvbnN0IHkgSW50KVxuKGRlY2xhcmUtY29uc3QgeiBJbnQpXG4oYXNzZXJ0IChhbmQgKD4geCAwKSAoPiB5IDApICg-IHogMCkpKVxuKGFzc2VydCAoPSAoKyAoKiB4IHggeCkgKCogeSB5IHkpKSAoKiB6IHogeikpKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Z3,
+  "(set-logic NIA)\n(declare-const x Int)\n(declare-const y Int)\n(declare-const z Int)\n(assert (and (> x 0) (> y 0) (> z 0)))\n(assert (= (+ (* x x x) (* y y y)) (* z z z)))\n(check-sat)\n",
+  time_limit: 2
+)
+```
+
+## Linting
+
+Expected: under the editor, `declare-const` lacks its sort and `simplify` is not an
+SMT-LIB 2.6 command (warning); evaluating raises `Loge.Error`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihkZWNsYXJlLWNvbnN0IHgpXG4oc2ltcGxpZnkgKCsgMSAyKSlcbihjaGVjay1zYXQpXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, "(declare-const x)\n(simplify (+ 1 2))\n(check-sat)\n",
+  time_limit: 10
+)
+```
+
+A solver error appears in the Result tab. Expected: `unknown constant y` on line 2.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihkZWNsYXJlLWNvbnN0IHggSW50KVxuKGFzc2VydCAoPiB5IDEpKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, "(declare-const x Int)\n(assert (> y 1))\n(check-sat)\n",
+  time_limit: 10
+)
+```
+

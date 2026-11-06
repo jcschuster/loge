@@ -1,7 +1,7 @@
 defmodule Loge.Asp.Engines.Clingo do
   @moduledoc """
   clingo, the grounder and solver bundled with `clingo_elixir`, run as an OS process
-  (`Loge.Asp.Executable`) with JSON output.
+  (`Loge.Executable`) with JSON output.
 
   Options:
 
@@ -22,7 +22,8 @@ defmodule Loge.Asp.Engines.Clingo do
   @behaviour Loge.Engine
 
   alias Loge.{Control, Outcome}
-  alias Loge.Asp.{Executable, Language}
+  alias Loge.Asp.Language
+  alias Loge.Executable.Exit
 
   # https://github.com/potassco/clasp/blob/master/clasp/cli/clasp_app.h (ExitCode)
   @interrupted 1
@@ -59,14 +60,16 @@ defmodule Loge.Asp.Engines.Clingo do
   def run(input, options) do
     program = input |> Loge.Input.to_iodata() |> IO.iodata_to_binary()
 
-    case Executable.run(program, ["--outf=2", "--warn=none" | limits(options)], :stdout) do
-      {output, status, _file} when status in @results ->
+    arguments = ["--outf=2", "--warn=none" | limits(options)]
+
+    case Loge.Executable.run(Clingo.CLI.executable(), arguments, program, extension: ".lp") do
+      {:ok, %Exit{status: status, output: output}} when status in @results ->
         outcome(output, status)
 
-      {_output, @error, _file} ->
+      {:ok, %Exit{status: @error}} ->
         {:error, {:invalid_program, Language.analyze(program, []).diagnostics}}
 
-      {output, status, _file} ->
+      {:ok, %Exit{status: status, output: output}} ->
         {:error, {:exit_status, status, output}}
     end
   end

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stands in for an SMT solver: prints the lines of the script that start with ";> ",
+# without that prefix, then sleeps if the script has a ";hang" line.
+for file; do :; done
+sed -n 's/^;> //p' "$file"
+grep -q '^;hang' "$file" && exec sleep 1000
+exit 0

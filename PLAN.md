@@ -87,7 +87,7 @@ in `kino_loge`.
 ### `loge_asp`
 
 - [x] Linter: grounding by the bundled `clingo` executable (`--outf=3 --solve-limit=0 --time-limit=10`), not the NIF (OUTLINE §6); `Loge.Asp.Messages` reads its messages, `note:` lines as related positions, codes from clingo's `--warn` classes
-- [x] `Loge.Asp.Executable`: Port + guardian killing clingo with its caller; tested against an endless grounding
+- [x] clingo runs under `Loge.Executable` (killed with its caller or the node; tested in `loge`)
 - [x] Engine `Loge.Asp.Engines.Clingo` (`--outf=2`): `models` control (unset: clingo's default, which runs an optimisation to its optimum), `time_limit` (`:timeout`); models view of shown atoms
 - [x] `to_source/2`: covered by core `Loge.Engine.to_source/4`
 - [x] Engine ids unique across packages: the DIMACS engine is `Loge.Dimacs.Engines.Clasp` (`:clasp`)
@@ -132,13 +132,15 @@ in `kino_loge`.
 
 ### `loge_smtlib`
 
-- [ ] S-expression lexer + command-level lint with offsets
-- [ ] Port engines: z3 (`-in -smt2`; parse `(error "line L column C: …")`), cvc5 (`--lang smt2 --produce-models`; `(error "Parse Error: <stdin>:L.C: …")`); binary from PATH/config, no download step
-- [ ] Model parsed from `(get-model)` into a table view
+- [x] S-expression reader with byte spans (`Loge.Smtlib.Sexp`, `SMTLIB001`–`005`) + command-level lint (`Loge.Smtlib.Commands`, `SMTLIB101`–`105`; unknown commands are warnings)
+- [x] Engines `Loge.Smtlib.Engines.Z3` (`-smt2 <file>`), `Cvc5` (`--lang smt2 --produce-models --incremental <file>`) over `Loge.Executable`; `executable` setting (PATH by default), `time_limit` control killing the solver; solver errors as a diagnostics view positioned from z3's/cvc5's messages
+- [x] Responses read as S-expressions: one `check-sat` → SZS; several → table of results, no SZS; models → table views
+- [x] Tests against a fake solver; real z3/cvc5 tests tagged and run when on PATH (run here with z3 5.3.3, cvc5 1.4.2)
+- [ ] CI: install z3 and cvc5 so the tagged tests run
 
 ### Gate
 
-- [ ] First Port-only engine; reusable as the template for kissat/cadical/Vampire
+- [x] First Port-only engine; reusable as the template for kissat/cadical/Vampire: `Loge.Executable` in core (also replaces `loge_asp`'s runner; kills the tool when the node halts)
 
 ## Phase 5 — MCP and agents
 
@@ -156,7 +158,7 @@ in `kino_loge`.
 - [ ] `notebooks/<language>.livemd` template per language with a pinned `Mix.install`
 - [ ] CI matrix: package × {ubuntu x86_64, ubuntu aarch64, macos}; NIF-bundled engines (clingo, SWI) exercised per OS
 - [ ] Clean-machine smoke test before each course
-- [x] Shared kill-with-caller in `loge`: `Loge.Guard` (used by `loge_asp`, `loge_prolog`, `Loge.Peer`)
+- [x] Shared kill-with-caller in `loge`: `Loge.Executable` for command-line tools, `Loge.Guard` for processes holding a Port (`loge_prolog`, `Loge.Peer`)
 - [ ] Run DIMACS through the `clingo` executable or a `Loge.Peer`, so grounding is cancellable too
 
 ## Open questions

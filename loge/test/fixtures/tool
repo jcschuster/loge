@@ -1,0 +1,8 @@
+#!/bin/sh
+# A stand-in for a solver: echoes its input file, then behaves as $LOGE_TOOL_MODE says.
+cat "$1"
+case "$LOGE_TOOL_MODE" in
+  stderr) echo "to stderr" >&2 ;;
+  fail) exit 3 ;;
+  hang) echo "started"; echo "$$" > "$1.pid"; exec sleep 1000 ;;
+esac

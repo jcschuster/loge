@@ -4,7 +4,7 @@ jobs:
   test:
     strategy:
       matrix:
-        package: [loge, loge_tptp, loge_dimacs, loge_asp, loge_prolog, loge_egglog, kino_loge]
+        package: [loge, loge_tptp, loge_dimacs, loge_asp, loge_prolog, loge_egglog, loge_smtlib, kino_loge]
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: ${{ matrix.package }} } }
     steps:

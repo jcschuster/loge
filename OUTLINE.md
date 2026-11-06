@@ -34,7 +34,7 @@ loge/                       this repo
   loge_asp/     (phase 2)   Deps: loge, clingo_elixir.
   loge_prolog/  (phase 3)   Deps: loge, swi_elixir.
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
-  loge_smtlib/  (phase 4)   Deps: loge only; z3/cvc5 via Port.
+  loge_smtlib/  (phase 4)   Deps: loge only; z3/cvc5 executables via Loge.Executable.
   loge_mcp/     (phase 5)   Deps: loge + MCP transport.
   notebooks/                one template notebook per language (pinned Mix.install).
   .github/workflows/ci.yml  matrix: package × {linux x86_64, linux aarch64, macos}.
@@ -184,12 +184,19 @@ An `async_nolink` task outlives its caller, so the supervised task monitors the 
 and runs the work in a linked child; on the caller's `:DOWN` it exits, which kills the
 work and so honours the engine cancellation contract.
 
-Work outside the BEAM's reach needs more, and core provides two pieces:
+Work outside the BEAM's reach needs more, and core provides three pieces:
 
+- `Loge.Executable.run(executable, arguments, input, options)`: runs a command-line
+  tool on its input written to a temporary file, under a `/bin/sh` wrapper that
+  SIGKILLs the tool and removes the file when the Port's pipe closes or receives a
+  line. The pipe closes when the caller dies and when the node halts or crashes, so no
+  tool outlives either; a line is how `:timeout` stops it, keeping the output so far.
+  stderr is merged or discarded (the wrapper's own `Killed` notices are discarded).
+  Used by `loge_asp` (clingo) and `loge_smtlib` (z3, cvc5); the template for further
+  Port engines (kissat, CaDiCaL, Vampire).
 - `Loge.Guard.start(release)`: a process monitoring its starter that calls `release`
-  when the starter dies, unless dismissed. Used to SIGKILL an OS process
-  (`loge_asp`'s clingo) or kill a process holding a Port (`loge_prolog`'s SWI session,
-  whose `swipl` exits when its stdin closes).
+  when the starter dies, unless dismissed. Used to kill a process holding a Port
+  (`loge_prolog`'s SWI session, whose `swipl` exits when its stdin closes).
 - `Loge.Peer.call(m, f, a)`: applies `m.f(a)` in a fresh `:peer` node (`standard_io`
   connection, this node's code path, about 130 ms to start), stopped by a guard when the
   caller dies. For NIFs on dirty schedulers, which nothing in the BEAM can interrupt
@@ -273,8 +280,8 @@ All read from source, not executed. Links in §8.
 | clingo 5.8.2 (executed) | stderr of the bundled `clingo` executable (`--outf=3 --solve-limit=0`), the same text the `logger:` callback receives; the file is the one clingo read | `<file>:L:C-[L2:]C2: error\|warning\|info: msg`, body lines indented by two spaces, then `note:` lines with their own positions; a closing `*** ERROR: (clingo): …` summary | 1/1, bytes, end exclusive | all, capped by `message_limit` | error, warning, info; a grounding error stops before the infos of the rest |
 | egglog (rev b912caa, egglog_elixir 45e8e55, executed) | `Egglog.parse/1` → `{:error, {:invalid_theory, msg, location}}`, `location` with `start_byte`/`end_byte` (end exclusive) and 1-based line/column; type and unbound-name errors only at run time, `{:error, {:native_error, msg}}` without location | `In L:C-C2: <quote>\nparse error: msg`; run errors `In …\nmsg`; failed check `{:error, {:check_failed, msg}}` | bytes, from the NIF | first only | error |
 | SWI-Prolog 10.0.1 (executed) | `read_term/3` on a UTF-8 file stream with `subterm_positions`, `singletons`; `error(syntax_error(M), stream(S, Line, LinePos, CharNo))` | `message_to_string/2` of the error | character offsets (`char_count`), 0-based | all: after a syntax error `read_term/3` resumes after the next full stop | error; singletons as warnings positioned on the variable |
-| z3                   | stdout                                                                                                                                                            | `(error "line L column C: msg")`, exit 1                                             | 1/0                                  | first per command                                                 | error                                                                             |
-| cvc5                 | stdout                                                                                                                                                            | `(error "Parse Error: <stdin>:L.C: msg")`, exit 1                                    | 1/0                                  | first                                                             | error                                                                             |
+| z3 5.3.3 (executed) | stdout; continues after an error | `(error "line L column C: msg")`; responses in command order; `echo` text unquoted | 1/0 (bytes assumed) | every error | error; z3 accepts some ill-sorted terms cvc5 rejects (`(> x true)`) |
+| cvc5 1.4.2 (executed) | stdout; warnings on stderr; stops at the first error | `(error "Parse Error: <file>:L.C: msg")`, or no position (`cannot push …` without `--incremental`); exit 1 | 1/1 | first | error |
 | kissat / CaDiCaL     | stderr                                                                                                                                                            | `<name>:<line>: parse error: msg`, exit 1                                            | line only                            | first                                                             | error                                                                             |
 
 Notes:
@@ -283,13 +290,11 @@ Notes:
   program whose grounding does not end (`p(X+1) :- p(X).`, easily typed mid-edit) is
   stopped only by killing its process. With the NIF, killing the session owner during
   grounding leaves the grounder running, and the VM segfaults when the session closes under
-  it (observed with clingo_elixir 1b5d4ab). `Loge.Asp.Executable` runs it under a Port with
-  a guardian that SIGKILLs it when the caller dies; `--time-limit` bounds a clingo that
-  outlives a halted VM, which the guardian does not survive. A Port merges stderr into
-  stdout or leaves it to the BEAM's: the lint reads both (`--outf=3` writes nothing to
-  stdout); the engine reads stdout only, since clingo's stderr can land inside a JSON line.
-  On exit 65 the engine runs the lint for diagnostics. Exit codes are clasp's `ExitCode`
-  bits (1 interrupted, 10 a model, 20 exhausted, 65 error).
+  it (observed with clingo_elixir 1b5d4ab). `Loge.Executable` runs it: the lint merges
+  stderr (`--outf=3` writes nothing to stdout) with a 10 s deadline; the engine discards
+  stderr, which can land inside a JSON line, and uses clingo's `--time-limit` so the
+  JSON stays complete. On exit 65 the engine runs the lint for diagnostics. Exit codes
+  are clasp's `ExitCode` bits (1 interrupted, 10 a model, 20 exhausted, 65 error).
 - `Clingo.Dimacs.solve!/2` rewrites CNF as a choice-rule ASP program in Elixir; it does not
   call clasp's DIMACS reader, and raises `ArgumentError` on input it does not read; the
   engine sends only what `Loge.Dimacs.Cnf` accepts and renders. `picosat_elixir` and
@@ -305,8 +310,14 @@ Notes:
   captured by redirecting in the worker thread (a loaded directive) and again in each
   `solve/2`. `SWI.query/3` raises on timeouts and Prolog errors; `Loge.Prolog.Swipl`
   rescues `SWI.Error` once per answer pull to keep earlier answers.
-- SMT-LIB lint cannot come from the solvers (first error, full run); write an S-expression
-  lexer + command-level lint in Elixir.
+- SMT-LIB lint cannot come from the solvers (first error, full run, and they disagree on
+  what is well-sorted): `Loge.Smtlib.Sexp` reads S-expressions with byte spans, and
+  `Loge.Smtlib.Commands` checks command names, arity and the kinds of name positions
+  (SMT-LIB 2.6 §4.1), only once the script reads. Solver errors become diagnostics in
+  the outcome, not a failed run. Both solvers flush each response through a pipe, so a
+  run killed at its deadline keeps its earlier answers; their own limits are not used
+  (z3 `-T` and cvc5 `--tlimit-per` only answer `unknown`; cvc5 `--tlimit` aborts with
+  a core dump).
 - egglog: `EGraph::parse_program` is separate from `run_program`; the NIF calls it with
   filename `None`. Runs are not interruptible: a run whose caller died kept a core busy
   (measured); egglog's own early stop is only triggered from primitives. Hence
