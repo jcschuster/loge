@@ -1,14 +1,17 @@
-import { mount, element, field, input, select, assign } from "./form.js";
+import { editor } from "./editor.js";
+import { mount, sync, element, field, input, select, assign } from "./form.js";
 
 export function init(ctx, data) {
   const app = mount(
     ctx,
-    `<div class="panel panel--top">
+    `<div class="panel">
       <div class="header"></div>
       <div class="options"></div>
+      <div class="editor"></div>
       <ul class="diagnostics"></ul>
     </div>`
   );
+  const source = editor(app.querySelector(".editor"), data, (edit) => ctx.pushEvent("push", edit));
   const header = app.querySelector(".header");
   const options = app.querySelector(".options");
   const list = app.querySelector(".diagnostics");
@@ -64,9 +67,11 @@ export function init(ctx, data) {
     assign(inputs.engine, setup.engine ?? "");
     if (inputs.variable) assign(inputs.variable, setup.variable);
     for (const c of setup.controls) assign(controls.get(c.key), c.value);
+    source.setLanguage(setup.editor_language);
   };
 
   const renderDiagnostics = (diagnostics) => {
+    source.setDiagnostics(diagnostics);
     list.replaceChildren(
       ...diagnostics.map((d) =>
         element(
@@ -85,4 +90,9 @@ export function init(ctx, data) {
   renderDiagnostics(data.diagnostics);
   ctx.handleEvent("setup", renderSetup);
   ctx.handleEvent("diagnostics", renderDiagnostics);
+  ctx.handleEvent("updates", source.receive);
+  ctx.handleSync(() => {
+    sync();
+    return source.synced();
+  });
 }

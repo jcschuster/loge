@@ -6,7 +6,9 @@ defmodule Loge.Tptp.Backend do
 
   alias AtpClient.Result
   alias Loge.Outcome
-  alias Loge.Tptp.Includes
+  alias Loge.Tptp.{Includes, Language}
+  alias Tptp.Szs.Ontology
+  alias Tptp.Tstp.Solution
 
   @doc "A backend's `AtpClient.Config.Field`s as `Loge.Config.Field`s."
   @spec config_schema(module()) :: [Loge.Config.Field.t()]
@@ -42,7 +44,9 @@ defmodule Loge.Tptp.Backend do
   end
 
   @doc """
-  The outcome of an `AtpClient` query run by `engine`, with `views`. The
+  The outcome of an `AtpClient` query run by `engine`: `views`, then what the system
+  derived (a proof, a model) as text views in TPTP titled by dataform. That is the
+  solution of a TSTP reply (`details.tstp`) and each SZS output block of the result. The
   `AtpClient.Result` stays in `details.result`.
   """
   @spec outcome({:ok, Result.t()} | {:error, term()}, atom(), [Outcome.view()]) ::
@@ -55,12 +59,28 @@ defmodule Loge.Tptp.Backend do
        szs: result.status,
        raw: result.output,
        engine: engine,
-       views: views,
+       views: views ++ solution(result) ++ Enum.map(result.blocks, &block/1),
        details: %{result: result}
      }}
   end
 
   def outcome({:error, _reason} = error, _engine, _views), do: error
+
+  defp solution(%Result{
+         output: output,
+         details: %{tstp: %Solution{span: %{solution: {start, length}}} = solution}
+       })
+       when length > 0,
+       do: [derivation(title(solution.output), binary_part(output, start, length))]
+
+  defp solution(%Result{}), do: []
+
+  defp block(%{dataform: dataform, body: body}), do: derivation(title(dataform), body)
+
+  defp derivation(title, text), do: {:titled, title, {:text, text, Language.editor_language()}}
+
+  defp title(nil), do: "Solution"
+  defp title(dataform), do: Ontology.name(dataform)
 
   @doc "A sentence describing an error an `AtpClient` backend returned."
   @spec format_error(term()) :: String.t()

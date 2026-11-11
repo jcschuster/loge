@@ -5,8 +5,12 @@ export function mount(ctx, html) {
   ctx.importCSS(FONTS);
   ctx.importCSS("loge.css");
   ctx.root.innerHTML = `<div class="app">${html}</div>`;
-  ctx.handleSync(() => document.activeElement?.dispatchEvent(new Event("change")));
+  ctx.handleSync(sync);
   return ctx.root.firstElementChild;
+}
+
+export function sync() {
+  document.activeElement?.dispatchEvent(new Event("change"));
 }
 
 export function element(tag, props = {}, ...children) {

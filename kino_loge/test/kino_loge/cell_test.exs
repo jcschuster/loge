@@ -38,12 +38,48 @@ defmodule KinoLoge.CellTest do
     assert data.diagnostics == []
   end
 
-  test "an edit updates the source" do
-    {kino, _source} = start_smart_cell!(Cell, %{})
-    push_smart_cell_editor_source(kino, "query")
+  test "the client gets the source, its version and the name of its grammar" do
+    {kino, _source} = start_smart_cell!(Cell, %{"source" => "fact"})
 
-    assert_smart_cell_update(kino, %{"source" => "query"}, source)
-    assert source =~ ~s|"query"|
+    assert %{source: "fact", version: 0, editor_language: "fake"} = connect(kino)
+  end
+
+  test "an edit updates the source and reaches every client" do
+    {kino, _source} = start_smart_cell!(Cell, %{"source" => "query"})
+    updates = [edit("a", [5, [0, "!"]]), edit("a", [[1, "Q"], 5])]
+    push_event(kino, "push", %{"version" => 0, "updates" => updates})
+
+    assert_smart_cell_update(kino, %{"source" => "Query!"}, source)
+    assert source =~ ~s|"Query!"|
+    assert_broadcast_event(kino, "updates", ^updates)
+    assert %{source: "Query!", version: 2} = connect(kino)
+  end
+
+  test "an edit made against another version is left to its client to rebase" do
+    {kino, _source} = start_smart_cell!(Cell, %{"source" => "query"})
+    push_event(kino, "push", %{"version" => 0, "updates" => [edit("a", [5, [0, "!"]])]})
+    push_event(kino, "push", %{"version" => 0, "updates" => [edit("b", [5, [0, "?"]])]})
+    push_event(kino, "push", %{"version" => 1, "updates" => [edit("b", [6, [0, "?"]])]})
+
+    assert_broadcast_event(kino, "updates", [%{"clientID" => "a"}])
+    assert_broadcast_event(kino, "updates", [%{"clientID" => "b", "changes" => [6, [0, "?"]]}])
+    assert %{source: "query!?", version: 2} = connect(kino)
+  end
+
+  test "an edit that does not fit the source changes nothing" do
+    {kino, _source} = start_smart_cell!(Cell, %{"source" => "query"})
+    updates = [edit("a", [5, [0, "!"]]), edit("a", [9])]
+    push_event(kino, "push", %{"version" => 0, "updates" => updates})
+
+    assert %{source: "query", version: 0} = connect(kino)
+    refute_received {:runtime_smart_cell_update, _, _, _, _}
+  end
+
+  test "another language changes the grammar" do
+    {kino, _source} = start_smart_cell!(Cell, %{})
+    push_event(kino, "set_language", %{"id" => "other"})
+
+    assert_broadcast_event(kino, "setup", %{language: "other", editor_language: nil})
   end
 
   test "a control change updates the source and every client" do
@@ -79,7 +115,7 @@ defmodule KinoLoge.CellTest do
 
   test "an edit is linted, positions in the editor's format" do
     {kino, _source} = start_smart_cell!(Cell, %{})
-    push_smart_cell_editor_source(kino, "include defs")
+    push_event(kino, "push", %{"version" => 0, "updates" => [edit("a", [[0, "include defs"]])]})
 
     assert_broadcast_event(
       kino,
@@ -103,4 +139,6 @@ defmodule KinoLoge.CellTest do
 
     assert_broadcast_event(kino, "diagnostics", [], 1_000)
   end
+
+  defp edit(client, changes), do: %{"clientID" => client, "changes" => changes}
 end

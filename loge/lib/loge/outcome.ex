@@ -19,7 +19,8 @@ defmodule Loge.Outcome do
   @typedoc """
   One renderable part of an outcome: text in an editor language (or plain), a
   badge, a table of rows under column headings, models, a graph in Mermaid's flowchart
-  syntax (https://mermaid.js.org/syntax/flowchart.html), or diagnostics.
+  syntax (https://mermaid.js.org/syntax/flowchart.html), diagnostics, or another view
+  under a title.
   """
   @type view ::
           {:text, binary(), String.t() | nil}
@@ -28,6 +29,7 @@ defmodule Loge.Outcome do
           | {:models, [term()]}
           | {:graph, binary()}
           | {:diagnostics, [Loge.Diagnostic.t()]}
+          | {:titled, binary(), view()}
 
   @typedoc "A verdict, if any, with the output it was read from."
   @type t :: %__MODULE__{

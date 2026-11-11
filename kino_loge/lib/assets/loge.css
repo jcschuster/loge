@@ -39,9 +39,9 @@
   border-radius: 0.5rem;
 }
 
-.panel--top {
-  border-bottom: none;
-  border-radius: 0.5rem 0.5rem 0 0;
+.code {
+  overflow: hidden;
+  border-radius: 0.5rem;
 }
 
 .panel > * + * {

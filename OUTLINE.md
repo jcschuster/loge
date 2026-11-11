@@ -11,8 +11,8 @@ This file is the design reference. `PLAN.md` holds the phased execution plan.
 
 | Decision          | Choice                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Editor            | Livebook-managed smart-cell editor (`editor:` option), not a custom CodeMirror/Monaco bundle.                                                  |
-| Highlighting      | Editor-side only; provided by Livebook's language list. TPTP via livebook#3234 (`codemirror-lang-tptp`); others later. No per-package JS.      |
+| Editor            | CodeMirror 6 bundled with `kino_loge`, edited collaboratively through the cell process (§7). Not Livebook's managed smart-cell editor.         |
+| Highlighting      | Lezer grammars, one npm package per language, imported by the editor bundle and chosen by `editor_language/0`. No JS in language packages.     |
 | Positions         | Diagnostics carry line/column ranges in Kino's smart-cell diagnostics format (kino#522): 1-based, columns in UTF-16 code units.                |
 | Linting / solving | Extensible from Elixir through behaviours; each language is its own Hex package.                                                               |
 | Verdicts          | A `Loge.Outcome` carries an SZS status (`Tptp.Szs.Ontology.t()`) where the ontology describes the result, `nil` otherwise (a badge view states it). |
@@ -56,7 +56,7 @@ for publishing via an env flag (`LOGE_HEX=1`). Per-package git tags `loge_tptp-v
 @callback id() :: atom()                       # :tptp, :asp, ...
 @callback label() :: String.t()
 @callback extensions() :: [String.t()]         # [".p", ".ax"]
-@callback editor_language() :: String.t() | nil  # name passed to Livebook's editor (e.g. "tptp")
+@callback editor_language() :: String.t() | nil  # name of its grammar in the cell's editor (e.g. "tptp")
 @callback analyze(binary(), keyword()) :: Loge.Analysis.t()
 @callback format(binary(), keyword()) :: {:ok, binary()} | {:error, term()}   # optional
 ```
@@ -160,9 +160,9 @@ SAT/UNSAT, a timeout. A Prolog answer (`true`/`false`) or an egglog run
 shows the SZS verdict only when there is one.
 
 `view` is a closed set the frontend knows how to render:
-`{:text, binary, lang_id | nil}`, `{:badge, label, tone}`, `{:table, columns, rows}`,
+`{:text, binary, editor_language | nil}` (highlighted by that grammar, or plain), `{:badge, label, tone}`, `{:table, columns, rows}`,
 `{:models, [...]}`, `{:graph, mermaid}` (Mermaid flowchart source, drawn by `Kino.Mermaid`
-without custom JS), `{:diagnostics, [Loge.Diagnostic.t]}`.
+without custom JS), `{:diagnostics, [Loge.Diagnostic.t]}`, `{:titled, title, view}`.
 Adding a view kind is a core change; adding an engine is not.
 
 ### `Loge.Registry`
@@ -209,9 +209,9 @@ Work outside the BEAM's reach needs more, and core provides three pieces:
 ```
 bind  → scan_binding/3 → every bound Loge.Input with a language, as Loge.Source
       → the cell keeps those of its language, for linting only
-edit  → handle_editor_change/2 → debounced (300 ms) Loge.lint/3 under Loge.Run
-      → diagnostics in Kino's editor format, listed under the editor; inline once
-        reconfigure_smart_cell(editor: [diagnostics:]) ships (livebook#3235 / kino#522)
+edit  → "push" event (version, change sets) → KinoLoge.ChangeSet.apply/2 → "updates"
+        broadcast to every client (§7) → debounced (300 ms) Loge.lint/3 under Loge.Run
+      → diagnostics in Kino's editor format, drawn in the editor and listed under it
 eval  → KinoLoge.Setup.to_source/1 → Loge.run!(..., includes: %{"defs" => defs}), or
         `defs = Loge.source(:lang, "...")` for a definitions cell → Outcome
       → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name, mnemonic, description in
@@ -233,10 +233,8 @@ are matched by their string form (`KinoLoge.Setup`); no atom is made from them.
 Cells:
 
 - `KinoLoge.Cell` ("Logic Engine"): language select → engine select (`engines_for/1`, or
-  none for a definitions cell with a variable) → controls from `controls/0` → managed editor
-  (`editor: [source:, language: Language.editor_language()]`) → diagnostics list. Kino cannot
-  reconfigure the editor language, so a language change is highlighted after the cell
-  restarts.
+  none for a definitions cell with a variable) → controls from `controls/0` → bundled editor
+  (grammar `Language.editor_language()`, §7) → diagnostics list.
 - `KinoLoge.ConfigCell` ("Logic Engine Settings"): form generated from every registered
   engine's `config_schema/0`, one engine shown at a time, grouped by field group
   (`:advanced` collapsed), with a per-engine probe (`verify/1` under `Loge.Run`). Its
@@ -326,29 +324,65 @@ Notes:
   (measured); egglog's own early stop is only triggered from primitives. Hence
   `Loge.Peer`.
 
-## 7. Editor facts (Kino 0.19.1, Livebook main @ ef1b666)
+## 7. Editor facts (Kino 0.19.1, Livebook main on 2026-11-11)
 
-- Managed editor: `init/2` returns `{:ok, ctx, editor: [source:, language:, placement:,
-visible:]}`; `handle_editor_change/2` required. `language` is matched by name against a
-  fixed list (elixir, erlang, sql, python, yaml, json, xml, css, html, javascript,
-  dockerfile, shell, toml, markdown); an unknown name is plain text, no error.
-  livebook#3234 (open) adds `LanguageDescription.of({name: "TPTP"})`; its description
-  uses `language: "tptp"`. Case-insensitive matching is not verified.
-- Released Kino: `reconfigure_smart_cell/2` accepts only `editor: [:source,
-  :intellisense_node, :visible]` (validated in `Kino.SmartCell.Server.reconfigure_smart_cell/2`).
-  kino#522 (open) adds `:diagnostics`; livebook#3235 (open) carries it in
-  `{:runtime_smart_cell_editor_update, ref, %{diagnostics: [code_marker]}}` to
-  `setCodeMarkers` under the `secondary` tag, without validation.
-- Diagnostic keys (kino#522 docs): `:line` (1-based, required), `:column` (1-based,
-  default first non-whitespace character), `:end_line` (default `:line`), `:end_column`
-  (exclusive, default end of `:end_line` without trailing whitespace), `:severity`
-  (`:error | :warning | :info | :hint`, required), `:description` (required). Columns count
-  UTF-16 code units. Each update replaces all diagnostics; `[]` clears. Not persisted: send
-  again in `handle_connect/1`.
-- Livebook's JS drops markers whose line is outside the document, clamps columns to the
-  line, and treats column `0` as absent.
-- Persistence: for both editor kinds only the attrs Kino reports are stored; on crash the
-  cell shows "Restart Smart cell" and `init/2` receives the last reported attrs.
+- The editor is CodeMirror 6. Its source is `kino_loge/assets/editor.js`; `npm run build`
+  there bundles it with esbuild into `kino_loge/lib/assets/editor.js`, which is committed
+  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 397 kB
+  with the TPTP grammar. Node comes from `.devcontainer` (Elixir image plus Debian's
+  `nodejs` and `npm`).
+- Output: `KinoLoge.Code` shows a `{:text, text, language}` view through the same bundle,
+  read-only, with line numbers, search and coloured brackets, at most 300 px high. A
+  text view without a language and the raw output stay terminal text: raw output mixes
+  languages, so an engine names the parts that are in one. The TPTP engines emit what
+  the system derived as TPTP text views titled by dataform (`CNFRefutation`): the solution
+  region of a TSTP reply (`details.tstp`, SystemOnTPTP's default) and each SZS output
+  block (`AtpClient.Result.blocks`).
+- Beside editing: search and replace (`@codemirror/search`, Ctrl+F), matching brackets,
+  and brackets coloured by nesting depth. The depth is read from the syntax tree, so a
+  grammar must expose `(`, `)`, `[`, `]`, `{`, `}` as nodes of those names, as
+  `codemirror-lang-tptp` does; brackets in comments and strings stay uncoloured.
+- Grammars are npm packages imported in `editor.js` and keyed by the name
+  `c:Loge.Language.editor_language/0` returns; `nil` or a name without a grammar is plain
+  text. A language change reconfigures the editor in place. Bundled: `codemirror-lang-tptp`.
+  Planned, each in its own repository: SWI-Prolog, egglog, DIMACS, SMT-LIB, ASP.
+- Collaboration is `@codemirror/collab` with the cell process as the authority. A client
+  pushes `%{"version" => n, "updates" => [%{"clientID" => id, "changes" => change_set}]}`.
+  The cell applies a push made against its current version (`KinoLoge.ChangeSet`, lengths
+  in UTF-16 code units), adds the number of updates to the version and broadcasts the
+  updates; any other push is dropped, and its client rebases on the broadcasts it was
+  missing and pushes again. The cell keeps the source and the version, no update log:
+  every client receives every broadcast in order, and a client that connects later starts
+  from the source and version of `handle_connect/1`.
+- Evaluation: Livebook awaits the promise of the `ctx.handleSync` handler before it pings
+  the cell and evaluates (`iframe/v6.html`, `js_view.js`). The handler resolves once the
+  cell has confirmed every edit of that client, so the evaluated source includes them.
+- Persistence is unchanged: the source is the `"source"` attr, reported after every
+  applied push. The version is not stored; it counts from 0 when the cell starts. On a
+  crash the cell shows "Restart Smart cell" and `init/2` receives the last reported attrs.
+- Diagnostic keys (the format of kino#522): `:line` (1-based, required), `:column`
+  (1-based, default first non-whitespace character), `:end_line` (default `:line`),
+  `:end_column` (exclusive, default end of `:end_line` without trailing whitespace),
+  `:severity` (`:error | :warning | :info | :hint`), `:description`. Columns count UTF-16
+  code units. `editor.js` turns them into `@codemirror/lint` diagnostics, dropping those
+  whose line is outside the document and clamping columns to the line. Each update
+  replaces all diagnostics; they are sent again in `handle_connect/1`.
+- Keys: Livebook's iframe (`iframe/priv/static/iframe/v6.html`) replicates every `keydown`
+  to the parent page with `isTargetEditable`, so notebook shortcuts that work while
+  typing in an input keep working. Read in the source, not tried in Livebook.
+- Not provided, unlike Livebook's own editor: the user's editor settings (theme, font
+  size, vim/emacs keys), remote cursors. The theme copies Livebook's dark default.
+- Verified outside Livebook: three simulated clients with random interleavings converge
+  (200 rounds); `KinoLoge.ChangeSet` agrees with CodeMirror on the 9906 change sets of
+  that run; `cell.js` with two clients in headless Chromium against a stand-in for the
+  cell syncs edits, highlights TPTP, colours brackets, searches, draws diagnostics,
+  switches grammar and holds the sync handler until its edits are confirmed; `code.js`
+  highlights, scrolls and searches a 31-line derivation and rejects typing. In Livebook
+  (released escript, `notebooks/tptp.livemd`, headless Chromium) every Logic Engine cell
+  loads its editor with highlighting, coloured brackets and diagnostics; editing by two
+  browsers, evaluation and highlighted output are not yet tried there.
+- Livebook's own editor highlights TPTP since livebook#3234 (merged), in Markdown fences
+  and code cells; the smart cell does not depend on it.
 
 ## 8. Sources
 

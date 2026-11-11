@@ -8,15 +8,21 @@ defmodule KinoLoge.Cell do
   cell's language bound in the notebook, which the cell reads from its binding.
 
   The cell's state is a `KinoLoge.Setup`; its source is `KinoLoge.Setup.to_source/1`.
-  Diagnostics use the position format of Kino's smart-cell editor diagnostics and are
-  listed under the editor.
+
+  The cell brings its own editor, which highlights the language named by
+  `c:Loge.Language.editor_language/0`. Every client edits the same source: a client
+  pushes its changes against the version it has seen, the cell applies those made
+  against the current version (`KinoLoge.ChangeSet`) and broadcasts them, and a client
+  whose changes were made against an older version rebases them on the broadcast and
+  pushes again. Diagnostics use the position format of Kino's smart-cell editor
+  diagnostics; they are drawn in the editor and listed under it.
   """
 
   use Kino.JS, assets_path: "lib/assets", entrypoint: "cell.js"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Logic Engine"
 
-  alias KinoLoge.Setup
+  alias KinoLoge.{ChangeSet, Setup}
   alias Loge.{Control, Diagnostic, Range}
 
   @lint_delay 300
@@ -27,20 +33,20 @@ defmodule KinoLoge.Cell do
 
     ctx =
       ctx
-      |> assign(setup: setup, sources: %{}, diagnostics: [], lint: nil, timer: nil)
+      |> assign(setup: setup, version: 0, sources: %{}, diagnostics: [], lint: nil, timer: nil)
       |> schedule_lint()
 
-    {:ok, ctx,
-     editor: [
-       source: setup.source,
-       language: setup.language.editor_language(),
-       placement: :bottom
-     ]}
+    {:ok, ctx}
   end
 
   @impl true
   def handle_connect(ctx) do
-    {:ok, Map.put(payload(ctx.assigns.setup), :diagnostics, ctx.assigns.diagnostics), ctx}
+    %{setup: setup, version: version, diagnostics: diagnostics} = ctx.assigns
+
+    {:ok,
+     setup
+     |> payload()
+     |> Map.merge(%{source: setup.source, version: version, diagnostics: diagnostics}), ctx}
   end
 
   @impl true
@@ -55,12 +61,28 @@ defmodule KinoLoge.Cell do
   def handle_event("set_option", %{"key" => key, "value" => value}, ctx),
     do: change(ctx, &Setup.put_option(&1, key, value))
 
-  def handle_event(_event, _payload, ctx), do: {:noreply, ctx}
+  def handle_event(
+        "push",
+        %{"version" => version, "updates" => updates},
+        %{assigns: %{version: version}} = ctx
+      )
+      when is_list(updates) do
+    case edit(ctx.assigns.setup.source, updates) do
+      {:ok, source} ->
+        broadcast_event(ctx, "updates", updates)
 
-  @impl true
-  def handle_editor_change(source, ctx) do
-    {:ok, ctx |> update(:setup, &Setup.put_source(&1, source)) |> schedule_lint()}
+        {:noreply,
+         ctx
+         |> update(:setup, &Setup.put_source(&1, source))
+         |> assign(version: version + length(updates))
+         |> schedule_lint()}
+
+      :error ->
+        {:noreply, ctx}
+    end
   end
+
+  def handle_event(_event, _payload, ctx), do: {:noreply, ctx}
 
   @impl true
   def handle_info(:lint, ctx), do: {:noreply, lint(ctx)}
@@ -112,6 +134,17 @@ defmodule KinoLoge.Cell do
   @impl true
   def to_source(attrs), do: attrs |> Setup.from_attrs() |> Setup.to_source()
 
+  defp edit(source, updates) do
+    Enum.reduce_while(updates, {:ok, source}, fn update, {:ok, source} ->
+      with %{"changes" => changes} <- update,
+           {:ok, source} <- ChangeSet.apply(source, changes) do
+        {:cont, {:ok, source}}
+      else
+        _invalid -> {:halt, :error}
+      end
+    end)
+  end
+
   defp change(ctx, fun) do
     ctx = update(ctx, :setup, fun)
     broadcast_event(ctx, "setup", payload(ctx.assigns.setup))
@@ -162,6 +195,7 @@ defmodule KinoLoge.Cell do
       languages: Enum.map(Loge.Registry.languages(), &choice/1),
       engines: Enum.map(Loge.Registry.engines_for(setup.language.id()), &choice/1),
       language: Atom.to_string(setup.language.id()),
+      editor_language: setup.language.editor_language(),
       engine: setup.engine && Atom.to_string(setup.engine.id()),
       controls: controls(setup),
       variable: setup.variable

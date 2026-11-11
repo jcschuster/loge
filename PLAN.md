@@ -10,9 +10,9 @@ Open these first; every item has a fallback inside Loge.
 
 | Repo                       | Change                                                                                                                                                                                                                                                                                                                                                                                              | Size                                               | Fallback if declined                                         | Status |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ | ------ |
-| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS                          | diagnostics listed under the editor (phase 1 default anyway) | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column |
-| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs                                    | —                                                            | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open |
-| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile                               | plain-text editor for TPTP                                   | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), open |
+| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS                          | diagnostics listed under the editor (phase 1 default anyway) | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column. Loge no longer waits on it (bundled editor) |
+| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs                                    | —                                                            | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open; as above |
+| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile                               | plain-text editor for TPTP                                   | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), merged; the cell uses its own bundle |
 | livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                                              | —                                                            | [ ]    |
 | davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | not needed: `loge_asp` lints through the executable            | [ ]    |
 | davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so | report | `loge_asp` runs the executable | [ ] |
@@ -48,7 +48,7 @@ in `kino_loge`.
 
 ### `loge_tptp`
 
-- [x] `Loge.Tptp.Language` over `Tptp.analyze/2` (`Tptp.Analysis` as `native`; spans via `Loge.Range.from_offsets/3`; `editor_language`: check whether Livebook matches `"tptp"` against #3234's `"TPTP"` case-insensitively)
+- [x] `Loge.Tptp.Language` over `Tptp.analyze/2` (`Tptp.Analysis` as `native`; spans via `Loge.Range.from_offsets/3`; `editor_language` `"tptp"`, the key of `codemirror-lang-tptp` in the editor bundle)
 - [x] No analyzers: `Tptp.analyze/2` applies `Tptp.Lint`, and `tptp` makes TPTP4X obsolete
 - [x] Engines, one per AtpClient backend: `Loge.Tptp.Engines.SystemOnTptp` (controls: system select, dynamic from `SystemOnTptp.systems/1`; time limit), `StarExec`, `LocalExec`, `Isabelle` (control: proof method with presets)
 - [x] Generated source: core `Loge.Engine.to_source/4` (replaces the per-engine port of `KinoAtpClient.AtpSolver.render_source/2`)
@@ -60,20 +60,35 @@ in `kino_loge`.
 
 ### `kino_loge`
 
-- [x] `KinoLoge.Cell` (name "Logic Engine"): managed editor, language/engine selects, controls from `controls/0`, diagnostics listed under the editor; state in `KinoLoge.Setup`
-- [ ] Inline diagnostics via `reconfigure_smart_cell(editor: [diagnostics:])`, resent in `handle_connect/1`, once #3235/#522 ship
+- [x] `KinoLoge.Cell` (name "Logic Engine"): language/engine selects, controls from `controls/0`, bundled editor, diagnostics drawn in the editor and listed under it; state in `KinoLoge.Setup`
 - [x] `KinoLoge.ConfigCell`: form from `config_schema/0` of every registered engine; `verify/1` probe with status indicator; `Loge.configure!/2` and the `configure/1` callback apply the settings; secrets by Livebook secret name
 - [x] `Kino.Render` impl for `Loge.Outcome`: verdict from core `Loge.Verdict` (tptp's SZS page texts), views, raw output in an Output tab
 - [x] Includes: definitions cell (no engine, `name = Loge.source(...)`); `scan_binding/3` for linting; generated includes from `include_names/1` + `Loge.Variable`
 - [x] Debounced lint via `Loge.Run` (`Loge.lint/3`); total `handle_event/3`; source attr persisted on every change
 - [x] Decided: Kino 0.19.1 has no self-evaluation API; the cell is evaluated as any cell, no Solve button
-- [x] Minimal JS (Kino.JS for the cell chrome only; no editor bundle)
+- [x] Hand-written JS for the cell chrome; the editor is the one bundle (`assets/editor.js` → `lib/assets/editor.js`)
 - [x] Outcome rendering: raw output and text views as terminal text (monospace, bounded height); graph views drawn by `Kino.Mermaid`
 
 ### Gate
 
 - [ ] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd` (smoke-test notebook exists; to be checked in Livebook)
-- [x] `grep -ri tptp kino_loge/lib` returns nothing
+- [x] `rg -i tptp kino_loge/lib -g '*.ex'` returns nothing
+
+### Editor (spike done, OUTLINE §7)
+
+- [x] CodeMirror 6 bundle with `codemirror-lang-tptp`, Livebook's dark theme, inline diagnostics, grammar switched with the language
+- [x] Collaboration: `@codemirror/collab`, the cell as authority, `KinoLoge.ChangeSet`; convergence simulated, Elixir checked against CodeMirror
+- [ ] Run in Livebook with two browsers: sync, persistence across restart, notebook shortcuts from inside the editor
+- [x] Evaluation right after typing: the `ctx.handleSync` handler resolves when the cell has confirmed the client's edits
+- [x] Search and replace (Ctrl+F); brackets coloured by nesting depth from the syntax tree
+- [x] `.devcontainer` built with Podman; the bundle rebuilt in it
+- [x] Highlighted output: `KinoLoge.Code` for text views in a language; TPTP engines emit SZS output blocks as TPTP text
+- [x] `{:titled, title, view}` view; an output block is titled by its dataform (`CNFRefutation`, `FiniteModel`)
+- [ ] Text views in their language from the other engines, once their grammars exist (clingo and z3 models, Prolog output)
+- [ ] Remote cursors and selections
+- [ ] Light theme and the user's editor settings (not exposed to the iframe; check what `ctx` offers)
+- [ ] CI: build the bundle and fail when `lib/assets/editor.js` differs from the committed one
+- [ ] Grammars, each a Lezer grammar in its own repository, exposing bracket tokens as nodes, then one import in `assets/editor.js` and the language's `editor_language/0`: SWI-Prolog, egglog, DIMACS, SMT-LIB, ASP
 - [ ] Publish `loge`, `loge_tptp`, `kino_loge` 0.1.0; KinoAtpClient README points here
 
 ## Phase 2 — DIMACS, ASP (cheap breadth)
@@ -93,7 +108,7 @@ in `kino_loge`.
 - [x] `to_source/2`: covered by core `Loge.Engine.to_source/4`
 - [x] Engine ids unique across packages: the DIMACS engine is `Loge.Dimacs.Engines.Clasp` (`:clasp`)
 - [ ] Includes: `#include` resolves files only; a definitions cell cannot be included yet (needs a language-side resolution like TPTP's)
-- [ ] Highlighting: none in Livebook (`editor_language/0` is `nil`)
+- [ ] Highlighting: Lezer grammar for ASP (see Editor, phase 1)
 
 ### Gate
 
@@ -114,7 +129,7 @@ in `kino_loge`.
 - [x] Linter in Prolog (`priv/loge.pl`): `read_term/3` loop over the program file, `op/3` directives applied, syntax errors (all) and singletons on the variable; character offsets converted to byte offsets
 - [x] Engine `Loge.Prolog.Engines.Swipl`: fresh `swipl` per run, lint then consult then goal; controls `goal`, `answers` (0 = all), `time_limit` (per answer); badge `true`/`false`/`consulted`, SZS only for `:timeout`; table of bindings written by `term_string/3`; printed output captured as raw
 - [x] Cancellation: `Loge.Guard` kills the `swipl` process; tested
-- [ ] Decide on highlighting: evaluate `codemirror-lang-prolog` on SWI syntax; fork or write a mode
+- [ ] Highlighting: Lezer grammar for SWI-Prolog (see Editor, phase 1)
 - [ ] Includes (`:- [defs].`, `:- include(defs).`) from definitions cells
 
 ### `loge_egglog`
@@ -168,7 +183,6 @@ in `kino_loge`.
 - [x] Smart-cell self-evaluation API in Kino: does not exist (0.19.1)
 - [x] SZS vocabulary for non-ATP outcomes: not everything maps; `szs: nil` with a badge for Prolog answers and egglog runs
 - [x] Sessions: dropped (OUTLINE §5)
-- [ ] Livebook maintainers' stance on smart-cell-only languages (`diagnostics`: line/column, settled in #3235/#522)
-- [ ] `codemirror-lang-prolog` SWI coverage
+- [x] Livebook maintainers' stance on smart-cell-only languages: not asked; niche languages are highlighted by the bundled editor instead
 - [x] Exact clingo message text at runtime: observed, OUTLINE §6
 - [ ] setup-beam elixir/OTP pair for 1.20 in CI

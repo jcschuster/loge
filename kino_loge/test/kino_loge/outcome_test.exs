@@ -46,11 +46,13 @@ defmodule KinoLoge.OutcomeTest do
   test "views follow the verdict, in order" do
     views = [
       {:text, "model", nil},
+      {:text, "proof", "fake"},
       {:badge, "SAT", :neutral},
       {:table, ["Lemma", "Status"], [["a", :theorem]]},
       {:models, [%{p: true}]},
       {:graph, "flowchart TB\n  a --> b\n"},
-      {:diagnostics, [Diagnostic.new("X", :warning, Range.new(2, column: 3), "careful")]}
+      {:diagnostics, [Diagnostic.new("X", :warning, Range.new(2, column: 3), "careful")]},
+      {:titled, "Proof", {:text, "steps", nil}}
     ]
 
     %Kino.Layout{items: [%Kino.Layout{items: [_verdict | kinos]}, _output]} =
@@ -58,12 +60,16 @@ defmodule KinoLoge.OutcomeTest do
 
     assert [
              %Kino.Text{text: "model", terminal: true},
+             %Kino.JS{module: KinoLoge.Code},
              %Kino.Text{text: "SAT", style: [color: _, font_weight: :bold]},
              %Kino.JS.Live{module: Kino.Table},
              %Kino.Layout{},
              %Kino.JS{module: Kino.Mermaid},
-             %Kino.Markdown{text: diagnostics}
+             %Kino.Markdown{text: diagnostics},
+             %Kino.Layout{type: :grid, items: [title, %Kino.Text{text: "steps"}]}
            ] = kinos
+
+    assert %Kino.Text{text: "Proof", style: [font_weight: :bold]} = title
 
     assert diagnostics =~ "2:3"
     assert diagnostics =~ "careful"

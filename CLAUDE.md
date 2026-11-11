@@ -15,7 +15,10 @@ contract or an upstream library, say so instead of routing around it.
 - Monorepo, one mix project per directory, no umbrella. Language packages depend only on
   `loge`; consumers (`kino_loge`, `loge_mcp`) depend only on `loge`. Never cross-link
   language packages.
-- `kino_loge` contains no language-specific code. `grep -ri tptp kino_loge/lib` must stay empty.
+- `kino_loge` contains no language-specific Elixir: `rg -i tptp kino_loge/lib -g '*.ex'` must stay
+  empty. The grammar table in `kino_loge/assets/editor.js` is the one place that names languages;
+  after changing it run `npm run build` there (Node is in `.devcontainer`) and keep the built
+  `lib/assets/editor.js`.
 - Generated cell source (`Loge.Engine.to_source/4`) must run without `kino_loge` installed: one
   `Loge.run!/3` call with named options, no helper modules.
 - Package name = module namespace (`loge_tptp` → `Loge.Tptp`).

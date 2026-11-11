@@ -19,6 +19,42 @@ defmodule Loge.Tptp.BackendTest do
               }}
   end
 
+  test "the output blocks follow the views, as TPTP text titled by dataform" do
+    block = %{dataform: :cnf_refutation, problem: nil, body: "cnf(a, axiom, p).\n", prefix: []}
+
+    assert {:ok, %Outcome{views: views}} =
+             Backend.outcome({:ok, %{@result | blocks: [block]}}, :e, [{:badge, "x", :neutral}])
+
+    assert views == [
+             {:badge, "x", :neutral},
+             {:titled, "CNFRefutation", {:text, "cnf(a, axiom, p).\n", "tptp"}}
+           ]
+  end
+
+  test "a TSTP reply's derivation is a view, titled by the header's dataform" do
+    rule = "%----\n"
+    derivation = "cnf(c, plain, $false)."
+
+    for {header, title} <- [
+          {"% Output   : CNFRefutation 0.1s\n", "CNFRefutation"},
+          {"", "Solution"}
+        ] do
+      text = rule <> "% File     : E---3.5.1\n" <> header <> rule <> derivation <> "\n"
+      {:ok, solution, []} = Tptp.Tstp.from_string(text)
+      result = %{@result | output: text, details: %{tstp: solution}}
+
+      assert {:ok, %Outcome{views: [view]}} = Backend.outcome({:ok, result}, :e)
+      assert view == {:titled, title, {:text, derivation, "tptp"}}
+    end
+  end
+
+  test "a TSTP reply without a derivation has no view for it" do
+    {:ok, solution, []} = Tptp.Tstp.from_string("%----\n% File     : E---3.5.1\n%----\n")
+    result = %{@result | details: %{tstp: solution}}
+
+    assert {:ok, %Outcome{views: []}} = Backend.outcome({:ok, result}, :e)
+  end
+
   test "an error passes through" do
     assert Backend.outcome({:error, :down}, :e) == {:error, :down}
   end

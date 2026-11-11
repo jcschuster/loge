@@ -13,7 +13,7 @@ defmodule Loge.Language do
   @doc "File extensions with the leading dot, such as `[\".p\", \".ax\"]`."
   @callback extensions() :: [String.t()]
 
-  @doc "The language name Livebook's editor highlights the source as, or `nil` for plain text."
+  @doc "The name of the language's grammar in the cell's editor, or `nil` for plain text."
   @callback editor_language() :: String.t() | nil
 
   @typedoc """
