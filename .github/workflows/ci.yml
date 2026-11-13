@@ -6,7 +6,9 @@ jobs:
       matrix:
         package: [loge, loge_tptp, loge_dimacs, loge_asp, loge_prolog, loge_egglog, loge_smtlib, kino_loge]
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: ${{ matrix.package }} } }
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
