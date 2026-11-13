@@ -187,4 +187,4 @@ in `kino_loge`.
 - [x] Sessions: dropped (OUTLINE §5)
 - [x] Livebook maintainers' stance on smart-cell-only languages: not asked; niche languages are highlighted by the bundled editor instead
 - [x] Exact clingo message text at runtime: observed, OUTLINE §6
-- [ ] setup-beam elixir/OTP pair for 1.20 in CI
+- [x] setup-beam pair for CI: Elixir 1.20, OTP 29 (`clingo_elixir`'s bundled NIF is built against OTP 29 headers, NIF 2.18)
