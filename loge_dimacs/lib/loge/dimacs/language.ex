@@ -20,7 +20,7 @@ defmodule Loge.Dimacs.Language do
   def extensions, do: [".cnf"]
 
   @impl true
-  def editor_language, do: nil
+  def editor_language, do: "dimacs"
 
   @impl true
   def include_names(source) when is_binary(source), do: []

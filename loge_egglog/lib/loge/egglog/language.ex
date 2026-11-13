@@ -21,7 +21,7 @@ defmodule Loge.Egglog.Language do
   def extensions, do: [".egg"]
 
   @impl true
-  def editor_language, do: nil
+  def editor_language, do: "egglog"
 
   @impl true
   def include_names(source) when is_binary(source), do: []

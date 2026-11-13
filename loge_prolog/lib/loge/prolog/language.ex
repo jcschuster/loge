@@ -22,7 +22,7 @@ defmodule Loge.Prolog.Language do
   def extensions, do: [".pl", ".pro"]
 
   @impl true
-  def editor_language, do: nil
+  def editor_language, do: "prolog"
 
   @impl true
   def include_names(source) when is_binary(source), do: []

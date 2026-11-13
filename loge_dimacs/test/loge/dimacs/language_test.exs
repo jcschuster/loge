@@ -8,7 +8,7 @@ defmodule Loge.Dimacs.LanguageTest do
     assert Language.id() == :dimacs
     assert Language.label() == "DIMACS CNF"
     assert Language.extensions() == [".cnf"]
-    assert Language.editor_language() == nil
+    assert Language.editor_language() == "dimacs"
     assert Language.include_names("p cnf 1 1\n1 0") == []
   end
 

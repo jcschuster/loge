@@ -10,7 +10,7 @@ defmodule Loge.Prolog.LanguageTest do
     assert Language.id() == :prolog
     assert Language.label() == "Prolog"
     assert Language.extensions() == [".pl", ".pro"]
-    assert Language.editor_language() == nil
+    assert Language.editor_language() == "prolog"
     assert Language.include_names(":- [defs].") == []
   end
 

@@ -7,7 +7,7 @@ defmodule KinoLoge.Outcome do
   graph view is drawn by `Kino.Mermaid`.
 
   The verdict is the status's name and mnemonic in its tone's colour, its
-  description, and a link to the SZS ontology. `Kino.Render` is implemented for
+  description if it has one, and a link to the SZS ontology. `Kino.Render` is implemented for
   `Loge.Outcome` through `kino/1`.
   """
 
@@ -17,7 +17,7 @@ defmodule KinoLoge.Outcome do
   @spec kino(Outcome.t()) :: Kino.Layout.t()
   def kino(%Outcome{} = outcome) do
     Kino.Layout.tabs(
-      Result: Kino.Layout.grid(verdict(outcome.szs) ++ Enum.map(outcome.views, &view/1)),
+      Result: Kino.Layout.grid(verdict(outcome) ++ Enum.map(outcome.views, &view/1)),
       Output: Kino.Text.new(outcome.raw, terminal: true)
     )
   end
@@ -28,16 +28,21 @@ defmodule KinoLoge.Outcome do
   def color(:negative), do: "#c0392b"
   def color(:neutral), do: "#5d6d7e"
 
-  defp verdict(nil), do: []
-  defp verdict(status), do: [verdict_kino(Verdict.of(status))]
+  defp verdict(%Outcome{szs: nil}), do: []
+
+  defp verdict(%Outcome{szs: status, problem: problem}),
+    do: [verdict_kino(Verdict.of(status, problem))]
 
   defp verdict_kino(%Verdict{} = verdict) do
-    Kino.Layout.grid([
-      label("#{verdict.name} (#{verdict.mnemonic})", verdict.tone),
-      Kino.Text.new(verdict.description),
-      Kino.Markdown.new("[SZS ontology](#{verdict.source})")
-    ])
+    Kino.Layout.grid(
+      [label("#{verdict.name} (#{verdict.mnemonic})", verdict.tone)] ++
+        description(verdict.description) ++
+        [Kino.Markdown.new("[SZS ontology](#{verdict.source})")]
+    )
   end
+
+  defp description(nil), do: []
+  defp description(text), do: [Kino.Text.new(text)]
 
   defp view({:text, text, nil}), do: Kino.Text.new(text, terminal: true)
   defp view({:text, text, language}), do: KinoLoge.Code.new(text, language)

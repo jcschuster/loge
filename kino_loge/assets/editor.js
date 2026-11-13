@@ -13,10 +13,16 @@ import {
   keymap,
   lineNumbers,
 } from "@codemirror/view";
+import { NodeProp } from "@lezer/common";
 import { tags as t } from "@lezer/highlight";
+import { asp } from "codemirror-lang-asp";
+import { dimacs } from "codemirror-lang-dimacs";
+import { egglog } from "codemirror-lang-egglog";
+import { smtlib } from "codemirror-lang-smtlib";
+import { prolog } from "codemirror-lang-swipl";
 import { tptp } from "codemirror-lang-tptp";
 
-const languages = { tptp };
+const languages = { asp, dimacs, egglog, prolog, smtlib, tptp };
 
 // https://github.com/livebook-dev/livebook/blob/main/assets/js/hooks/cell_editor/live_editor/codemirror/theme.js
 const colors = {
@@ -97,32 +103,31 @@ const theme = EditorView.theme(
 
 const highlighting = HighlightStyle.define([
   { tag: [t.keyword, t.modifier], color: colors.purple },
-  { tag: [t.number, t.bool, t.atom, t.standard(t.variableName)], color: colors.blue },
+  { tag: [t.number, t.bool, t.atom, t.escape, t.standard(t.variableName)], color: colors.blue },
   { tag: t.function(t.variableName), color: colors.blue },
   { tag: t.string, color: colors.green },
+  { tag: t.special(t.string), color: colors.yellow },
   { tag: t.variableName, color: colors.text },
-  { tag: [t.special(t.variableName), t.labelName], color: colors.lightRed },
-  { tag: t.typeName, color: colors.teal },
+  { tag: [t.special(t.variableName), t.labelName, t.propertyName], color: colors.lightRed },
+  { tag: [t.typeName, t.namespace], color: colors.teal },
   { tag: [t.operator, t.logicOperator], color: colors.peach },
   { tag: t.comment, color: colors.gray },
 ]);
 
 const grammar = (name) => languages[name]?.() ?? [];
 
-const closing = { "(": ")", "[": "]", "{": "}" };
-const opening = new Set(Object.keys(closing));
-const closers = new Set(Object.values(closing));
 const bracketMarks = bracketColors.map((_color, depth) => Decoration.mark({ class: `cm-bracket-${depth}` }));
 
 const nestedBrackets = (state) => {
   const marks = new RangeSetBuilder();
   const open = [];
   syntaxTree(state).iterate({
-    enter({ name, from, to }) {
-      if (opening.has(name)) {
+    enter({ type, name, from, to }) {
+      const closedBy = type.prop(NodeProp.closedBy);
+      if (closedBy) {
         marks.add(from, to, bracketMarks[open.length % bracketMarks.length]);
-        open.push(closing[name]);
-      } else if (closers.has(name) && open.at(-1) === name) {
+        open.push(closedBy);
+      } else if (open.at(-1)?.includes(name)) {
         open.pop();
         marks.add(from, to, bracketMarks[open.length % bracketMarks.length]);
       }

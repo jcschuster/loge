@@ -23,7 +23,7 @@ defmodule Loge.Smtlib.Language do
   def extensions, do: [".smt2"]
 
   @impl true
-  def editor_language, do: nil
+  def editor_language, do: "smtlib"
 
   @impl true
   def include_names(source) when is_binary(source), do: []

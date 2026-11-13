@@ -132,6 +132,7 @@ defmodule Loge.Smtlib.Solver do
 
     %Outcome{
       szs: szs(answers),
+      problem: :satisfiability,
       raw: output,
       engine: engine,
       views: answers_view(answers) ++ models ++ errors_view(errors)

@@ -16,7 +16,12 @@ defmodule Loge.Dimacs.Engines.ClaspTest do
 
   test "a satisfiable formula yields its model as literals of every variable" do
     assert {:ok,
-            %Outcome{szs: :satisfiable, engine: :clasp, views: [{:models, [model]}]} = outcome} =
+            %Outcome{
+              szs: :satisfiable,
+              problem: :satisfiability,
+              engine: :clasp,
+              views: [{:models, [model]}]
+            } = outcome} =
              Clasp.run("p cnf 3 2\n1 0\n-1 -2 0\n", [])
 
     assert model in [[1, -2, 3], [1, -2, -3]]

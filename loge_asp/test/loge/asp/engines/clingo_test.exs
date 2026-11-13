@@ -19,7 +19,12 @@ defmodule Loge.Asp.Engines.ClingoTest do
 
   test "a satisfiable program yields its first stable model" do
     assert {:ok,
-            %Outcome{szs: :satisfiable, engine: :clingo, views: [{:models, [["a", "b"]]}]} =
+            %Outcome{
+              szs: :satisfiable,
+              problem: :satisfiability,
+              engine: :clingo,
+              views: [{:models, [["a", "b"]]}]
+            } =
               outcome} =
              Clingo.run("a. b :- a.", [])
 
@@ -35,11 +40,14 @@ defmodule Loge.Asp.Engines.ClingoTest do
     assert {:ok, %Outcome{views: [{:models, [[~s|p("a b")|]]}]}} = Clingo.run(~s|p("a b").|, [])
   end
 
-  test "without a model limit, an optimisation runs to the optimum" do
+  test "without a model limit, an optimisation runs to the optimum and says so" do
     program = "{a; b}. :- not a, not b. #minimize {2,a : a; 1,b : b}. #minimize {1,c : c}."
 
-    assert {:ok, %Outcome{szs: :satisfiable, views: [{:models, models}]} = outcome} =
-             Clingo.run(program, [])
+    assert {:ok,
+            %Outcome{
+              szs: :satisfiable,
+              views: [{:badge, "optimum found", :positive}, {:models, models}]
+            } = outcome} = Clingo.run(program, [])
 
     assert List.last(models) == ["b"]
     assert %{"Result" => "OPTIMUM FOUND"} = JSON.decode!(outcome.raw)
@@ -47,6 +55,11 @@ defmodule Loge.Asp.Engines.ClingoTest do
 
   test "clingo's warnings do not reach the output" do
     assert {:ok, %Outcome{szs: :satisfiable}} =
+             Clingo.run("{a; b}. #minimize {1,a : a; 2,b : b}.", models: 1)
+  end
+
+  test "an optimisation stopped by the model limit is not an optimum" do
+    assert {:ok, %Outcome{szs: :satisfiable, views: [{:models, _models}]}} =
              Clingo.run("{a; b}. #minimize {1,a : a; 2,b : b}.", models: 1)
   end
 

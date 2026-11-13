@@ -152,12 +152,19 @@ byte offsets (tptp, Elixir lexers). The cell passes ranges through unchanged, re
 
 ### `Loge.Outcome` (struct)
 
-`%{szs: Tptp.Szs.Ontology.t() | nil, raw: binary, engine: atom, views: [view], details: map}`
+`%{szs: Tptp.Szs.Ontology.t() | nil, problem: :entailment | :satisfiability, raw: binary, engine: atom, views: [view], details: map}`
 
 `szs` is set where the SZS ontology describes the result exactly: an ATP verdict,
 SAT/UNSAT, a timeout. A Prolog answer (`true`/`false`) or an egglog run
 (`completed`/`check failed`) has `szs: nil` and a `{:badge, label, tone}` view; the cell
 shows the SZS verdict only when there is one.
+
+`problem` is what the status is about. The SZS ontology defines its values over axioms
+Ax and a conjecture C, so its descriptions fit `:entailment` (the default: TPTP, a Prolog
+goal) and are not shown for `:satisfiability` (DIMACS, ASP, SMT-LIB), whose verdict is
+name, mnemonic and SZS link. Loge does not reword the ontology's texts. What a status
+does not say is a badge beside it: clingo's `OPTIMUM FOUND` is `:satisfiable` with an
+`optimum found` badge.
 
 `view` is a closed set the frontend knows how to render:
 `{:text, binary, editor_language | nil}` (highlighted by that grammar, or plain), `{:badge, label, tone}`, `{:table, columns, rows}`,
@@ -214,8 +221,8 @@ edit  → "push" event (version, change sets) → KinoLoge.ChangeSet.apply/2 →
       → diagnostics in Kino's editor format, drawn in the editor and listed under it
 eval  → KinoLoge.Setup.to_source/1 → Loge.run!(..., includes: %{"defs" => defs}), or
         `defs = Loge.source(:lang, "...")` for a definitions cell → Outcome
-      → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name, mnemonic, description in
-        the tone's colour, SZS link; then the views), Output tab (raw output as terminal
+      → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name and mnemonic in the tone's
+        colour, description for an entailment problem, SZS link; then the views), Output tab (raw output as terminal
         text: monospace, at most 300 px high with scrolling, as Livebook draws stdout)
 ```
 
@@ -328,8 +335,8 @@ Notes:
 
 - The editor is CodeMirror 6. Its source is `kino_loge/assets/editor.js`; `npm run build`
   there bundles it with esbuild into `kino_loge/lib/assets/editor.js`, which is committed
-  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 397 kB
-  with the TPTP grammar. Node comes from `.devcontainer` (Elixir image plus Debian's
+  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 533 kB
+  with the six grammars. Node comes from `.devcontainer` (Elixir image plus Debian's
   `nodejs` and `npm`).
 - Output: `KinoLoge.Code` shows a `{:text, text, language}` view through the same bundle,
   read-only, with line numbers, search and coloured brackets, at most 300 px high. A
@@ -339,13 +346,14 @@ Notes:
   region of a TSTP reply (`details.tstp`, SystemOnTPTP's default) and each SZS output
   block (`AtpClient.Result.blocks`).
 - Beside editing: search and replace (`@codemirror/search`, Ctrl+F), matching brackets,
-  and brackets coloured by nesting depth. The depth is read from the syntax tree, so a
-  grammar must expose `(`, `)`, `[`, `]`, `{`, `}` as nodes of those names, as
-  `codemirror-lang-tptp` does; brackets in comments and strings stay uncoloured.
+  and brackets coloured by nesting depth. The depth is read from the syntax tree: an
+  opening bracket is a node with `NodeProp.closedBy` (set by the grammar), its
+  closer the next node named in that list, as `@codemirror/language` matches brackets;
+  brackets in comments and strings stay uncoloured.
 - Grammars are npm packages imported in `editor.js` and keyed by the name
   `c:Loge.Language.editor_language/0` returns; `nil` or a name without a grammar is plain
-  text. A language change reconfigures the editor in place. Bundled: `codemirror-lang-tptp`.
-  Planned, each in its own repository: SWI-Prolog, egglog, DIMACS, SMT-LIB, ASP.
+  text. A language change reconfigures the editor in place. Bundled, keyed by language id:
+  `codemirror-lang-tptp`, `-asp`, `-dimacs`, `-egglog`, `-smtlib`, `-swipl` (as `prolog`).
 - Collaboration is `@codemirror/collab` with the cell process as the authority. A client
   pushes `%{"version" => n, "updates" => [%{"clientID" => id, "changes" => change_set}]}`.
   The cell applies a push made against its current version (`KinoLoge.ChangeSet`, lengths
@@ -380,7 +388,9 @@ Notes:
   highlights, scrolls and searches a 31-line derivation and rejects typing. In Livebook
   (released escript, `notebooks/tptp.livemd`, headless Chromium) every Logic Engine cell
   loads its editor with highlighting, coloured brackets and diagnostics; editing by two
-  browsers, evaluation and highlighted output are not yet tried there.
+  browsers, evaluation and highlighted output are not yet tried there. These runs predate
+  the other grammars and brackets found by `closedBy`; those are checked in Node only
+  (bracket depths in ASP, egglog, SMT-LIB, SWI-Prolog and TPTP samples).
 - Livebook's own editor highlights TPTP since livebook#3234 (merged), in Markdown fences
   and code cells; the smart cell does not depend on it.
 

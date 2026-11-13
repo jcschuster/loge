@@ -8,7 +8,7 @@ defmodule Loge.Smtlib.LanguageTest do
     assert Language.id() == :smtlib
     assert Language.label() == "SMT-LIB"
     assert Language.extensions() == [".smt2"]
-    assert Language.editor_language() == nil
+    assert Language.editor_language() == "smtlib"
     assert Language.include_names("(check-sat)") == []
   end
 

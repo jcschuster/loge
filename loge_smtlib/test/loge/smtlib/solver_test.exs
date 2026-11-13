@@ -10,7 +10,7 @@ defmodule Loge.Smtlib.SolverTest do
 
   test "one check-sat gives the SZS status" do
     for {answer, szs} <- [sat: :satisfiable, unsat: :unsatisfiable, unknown: :unknown] do
-      assert {:ok, %Outcome{szs: ^szs, engine: :z3, raw: raw}} =
+      assert {:ok, %Outcome{szs: ^szs, problem: :satisfiability, engine: :z3, raw: raw}} =
                run("(check-sat)\n;> #{answer}\n")
 
       assert raw == "#{answer}\n"

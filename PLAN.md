@@ -23,6 +23,7 @@ Open these first; every item has a fallback inside Loge.
 | davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests | small | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard` | [ ] |
 | davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only) | release | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI | [ ] |
 | bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies | small C | no Picosat engine; clasp covers DIMACS | [ ] |
+| jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild | small generator change | TPTP brackets uncoloured | [x] 0.1.3 |
 
 Not PR targets: `codemirror/legacy-modes` (ports CM5 modes only), `SirBogman/codemirror-lang-prolog`
 (fork after evaluation), potassco/clingo, egraphs-good/egglog.
@@ -80,7 +81,7 @@ in `kino_loge`.
 - [x] Collaboration: `@codemirror/collab`, the cell as authority, `KinoLoge.ChangeSet`; convergence simulated, Elixir checked against CodeMirror
 - [ ] Run in Livebook with two browsers: sync, persistence across restart, notebook shortcuts from inside the editor
 - [x] Evaluation right after typing: the `ctx.handleSync` handler resolves when the cell has confirmed the client's edits
-- [x] Search and replace (Ctrl+F); brackets coloured by nesting depth from the syntax tree
+- [x] Search and replace (Ctrl+F); brackets coloured by nesting depth from the syntax tree (`closedBy`)
 - [x] `.devcontainer` built with Podman; the bundle rebuilt in it
 - [x] Highlighted output: `KinoLoge.Code` for text views in a language; TPTP engines emit SZS output blocks as TPTP text
 - [x] `{:titled, title, view}` view; an output block is titled by its dataform (`CNFRefutation`, `FiniteModel`)
@@ -88,7 +89,7 @@ in `kino_loge`.
 - [ ] Remote cursors and selections
 - [ ] Light theme and the user's editor settings (not exposed to the iframe; check what `ctx` offers)
 - [ ] CI: build the bundle and fail when `lib/assets/editor.js` differs from the committed one
-- [ ] Grammars, each a Lezer grammar in its own repository, exposing bracket tokens as nodes, then one import in `assets/editor.js` and the language's `editor_language/0`: SWI-Prolog, egglog, DIMACS, SMT-LIB, ASP
+- [x] Grammars, each a Lezer grammar in its own repository, then one import in `assets/editor.js` and the language's `editor_language/0`: SWI-Prolog, egglog, DIMACS, SMT-LIB, ASP
 - [ ] Publish `loge`, `loge_tptp`, `kino_loge` 0.1.0; KinoAtpClient README points here
 
 ## Phase 2 — DIMACS, ASP (cheap breadth)
@@ -104,11 +105,11 @@ in `kino_loge`.
 
 - [x] Linter: grounding by the bundled `clingo` executable (`--outf=3 --solve-limit=0 --time-limit=10`), not the NIF (OUTLINE §6); `Loge.Asp.Messages` reads its messages, `note:` lines as related positions, codes from clingo's `--warn` classes
 - [x] clingo runs under `Loge.Executable` (killed with its caller or the node; tested in `loge`)
-- [x] Engine `Loge.Asp.Engines.Clingo` (`--outf=2`): `models` control (unset: clingo's default, which runs an optimisation to its optimum), `time_limit` (`:timeout`); models view of shown atoms
+- [x] Engine `Loge.Asp.Engines.Clingo` (`--outf=2`): `models` control (unset: clingo's default, which runs an optimisation to its optimum), `time_limit` (`:timeout`); models view of shown atoms; `OPTIMUM FOUND` adds an `optimum found` badge
 - [x] `to_source/2`: covered by core `Loge.Engine.to_source/4`
 - [x] Engine ids unique across packages: the DIMACS engine is `Loge.Dimacs.Engines.Clasp` (`:clasp`)
 - [ ] Includes: `#include` resolves files only; a definitions cell cannot be included yet (needs a language-side resolution like TPTP's)
-- [ ] Highlighting: Lezer grammar for ASP (see Editor, phase 1)
+- [x] Highlighting: `codemirror-lang-asp`
 
 ### Gate
 
@@ -129,7 +130,7 @@ in `kino_loge`.
 - [x] Linter in Prolog (`priv/loge.pl`): `read_term/3` loop over the program file, `op/3` directives applied, syntax errors (all) and singletons on the variable; character offsets converted to byte offsets
 - [x] Engine `Loge.Prolog.Engines.Swipl`: fresh `swipl` per run, lint then consult then goal; controls `goal`, `answers` (0 = all), `time_limit` (per answer); badge `true`/`false`/`consulted`, SZS only for `:timeout`; table of bindings written by `term_string/3`; printed output captured as raw
 - [x] Cancellation: `Loge.Guard` kills the `swipl` process; tested
-- [ ] Highlighting: Lezer grammar for SWI-Prolog (see Editor, phase 1)
+- [x] Highlighting: `codemirror-lang-swipl`
 - [ ] Includes (`:- [defs].`, `:- include(defs).`) from definitions cells
 
 ### `loge_egglog`
@@ -182,6 +183,7 @@ in `kino_loge`.
 
 - [x] Smart-cell self-evaluation API in Kino: does not exist (0.19.1)
 - [x] SZS vocabulary for non-ATP outcomes: not everything maps; `szs: nil` with a badge for Prolog answers and egglog runs
+- [x] SZS descriptions for satisfiability problems: they speak of Ax and C, so `Loge.Outcome.problem` is `:satisfiability` for DIMACS, ASP and SMT-LIB and their verdict has no description; one status vocabulary, no per-language labels
 - [x] Sessions: dropped (OUTLINE §5)
 - [x] Livebook maintainers' stance on smart-cell-only languages: not asked; niche languages are highlighted by the bundled editor instead
 - [x] Exact clingo message text at runtime: observed, OUTLINE §6

@@ -18,10 +18,20 @@ defmodule KinoLoge.OutcomeTest do
     assert %Kino.Text{text: "Theorem (THM)", style: [color: color, font_weight: :bold]} = name
     assert color == KinoLoge.Outcome.color(:positive)
     assert %Kino.Text{text: text} = description
-    assert text == Verdict.of(:theorem).description
+    assert text == Verdict.of(:theorem, :entailment).description
     assert %Kino.Markdown{text: markdown} = link
-    assert markdown =~ "(#{Verdict.of(:theorem).source})"
+    assert markdown =~ "(#{Verdict.of(:theorem, :entailment).source})"
     assert output == Kino.Text.new(@outcome.raw, terminal: true)
+  end
+
+  test "a verdict without a description shows its name and the link" do
+    outcome = %Outcome{szs: :satisfiable, problem: :satisfiability, raw: "", engine: :e}
+
+    %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _output]} =
+      KinoLoge.Outcome.kino(outcome)
+
+    assert %Kino.Layout{items: [%Kino.Text{text: "Satisfiable (SAT)"}, %Kino.Markdown{}]} =
+             verdict
   end
 
   test "the tone colours the name" do

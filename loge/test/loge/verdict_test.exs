@@ -4,7 +4,7 @@ defmodule Loge.VerdictTest do
   alias Loge.Verdict
 
   test "a verdict names and describes its status" do
-    verdict = Verdict.of(:counter_satisfiable)
+    verdict = Verdict.of(:counter_satisfiable, :entailment)
 
     assert verdict.status == :counter_satisfiable
     assert verdict.name == "CounterSatisfiable"
@@ -13,12 +13,20 @@ defmodule Loge.VerdictTest do
     assert verdict.source =~ "https://"
   end
 
+  test "a verdict on a satisfiability problem has no description" do
+    verdict = Verdict.of(:satisfiable, :satisfiability)
+
+    assert verdict.name == "Satisfiable"
+    assert verdict.mnemonic == "SAT"
+    assert verdict.description == nil
+  end
+
   test "success is positive, an error negative, other no-success neutral" do
-    assert Verdict.of(:theorem).tone == :positive
-    assert Verdict.of(:counter_satisfiable).tone == :positive
-    assert Verdict.of(:input_error).tone == :negative
-    assert Verdict.of(:error).tone == :negative
-    assert Verdict.of(:timeout).tone == :neutral
-    assert Verdict.of(:gave_up).tone == :neutral
+    assert Verdict.of(:theorem, :entailment).tone == :positive
+    assert Verdict.of(:counter_satisfiable, :entailment).tone == :positive
+    assert Verdict.of(:input_error, :entailment).tone == :negative
+    assert Verdict.of(:error, :entailment).tone == :negative
+    assert Verdict.of(:timeout, :entailment).tone == :neutral
+    assert Verdict.of(:gave_up, :entailment).tone == :neutral
   end
 end

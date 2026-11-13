@@ -8,7 +8,7 @@ defmodule Loge.Asp.LanguageTest do
     assert Language.id() == :asp
     assert Language.label() == "ASP"
     assert Language.extensions() == [".lp"]
-    assert Language.editor_language() == nil
+    assert Language.editor_language() == "asp"
     assert Language.include_names("#include \"a.lp\".") == []
   end
 

@@ -105,9 +105,10 @@ defmodule Loge.Asp.Engines.Clingo do
         {:ok,
          %Outcome{
            szs: szs(result, status),
+           problem: :satisfiability,
            raw: output,
            engine: id(),
-           views: if(models == [], do: [], else: [{:models, models}]),
+           views: optimum(result) ++ if(models == [], do: [], else: [{:models, models}]),
            details: %{json: json}
          }}
 
@@ -115,6 +116,9 @@ defmodule Loge.Asp.Engines.Clingo do
         {:error, {:unrecognized_output, output}}
     end
   end
+
+  defp optimum("OPTIMUM FOUND"), do: [{:badge, "optimum found", :positive}]
+  defp optimum(_result), do: []
 
   defp szs("SATISFIABLE", _status), do: :satisfiable
   defp szs("OPTIMUM FOUND", _status), do: :satisfiable

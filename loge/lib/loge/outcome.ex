@@ -4,14 +4,23 @@ defmodule Loge.Outcome do
   engine's raw output, and views a consumer renders.
 
   `szs` is `nil` for a result the SZS ontology does not describe, such as a Prolog
-  answer or an egglog run; a `{:badge, label, tone}` view then states it.
+  answer or an egglog run; a `{:badge, label, tone}` view then states it. `problem`
+  says what the status is about.
 
   The view kinds are a closed set; adding one is a change to this module, adding an
   engine is not. `details` holds engine-specific data no view shows.
   """
 
   @enforce_keys [:raw, :engine]
-  defstruct [:szs, :raw, :engine, views: [], details: %{}]
+  defstruct [:szs, :raw, :engine, problem: :entailment, views: [], details: %{}]
+
+  @typedoc """
+  The kind of problem an SZS status is about: `:entailment` for axioms and a
+  conjecture, either possibly empty, as the SZS ontology defines its values (TPTP);
+  `:satisfiability` for a problem stated without them, whose satisfiability is asked
+  (DIMACS, ASP, SMT-LIB).
+  """
+  @type problem :: :entailment | :satisfiability
 
   @typedoc "The colour a badge is drawn in."
   @type tone :: :positive | :negative | :neutral
@@ -34,6 +43,7 @@ defmodule Loge.Outcome do
   @typedoc "A verdict, if any, with the output it was read from."
   @type t :: %__MODULE__{
           szs: Tptp.Szs.Ontology.t() | nil,
+          problem: problem(),
           raw: binary(),
           engine: atom(),
           views: [view()],

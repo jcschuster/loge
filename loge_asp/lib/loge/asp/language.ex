@@ -26,7 +26,7 @@ defmodule Loge.Asp.Language do
   def extensions, do: [".lp"]
 
   @impl true
-  def editor_language, do: nil
+  def editor_language, do: "asp"
 
   @impl true
   def include_names(source) when is_binary(source), do: []

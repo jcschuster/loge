@@ -7,6 +7,7 @@ defmodule Loge.StructsTest do
     assert %Outcome{szs: :theorem, raw: "", engine: :e}.views == []
     assert %Outcome{szs: :theorem, raw: "", engine: :e}.details == %{}
     assert %Outcome{raw: "", engine: :e}.szs == nil
+    assert %Outcome{raw: "", engine: :e}.problem == :entailment
   end
 
   test "an analysis has no native analysis unless the language provides one" do

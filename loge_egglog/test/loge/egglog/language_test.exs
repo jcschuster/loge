@@ -8,7 +8,7 @@ defmodule Loge.Egglog.LanguageTest do
     assert Language.id() == :egglog
     assert Language.label() == "egglog"
     assert Language.extensions() == [".egg"]
-    assert Language.editor_language() == nil
+    assert Language.editor_language() == "egglog"
     assert Language.include_names("(include \"defs.egg\")") == []
   end
 
