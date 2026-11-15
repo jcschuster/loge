@@ -44,17 +44,18 @@ defmodule Loge.VerdictTest do
     assert verdict.legend == nil
   end
 
-  test "success is positive, an error negative, other no-success neutral" do
+  test "a verdict has the tone of its status" do
     assert Verdict.of(:theorem, :entailment).tone == :positive
-    assert Verdict.of(:counter_satisfiable, :entailment).tone == :positive
-    assert Verdict.of(:input_error, :entailment).tone == :negative
-    assert Verdict.of(:error, :entailment).tone == :negative
-    assert Verdict.of(:timeout, :entailment).tone == :neutral
-    assert Verdict.of(:gave_up, :entailment).tone == :neutral
+    assert Verdict.of(:verified_bad, :verification).tone == :negative
+    assert Verdict.of(:no, :entailment).tone == :neutral
   end
 
-  test "a solution verified as bad is negative, though the verification succeeded" do
-    assert Verdict.of(:verified_good, :verification).tone == :positive
-    assert Verdict.of(:verified_bad, :verification).tone == :negative
+  test "a verdict on one of Loge's own statuses has no mnemonic and no page" do
+    verdict = Verdict.of(:yes, :entailment)
+
+    assert verdict.name == "Yes"
+    assert verdict.mnemonic == nil
+    assert verdict.description == Loge.Status.description(:yes)
+    assert verdict.source == nil
   end
 end

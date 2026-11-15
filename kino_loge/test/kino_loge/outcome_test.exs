@@ -7,7 +7,7 @@ defmodule KinoLoge.OutcomeTest do
 
   setup :configure_livebook_bridge
 
-  @outcome %Outcome{szs: :theorem, raw: "% SZS status Theorem\n", engine: :fake_engine}
+  @outcome %Outcome{status: :theorem, raw: "% SZS status Theorem\n", engine: :fake_engine}
 
   test "the result tab shows the verdict, the output tab the raw output" do
     %Kino.Layout{type: :tabs, info: %{labels: ["Result", "Output"]}, items: [result, output]} =
@@ -25,7 +25,7 @@ defmodule KinoLoge.OutcomeTest do
   end
 
   test "a verdict without a description shows its name and the link" do
-    outcome = %Outcome{szs: :satisfiable, problem: :satisfiability, raw: "", engine: :e}
+    outcome = %Outcome{status: :satisfiable, problem: :satisfiability, raw: "", engine: :e}
 
     %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _output]} =
       KinoLoge.Outcome.kino(outcome)
@@ -37,20 +37,24 @@ defmodule KinoLoge.OutcomeTest do
   test "the tone colours the name" do
     for {status, tone} <- [input_error: :negative, timeout: :neutral] do
       %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _output]} =
-        KinoLoge.Outcome.kino(%{@outcome | szs: status})
+        KinoLoge.Outcome.kino(%{@outcome | status: status})
 
       %Kino.Layout{items: [%Kino.Text{style: style} | _]} = verdict
       assert style[:color] == KinoLoge.Outcome.color(tone)
     end
   end
 
-  test "an outcome without an SZS status shows only its views" do
-    outcome = %Outcome{raw: "", engine: :fake_engine, views: [{:badge, "true", :positive}]}
+  test "a status of Loge's own shows its name and description, without mnemonic or link" do
+    outcome = %Outcome{status: :yes, raw: "", engine: :fake_engine}
 
-    assert %Kino.Layout{items: [%Kino.Layout{type: :grid, items: [badge]}, _output]} =
-             KinoLoge.Outcome.kino(outcome)
+    %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _output]} =
+      KinoLoge.Outcome.kino(outcome)
 
-    assert %Kino.Text{text: "true", style: [color: _, font_weight: :bold]} = badge
+    assert %Kino.Layout{items: [%Kino.Text{text: "Yes", style: style}, %Kino.Text{text: text}]} =
+             verdict
+
+    assert style[:color] == KinoLoge.Outcome.color(:positive)
+    assert text == Loge.Status.description(:yes)
   end
 
   test "views follow the verdict, in order" do
@@ -107,7 +111,7 @@ defmodule KinoLoge.OutcomeTest do
   end
 
   test "a translation's verdict says what Ax and C stand for" do
-    outcome = %Outcome{szs: :equi_satisfiable, problem: :translation, raw: "", engine: :e}
+    outcome = %Outcome{status: :equi_satisfiable, problem: :translation, raw: "", engine: :e}
 
     %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _raw]} = KinoLoge.Outcome.kino(outcome)
 

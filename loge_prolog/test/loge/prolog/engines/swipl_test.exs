@@ -19,30 +19,27 @@ defmodule Loge.Prolog.Engines.SwiplTest do
            ] = Swipl.controls()
   end
 
-  test "a goal with answers is true, with a table of bindings and no SZS status" do
-    assert {:ok, %Outcome{szs: nil, engine: :swipl, views: [{:badge, "true", :positive}, table]}} =
+  test "a goal with answers is yes, with a table of bindings" do
+    assert {:ok, %Outcome{status: :yes, engine: :swipl, views: [table]}} =
              Swipl.run(@family, goal: "parent(bob, X)", answers: 0)
 
     assert table == {:table, ["X"], [["ann"], ["pat"]]}
   end
 
   test "a goal without variables has no table" do
-    assert {:ok, %Outcome{szs: nil, views: [{:badge, "true", :positive}]}} =
-             Swipl.run(@family, goal: "parent(tom, bob)")
+    assert {:ok, %Outcome{status: :yes, views: []}} = Swipl.run(@family, goal: "parent(tom, bob)")
   end
 
-  test "a failing goal is false" do
-    assert {:ok, %Outcome{szs: nil, views: [{:badge, "false", :neutral}]}} =
-             Swipl.run(@family, goal: "parent(ann, _)")
+  test "a failing goal is no" do
+    assert {:ok, %Outcome{status: :no, views: []}} = Swipl.run(@family, goal: "parent(ann, _)")
   end
 
   test "a goal out of time without answers is a timeout" do
-    assert {:ok, %Outcome{szs: :timeout}} = Swipl.run("", goal: "repeat, fail", time_limit: 1)
+    assert {:ok, %Outcome{status: :timeout}} = Swipl.run("", goal: "repeat, fail", time_limit: 1)
   end
 
-  test "without a goal the program is consulted" do
-    assert {:ok, %Outcome{szs: nil, views: [{:badge, "consulted", :positive}]}} =
-             Swipl.run(@family, [])
+  test "without a goal the program is consulted, which asks nothing, so a success" do
+    assert {:ok, %Outcome{status: :success, views: []}} = Swipl.run(@family, [])
   end
 
   test "the raw output is what the program printed" do
@@ -63,7 +60,6 @@ defmodule Loge.Prolog.Engines.SwiplTest do
   end
 
   test "Loge.run!/3 solves through the engine" do
-    assert %Outcome{views: [{:badge, "true", _tone}]} =
-             Loge.run!(Swipl, @family, goal: "parent(tom, _)")
+    assert %Outcome{status: :yes} = Loge.run!(Swipl, @family, goal: "parent(tom, _)")
   end
 end

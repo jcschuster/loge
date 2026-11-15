@@ -152,7 +152,12 @@ defmodule Loge.Fake.Engine do
         includes = Keyword.get(options, :includes, %{})
 
         {:ok,
-         %Outcome{szs: :theorem, raw: raw, engine: :fake_engine, details: %{includes: includes}}}
+         %Outcome{
+           status: :theorem,
+           raw: raw,
+           engine: :fake_engine,
+           details: %{includes: includes}
+         }}
     end
   end
 
@@ -238,7 +243,7 @@ defmodule Loge.Fake.Translator do
 
     {:ok,
      %Outcome{
-       szs: :equi_satisfiable,
+       status: :equi_satisfiable,
        problem: :translation,
        raw: text,
        engine: :fake_translator,
@@ -278,7 +283,7 @@ defmodule Loge.Fake.Solver do
   def run(input, options) do
     {:ok,
      %Outcome{
-       szs: :satisfiable,
+       status: :satisfiable,
        problem: :satisfiability,
        raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
        engine: :fake_solver,
@@ -315,7 +320,7 @@ defmodule Loge.Fake.Checker do
   def run(input, _options) do
     {:ok,
      %Loge.Outcome{
-       szs: :verified_good,
+       status: :verified_good,
        problem: :verification,
        raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
        engine: :fake_checker

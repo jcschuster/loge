@@ -1,11 +1,13 @@
 defmodule Loge.Outcome do
   @moduledoc """
-  The result of `c:Loge.Engine.run/2`: an SZS status where one describes it, the
-  engine's raw output, views a consumer renders, and the source the run produced.
+  The result of `c:Loge.Engine.run/2`: a status, the engine's raw output, views a
+  consumer renders, and the source the run produced.
 
-  `szs` is `nil` for a result the SZS ontology does not describe, such as a Prolog
-  answer or an egglog run; a `{:badge, label, tone}` view then states it. `problem`
-  says what the status is about.
+  `status` is a `Loge.Status`: a value of the SZS ontology, or one of Loge's own where
+  the ontology has none, such as `:yes` for a Prolog query with an answer. A run that
+  asks nothing, or several things, is `:success`. `problem` says what the status is
+  about. A `{:badge, label, tone}` view states what stands beside the status, such as
+  an optimum found.
 
   `output` is the source a run produced: a translation's target, a prover's
   derivation, a model finder's interpretation. A consumer shows it as text in its
@@ -16,11 +18,11 @@ defmodule Loge.Outcome do
   engine is not. `details` holds engine-specific data no view shows.
   """
 
-  @enforce_keys [:raw, :engine]
-  defstruct [:szs, :raw, :engine, :output, problem: :entailment, views: [], details: %{}]
+  @enforce_keys [:status, :raw, :engine]
+  defstruct [:status, :raw, :engine, :output, problem: :entailment, views: [], details: %{}]
 
   @typedoc """
-  The kind of problem an SZS status is about: `:entailment` for axioms and a
+  The kind of problem a status is about: `:entailment` for axioms and a
   conjecture, either possibly empty, as the SZS ontology defines its values (TPTP);
   `:satisfiability` for a problem stated without them, whose satisfiability is asked
   (DIMACS, ASP, SMT-LIB); `:translation` for the relation between a translation's
@@ -47,9 +49,9 @@ defmodule Loge.Outcome do
           | {:diagnostics, [Loge.Diagnostic.t()]}
           | {:titled, binary(), view()}
 
-  @typedoc "A verdict, if any, with the output it was read from and the source it produced."
+  @typedoc "A status with the output it was read from and the source it produced."
   @type t :: %__MODULE__{
-          szs: Tptp.Szs.Ontology.t() | nil,
+          status: Loge.Status.t(),
           problem: problem(),
           raw: binary(),
           engine: atom(),

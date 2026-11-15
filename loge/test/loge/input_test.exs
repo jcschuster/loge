@@ -7,14 +7,19 @@ defmodule Loge.InputTest do
   end
 
   test "an outcome with an output is that output" do
-    outcome = %Loge.Outcome{raw: "log", engine: :e, output: Loge.source(:fake, "p.")}
+    outcome = %Loge.Outcome{
+      status: :success,
+      raw: "log",
+      engine: :e,
+      output: Loge.source(:fake, "p.")
+    }
 
     assert Loge.Input.to_iodata(outcome) == "p."
     assert Loge.Input.language(outcome) == :fake
   end
 
   test "an outcome without an output is its raw text in no language" do
-    outcome = %Loge.Outcome{raw: "log", engine: :e}
+    outcome = %Loge.Outcome{status: :success, raw: "log", engine: :e}
 
     assert Loge.Input.to_iodata(outcome) == "log"
     assert Loge.Input.language(outcome) == nil

@@ -8,11 +8,12 @@ defmodule Loge.Engine do
       it is what it claims to be, `:verified_good` or `:verified_bad` where a verifier
       of the TPTP World gives it.
     * `{:translate, to, preserves}`: the outcome's `output` is a source in the
-      language `to`, related to the input by the SZS status `preserves`, with the input
-      as the axioms Ax and the output as the conjecture C. A successful run has
-      `szs: preserves`; an input outside the fragment the translation is defined on
-      gives `szs: :inappropriate`, a `{:diagnostics, …}` view naming what lies outside,
-      and no output.
+      language `to`, related to the input by the status `preserves`, with the input as
+      the axioms Ax and the output as the conjecture C: `:equivalent`,
+      `:equi_satisfiable`, `:satisfiability_preserving`, `:unsatisfiability_preserving`
+      or `:theorem`. A successful run has `status: preserves`; an input outside the
+      fragment the translation is defined on gives `status: :inappropriate`, a
+      `{:diagnostics, …}` view naming what lies outside, and no output.
 
   A tool that does several of these is several engines.
 
@@ -27,16 +28,11 @@ defmodule Loge.Engine do
   `Loge.Run.async/1` relies on this.
   """
 
-  @typedoc "An SZS status a translation preserves between its input, as Ax, and its output, as C."
-  @type relation ::
-          :equivalent
-          | :equi_satisfiable
-          | :satisfiability_preserving
-          | :unsatisfiability_preserving
-          | :theorem
-
-  @typedoc "What an engine does with its input: solve it, check it, or translate it into the language `to`."
-  @type task :: :solve | :check | {:translate, to :: atom(), relation()}
+  @typedoc """
+  What an engine does with its input: solve it, check it, or translate it into the
+  language `to` under the status `preserves`.
+  """
+  @type task :: :solve | :check | {:translate, to :: atom(), preserves :: Loge.Status.t()}
 
   @typedoc """
   The names a generated `Loge.run!/3` call refers to: `:includes`, the include names of

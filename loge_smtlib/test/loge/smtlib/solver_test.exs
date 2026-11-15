@@ -8,9 +8,9 @@ defmodule Loge.Smtlib.SolverTest do
 
   defp run(script, options \\ []), do: Z3.run(script, [executable: @fake] ++ options)
 
-  test "one check-sat gives the SZS status" do
-    for {answer, szs} <- [sat: :satisfiable, unsat: :unsatisfiable, unknown: :unknown] do
-      assert {:ok, %Outcome{szs: ^szs, problem: :satisfiability, engine: :z3, raw: raw}} =
+  test "one check-sat gives the status" do
+    for {answer, status} <- [sat: :satisfiable, unsat: :unsatisfiable, unknown: :unknown] do
+      assert {:ok, %Outcome{status: ^status, problem: :satisfiability, engine: :z3, raw: raw}} =
                run("(check-sat)\n;> #{answer}\n")
 
       assert raw == "#{answer}\n"
@@ -31,7 +31,7 @@ defmodule Loge.Smtlib.SolverTest do
     ;> )
     """
 
-    assert {:ok, %Outcome{szs: :satisfiable, views: [model]}} = run(script)
+    assert {:ok, %Outcome{status: :satisfiable, views: [model]}} = run(script)
 
     assert model ==
              {:table, ["Name", "Sort", "Value"],
@@ -51,10 +51,10 @@ defmodule Loge.Smtlib.SolverTest do
     assert row == ["f", "((x!0 Int))", "Bool", "true"]
   end
 
-  test "several check-sats are a table of results, without an SZS status" do
+  test "several check-sats are a table of results, and the run a success" do
     script = "(check-sat)(push)(check-sat-assuming (p))(check-sat)\n;> sat\n;> unsat\n;> sat\n"
 
-    assert {:ok, %Outcome{szs: nil, views: [table]}} = run(script)
+    assert {:ok, %Outcome{status: :success, views: [table]}} = run(script)
 
     assert table ==
              {:table, ["check-sat", "Result"], [["1", "sat"], ["2", "unsat"], ["3", "sat"]]}
@@ -69,7 +69,8 @@ defmodule Loge.Smtlib.SolverTest do
     ;> sat
     """
 
-    assert {:ok, %Outcome{szs: :satisfiable, views: [{:diagnostics, [diagnostic]}]}} = run(script)
+    assert {:ok, %Outcome{status: :satisfiable, views: [{:diagnostics, [diagnostic]}]}} =
+             run(script)
 
     assert diagnostic ==
              Diagnostic.new(
@@ -87,7 +88,9 @@ defmodule Loge.Smtlib.SolverTest do
     ;> (error "cannot push when not solving incrementally")
     """
 
-    assert {:ok, %Outcome{szs: nil, views: [{:diagnostics, [positioned, general]}]}} = run(script)
+    assert {:ok, %Outcome{status: :input_error, views: [{:diagnostics, [positioned, general]}]}} =
+             run(script)
+
     assert positioned.range == Range.new(1, column: 2, end_line: 1, end_column: 11)
     assert positioned.message == "Expected RPAREN_TOK"
     assert general.range == Range.new(1)
@@ -96,10 +99,19 @@ defmodule Loge.Smtlib.SolverTest do
   test "past the time limit the run is a timeout, keeping the results so far" do
     script = "(check-sat)\n(check-sat)\n;> sat\n;hang\n"
 
-    assert {:ok, %Outcome{szs: nil, views: [table]}} = run(script, time_limit: 1)
+    assert {:ok, %Outcome{status: :success, views: [table]}} = run(script, time_limit: 1)
     assert table == {:table, ["check-sat", "Result"], [["1", "sat"], ["2", "timeout"]]}
 
-    assert {:ok, %Outcome{szs: :timeout, views: []}} = run("(check-sat)\n;hang\n", time_limit: 1)
+    assert {:ok, %Outcome{status: :timeout, views: []}} =
+             run("(check-sat)\n;hang\n", time_limit: 1)
+  end
+
+  test "a script without a check-sat asks nothing, so its run is a success" do
+    assert {:ok, %Outcome{status: :success, views: []}} = run("(declare-const x Int)\n")
+  end
+
+  test "a check-sat the solver stopped before, without an error, is stopped" do
+    assert {:ok, %Outcome{status: :stopped, views: []}} = run("(check-sat)\n")
   end
 
   test "a script that does not read is an error carrying its diagnostics" do
@@ -110,7 +122,7 @@ defmodule Loge.Smtlib.SolverTest do
   end
 
   test "command warnings do not stop the run" do
-    assert {:ok, %Outcome{szs: :satisfiable}} = run("(simplify x)\n(check-sat)\n;> sat\n")
+    assert {:ok, %Outcome{status: :satisfiable}} = run("(simplify x)\n(check-sat)\n;> sat\n")
   end
 
   test "a missing executable is an error naming the setting" do

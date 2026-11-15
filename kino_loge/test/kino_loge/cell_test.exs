@@ -115,8 +115,13 @@ defmodule KinoLoge.CellTest do
       kino.pid,
       [
         problem: Loge.source(:fake, "p"),
-        cnf: %Loge.Outcome{raw: "", engine: :e, output: Loge.source(:fake, "c")},
-        log: %Loge.Outcome{raw: "", engine: :e},
+        cnf: %Loge.Outcome{
+          status: :equivalent,
+          raw: "",
+          engine: :e,
+          output: Loge.source(:fake, "c")
+        },
+        log: %Loge.Outcome{status: :success, raw: "", engine: :e},
         other: Loge.source(:other, "x")
       ],
       __ENV__

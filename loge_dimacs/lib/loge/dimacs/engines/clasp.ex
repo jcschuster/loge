@@ -73,7 +73,7 @@ defmodule Loge.Dimacs.Engines.Clasp do
     models = Enum.map(models, &literals(&1, variables))
 
     %Outcome{
-      szs: status,
+      status: status,
       problem: :satisfiability,
       raw:
         IO.iodata_to_binary(["s ", status_line(status), ?\n | Enum.map(models, &value_line/1)]),

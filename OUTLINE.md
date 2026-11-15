@@ -19,7 +19,7 @@ translations between them that preserve a stated semantic relation.
 | Source   | Text in a language; a value a notebook binds to a name (`Loge.Source`).                                                             |
 | Language | How a source is read, linted and highlighted (`Loge.Language`).                                                                     |
 | Engine   | Performs one task on sources (`Loge.Engine`).                                                                                       |
-| Outcome  | What a run returns: an SZS status where the ontology describes the result, views, and possibly a source as output (`Loge.Outcome`). |
+| Outcome  | What a run returns: a status (`Loge.Status`), views, and possibly a source as output (`Loge.Outcome`).                              |
 | Role     | A source an engine needs beside its input and that the input's language cannot name (`Loge.Role`).                                  |
 
 An engine belongs in Loge when it passes both tests:
@@ -52,7 +52,7 @@ representations ("if this can be a satisfiability problem, translate it and solv
 | Predicate logic, Horn logic, Datalog, logic programming | TPTP provers, Prolog, egglog; clausification, grounding                               | engines exist; translations phase 8      |
 | Modal and description logics, correspondences           | non-classical TPTP; embedding into THF; translations between DL, modal logic and FOL  | phase 9                                  |
 | TPTP infrastructure                                     | provers, verifiers (GDV, AGMV), problem tools                                         | provers exist; verifiers phase 7         |
-| Semantic web                                            | RDF (Turtle), SPARQL, SHACL, ShEx                                                     | phase 9, `loge_rdf`                      |
+| Semantic web                                            | RDF (Turtle), SPARQL, SHACL, ShEx                                                     | phase 10: `loge_turtle`, `loge_sparql`, `loge_shex` |
 
 ## 1. Decisions (fixed)
 
@@ -63,7 +63,7 @@ representations ("if this can be a satisfiability problem, translate it and solv
 | Positions         | Diagnostics carry line/column ranges in Kino's smart-cell diagnostics format (kino#522): 1-based, columns in UTF-16 code units.                |
 | Linting / solving | Extensible from Elixir through behaviours; each language is its own Hex package.                                                               |
 | Tasks             | An engine declares one: `:solve`, `:check` or `{:translate, to, preserves}` (§3). Cells and consumers treat the three alike.                   |
-| Verdicts          | A `Loge.Outcome` carries an SZS status (`Tptp.Szs.Ontology.t()`) where the ontology describes the result, `nil` otherwise (a badge view states it). A translation's status is the relation it preserves between input and output. |
+| Verdicts          | Every `Loge.Outcome` carries a status of `Loge.Status`: a value of the SZS ontology where it describes the result, one of Loge's own otherwise (§3). A translation's status is the relation it preserves between input and output. |
 | Sources in a run  | A question the language has syntax for is part of the source (a conjecture, `(check-sat)`, `?- Goal.`). A reference the language can express is an include. A source the language cannot name is a role (§3). No control carries part of a problem. |
 | Translations      | Written in Elixir, in the package of the source language; verified before publication, not in CI (§8, §9).                                     |
 | Cells             | Two, by what they produce: a Source cell binds a source, an Engine cell binds an outcome (§4). None per task.                                  |
@@ -87,7 +87,9 @@ loge/                       this repo
   loge_prolog/  (phase 3)   Deps: loge, swi_elixir.
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
   loge_smtlib/  (phase 4)   Deps: loge only; z3/cvc5 executables via Loge.Executable.
-  loge_rdf/     (phase 9)   Turtle, SPARQL, ShExC; query and validation. Deps: loge, rudof_elixir.
+  loge_turtle/  (phase 10)  Turtle; SHACL validation. Deps: loge, rudof_elixir.
+  loge_sparql/  (phase 10)  SPARQL; queries on a graph and on an endpoint. Deps: loge, rudof_elixir.
+  loge_shex/    (phase 10)  ShExC and ShapeMap; ShEx validation. Deps: loge, rudof_elixir.
   notebooks/                demo.livemd (guided tour of every package), and one smoke-test
                             notebook per language (pinned Mix.install).
   .github/workflows/ci.yml  matrix: package × {linux x86_64, linux aarch64, macos}.
@@ -163,12 +165,12 @@ words.
   what it claims to be: `:verified_good` or `:verified_bad` where a verifier of the TPTP
   World gives it.
 - `{:translate, to, preserves}`: the outcome's `output` is a source in the language
-  `to`. `preserves` is the SZS status relating the input, as Ax, to the output, as C:
+  `to`. `preserves` is the status relating the input, as Ax, to the output, as C:
   `:equivalent`, `:equi_satisfiable`, `:satisfiability_preserving`,
   `:unsatisfiability_preserving` or `:theorem` (§8). A successful run has
-  `szs: preserves`. An input outside the fragment the translation is defined on gives
-  `szs: :inappropriate`, a `{:diagnostics, …}` view naming what lies outside, and no
-  output.
+  `status: preserves`. An input outside the fragment the translation is defined on
+  gives `status: :inappropriate`, a `{:diagnostics, …}` view naming what lies outside,
+  and no output.
 
 One engine module performs one task; a tool that does several is several engines.
 
@@ -176,7 +178,7 @@ One engine module performs one task; a tool that does several is several engines
 evaluates; it is the same for every engine, so it is a core function, not a callback.
 `input` is the source text, or an atom naming the variable that holds the input.
 `references` are `includes: [name]`, the include names of the source, each passed as
-the variable of that name; `roles: [key: variable]` (phase 9); and `bind: variable`,
+the variable of that name; `roles: [key: variable]` (phase 10); and `bind: variable`,
 the name the outcome is bound to, absent for none:
 
     cnf = Loge.run!(Loge.Tptp.Engines.Clausify, "fof(a, axiom, p | q).", [])
@@ -244,18 +246,32 @@ directive that reaches it, prefixed `in '<name>': `. Engines receive the problem
 include inlined (a `Tptp.Unit`) when includes are given, the source as written otherwise; an
 unresolved include is `{:error, {:unresolved_includes, diagnostics}}`.
 
-### Roles (`Loge.Role`, phase 9)
+### Roles (`Loge.Role`, phase 10)
 
 A role is a source an engine needs beside its input and that the input's language has no
-syntax to name: the data graph of a SPARQL query, of SHACL shapes, of a ShEx schema.
-`c:Loge.Engine.roles/0` lists them as `%Loge.Role{key, label, languages, required?}`. A
-role's value reaches `run/2` under `key` as a `Loge.Input.t()`; role keys and control keys
-are disjoint. A consumer offers the bound inputs of the role's languages.
+syntax to name: the data graph of a SPARQL query or of SHACL shapes, the schema and the
+data graph of a ShEx shape map. `c:Loge.Engine.roles/0` lists them as
+`%Loge.Role{key, label, languages, required?}`. A role's value reaches `run/2` under
+`key` as a `Loge.Input.t()`; role keys and control keys are disjoint. `Loge.run!/3` takes
+role keys as options and raises `ArgumentError` for a required role that is missing and
+for a value in a language the role does not list. A consumer offers the bound inputs of
+the role's languages.
 
-The editor holds what is asked (query, shapes, schema) and a role holds what it is asked
-of (data). None of the languages of phases 1–4 has a role: TPTP, Prolog, ASP and egglog
-name other sources through includes, and SMT-LIB and DIMACS sources are self-contained.
-Roles are therefore built with their first engine, in `loge_rdf`, and not before.
+The editor holds what is asked and a role holds what it is asked of:
+
+| Engine            | Editor                                       | Roles                                                                                         |
+| ----------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| SPARQL on a graph | the query                                    | `data` (Turtle)                                                                               |
+| SHACL             | the shapes, with their targets               | `data` (Turtle), optional: without it the source is validated against the shapes it contains  |
+| ShEx              | the shape map: which nodes, against which shapes | `schema` (ShExC) and `data` (Turtle)                                                      |
+
+A ShEx schema is thereby a source many shape maps are asked of, as a Prolog program is of
+many queries. A SPARQL query on an endpoint has no role: the endpoint is an address, given
+by a control.
+
+None of the languages of phases 1–4 has a role: TPTP, Prolog, ASP and egglog name other
+sources through includes, and SMT-LIB and DIMACS sources are self-contained. Roles are
+therefore built with their first engines, in phase 10, and not before.
 
 ### `Loge.Diagnostic` (struct; fields of `Tptp.Diagnostic`, `range` for `span`)
 
@@ -274,16 +290,15 @@ byte offsets (tptp, Elixir lexers). The cell passes ranges through unchanged, re
 
 ### `Loge.Outcome` (struct)
 
-`%{szs: Tptp.Szs.Ontology.t() | nil, problem: :entailment | :satisfiability | :translation | :verification, raw: binary, engine: atom, views: [view], output: Loge.Source.t() | nil, details: map}`
+`%{status: Loge.Status.t(), problem: :entailment | :satisfiability | :translation | :verification, raw: binary, engine: atom, views: [view], output: Loge.Source.t() | nil, details: map}`
 
 `output` is the source a run produced: a translation's target, a prover's derivation, a
 model finder's interpretation, the graph of a SPARQL `CONSTRUCT`. A consumer shows it as
 text in its language; an engine does not repeat it as a view.
 
-`szs` is set where the SZS ontology describes the result exactly: an ATP verdict,
-SAT/UNSAT, a timeout. A Prolog answer (`true`/`false`) or an egglog run
-(`completed`/`check failed`) has `szs: nil` and a `{:badge, label, tone}` view; the cell
-shows the SZS verdict only when there is one.
+`status` is a value of the SZS ontology where the ontology describes the result
+exactly: an ATP verdict, SAT/UNSAT, a timeout. Otherwise it is one of Loge's own
+(`Loge.Status`, below), such as `:yes` for a Prolog query with an answer.
 
 `problem` is what the status is about. The SZS ontology defines its values over axioms
 Ax and a conjecture C, so its descriptions fit `:entailment` (the default: TPTP, a Prolog
@@ -301,6 +316,32 @@ succeeded, the solution did not.
 `{:models, [...]}`, `{:graph, mermaid}` (Mermaid flowchart source, drawn by `Kino.Mermaid`
 without custom JS), `{:diagnostics, [Loge.Diagnostic.t]}`, `{:titled, title, view}`.
 Adding a view kind is a core change; adding an engine is not.
+
+### `Loge.Status`
+
+Every outcome has a status, a `Loge.Status.t()`: a value of the SZS ontology, or one of
+Loge's own for a verdict the ontology has no value for.
+
+| Status           | States                                | Given by                                                    |
+| ---------------- | ------------------------------------- | ----------------------------------------------------------- |
+| `:yes`           | the question asked has an answer      | a Prolog query the toplevel answers `true`                  |
+| `:no`            | it has none                           | a Prolog query answered `false`, a failed egglog `check`    |
+| `:conformant`    | the data conforms to the shapes       | SHACL and ShEx validation (phase 10)                        |
+| `:nonconformant` | it does not                           | SHACL and ShEx validation (phase 10)                        |
+
+A run that asks nothing (a consulted Prolog program, an egglog run to its end, whose
+checks are assertions that held, a SPARQL `CONSTRUCT`) or several things (an SMT-LIB
+script with no `check-sat` or more than one) is SZS `:success`. No outcome has `nil`: a result none of the values states gets a value
+here, not a badge. A badge remains for what stands beside a status, such as clingo's
+`optimum found`.
+
+`Loge.Status` gives each value its name, description and tone, and delegates to
+`Tptp.Szs.Ontology` for the ontology's; `Loge.Verdict.of/2` reads them from it. Loge's
+own values are answers, so they count as success; they have no mnemonic and no SZS
+page. `:yes` and `:conformant` are drawn in the positive tone, `:no` in the neutral one,
+as a goal that fails is no error, and `:nonconformant` in the negative one, as
+`VerifiedBad` is. The `preserves` of a translation is a
+`Loge.Status.t()` as well.
 
 ### `Loge.Registry`
 
@@ -360,9 +401,9 @@ edit  → "push" event (version, change sets) → KinoLoge.ChangeSet.apply/2 →
 eval  → Source cell: `defs = Loge.source(:lang, "...")` → Loge.Source
       → Engine cell: `result = Loge.run!(Engine, input, ..., includes: %{"defs" => defs})`
         → Outcome
-      → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name and mnemonic in the tone's
-        colour, description unless the problem is one of satisfiability, SZS link; then the
-        views; then the output as text in its language), Output tab (raw output as terminal
+      → Kino.Render (KinoLoge.Outcome): Result tab (verdict: name, with the mnemonic
+        where there is one, in the tone's colour; description unless the problem is one
+        of satisfiability; SZS link for a value of the ontology; then the views; then the output as text in its language), Output tab (raw output as terminal
         text: monospace, at most 300 px high with scrolling, as Livebook draws stdout)
 ```
 
@@ -395,7 +436,8 @@ Cells:
 - `KinoLoge.Cell` ("Logic Engine"): language select → engine select (`engines_for/1`,
   grouped by task) → input (this cell's editor, or a bound input the engine accepts,
   shown read-only in the editor; the select appears once there is a bound input to
-  choose) → controls from `controls/0` → result name (optional) →
+  choose) → roles (phase 10: one select per role, over the bound inputs of its
+  languages) → controls from `controls/0` → result name (optional) →
   bundled editor (grammar `Language.editor_language()`, §7) → diagnostics list. Its
   source is one `Loge.run!/3` call, bound to the result name when there is one. A cell
   always has an engine.
@@ -482,7 +524,8 @@ Notes:
   what is well-sorted): `Loge.Smtlib.Sexp` reads S-expressions with byte spans, and
   `Loge.Smtlib.Commands` checks command names, arity and the kinds of name positions
   (SMT-LIB 2.6 §4.1), only once the script reads. Solver errors become diagnostics in
-  the outcome, not a failed run. Both solvers flush each response through a pipe, so a
+  the outcome, not a failed run; a single `check-sat` the solver stopped before
+  answering is `:input_error` when it reported an error, `:stopped` otherwise. Both solvers flush each response through a pipe, so a
   run killed at its deadline keeps its earlier answers; their own limits are not used
   (z3 `-T` and cvc5 `--tlimit-per` only answer `unknown`; cvc5 `--tlimit` aborts with
   a core dump).
@@ -662,7 +705,10 @@ between cells), [SWISH](https://arxiv.org/abs/1808.08042) (program and query cel
 [SystemOnTPTP](https://tptp.org/cgi-bin/SystemOnTPTP),
 [SystemOnTSTP](https://tptp.org/cgi-bin/SystemOnTSTP) (problem tools, solvers, solution
 tools), [RDF Playground](https://www.aidanhogan.com/docs/rdf-playground.pdf),
-[rudof_elixir](https://github.com/davfuenmayor/rudof_elixir).
+[rudof_elixir](https://github.com/davfuenmayor/rudof_elixir),
+[rudof](https://github.com/rudof-project/rudof),
+[codemirror-lang-sparql](https://github.com/aatauil/codemirror-lang-sparql),
+[codemirror-lang-turtle](https://github.com/aatauil/codemirror-lang-turtle).
 Translations and their verification: Sutcliffe,
 [Semantic Derivation Verification: Techniques and Implementation](https://doi.org/10.1142/S0218213006003119)
 (GDV); Reger, Suda and Voronkov,

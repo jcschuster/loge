@@ -56,9 +56,9 @@ contract or an upstream library, say so instead of routing around it.
   default and from CI. Run them with `mix test --only verification` before a release and
   record the figures in the package's `VERIFICATION.md` (OUTLINE §9). Never weaken, skip
   or delete a failing verification; report the disagreement.
-- From phase 5 on, follow PLAN's phase order; a phase is done when its gate passes. Tick
-  a checkbox only for what was run, and write "to be checked in Livebook" where it was
-  not.
+- From phase 5 on, follow PLAN's phase order; phase 10 needs phases 5 and 6 only and may
+  run beside 7 to 9. A phase is done when its gate passes. Tick a checkbox only for what
+  was run, and write "to be checked in Livebook" where it was not.
 - Never commit or push. When a change is complete, suggest a commit message and stop.
 - Report what changed, not full file contents.
 - Flag ambiguities instead of resolving them silently. Verify claims about libraries

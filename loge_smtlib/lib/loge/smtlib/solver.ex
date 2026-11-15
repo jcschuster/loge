@@ -8,10 +8,12 @@ defmodule Loge.Smtlib.Solver do
   S-expressions:
 
     * `sat`, `unsat` and `unknown` answer the script's `check-sat` commands in order.
-      With one `check-sat` the answer is the outcome's SZS status (`:satisfiable`,
-      `:unsatisfiable`, `:unknown`, or `:timeout` when the time limit stopped it);
-      with several, a `{:table, ["check-sat", "Result"], rows}` view lists them and
-      there is no SZS status.
+      With one `check-sat` the answer is the outcome's status (`:satisfiable`,
+      `:unsatisfiable`, `:unknown`, or `:timeout` when the time limit stopped it). A
+      solver that stopped before answering is `:input_error` when it reported an
+      error, `:stopped` otherwise. A script with no `check-sat` asks nothing and one
+      with several asks more than a status states, so both are `:success`; with
+      several, a `{:table, ["check-sat", "Result"], rows}` view lists the answers.
     * A model, the response to `(get-model)`, is a `{:table, columns, rows}` view of
       its definitions, written as the solver wrote them.
     * `(error "…")` responses are a `{:diagnostics, diagnostics}` view, positioned on
@@ -131,7 +133,7 @@ defmodule Loge.Smtlib.Solver do
           do: model(definitions, output)
 
     %Outcome{
-      szs: szs(answers),
+      status: szs(answers, errors),
       problem: :satisfiability,
       raw: output,
       engine: engine,
@@ -149,11 +151,13 @@ defmodule Loge.Smtlib.Solver do
     end
   end
 
-  defp szs(["sat"]), do: :satisfiable
-  defp szs(["unsat"]), do: :unsatisfiable
-  defp szs(["unknown"]), do: :unknown
-  defp szs(["timeout"]), do: :timeout
-  defp szs(_answers), do: nil
+  defp szs(["sat"], _errors), do: :satisfiable
+  defp szs(["unsat"], _errors), do: :unsatisfiable
+  defp szs(["unknown"], _errors), do: :unknown
+  defp szs(["timeout"], _errors), do: :timeout
+  defp szs(["not run"], [_ | _]), do: :input_error
+  defp szs(["not run"], []), do: :stopped
+  defp szs(_answers, _errors), do: :success
 
   defp answers_view(answers) when length(answers) > 1 do
     rows =

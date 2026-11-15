@@ -71,7 +71,7 @@ defmodule Loge.Tptp.Backend do
   def outcome({:ok, %Result{} = result}, engine, views) do
     {:ok,
      %Outcome{
-       szs: result.status,
+       status: result.status,
        raw: result.output,
        engine: engine,
        views: views ++ solution(result) ++ Enum.map(result.blocks, &block/1),

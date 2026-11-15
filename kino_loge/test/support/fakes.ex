@@ -125,7 +125,7 @@ defmodule KinoLoge.Fake.Engine do
   def run(input, options) do
     {:ok,
      %Loge.Outcome{
-       szs: :theorem,
+       status: :theorem,
        raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
        engine: :fake_engine,
        details: Map.new(options)
@@ -189,7 +189,7 @@ defmodule KinoLoge.Fake.Translator do
 
     {:ok,
      %Loge.Outcome{
-       szs: :equi_satisfiable,
+       status: :equi_satisfiable,
        problem: :translation,
        raw: text,
        engine: :translator,

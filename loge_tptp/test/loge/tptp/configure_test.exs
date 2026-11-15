@@ -26,7 +26,7 @@ defmodule Loge.Tptp.ConfigureTest do
     prover = Path.expand("../../fixtures/prover", __DIR__)
     :ok = Loge.configure!(Engines.LocalExec, binary: prover)
 
-    assert {:ok, %Loge.Outcome{szs: :theorem}} =
+    assert {:ok, %Loge.Outcome{status: :theorem}} =
              Engines.LocalExec.run("fof(a, conjecture, $true).", [])
   end
 

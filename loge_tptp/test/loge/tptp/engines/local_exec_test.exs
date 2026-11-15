@@ -7,7 +7,7 @@ defmodule Loge.Tptp.Engines.LocalExecTest do
   @prover Path.expand("../../../fixtures/prover", __DIR__)
 
   test "runs the prover binary" do
-    assert {:ok, %Outcome{szs: :theorem, engine: :local_exec, raw: raw}} =
+    assert {:ok, %Outcome{status: :theorem, engine: :local_exec, raw: raw}} =
              LocalExec.run("fof(a, conjecture, $true).", binary: @prover, time_limit: 1)
 
     assert raw =~ "SZS status Theorem"

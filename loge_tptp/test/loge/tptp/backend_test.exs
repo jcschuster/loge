@@ -13,7 +13,7 @@ defmodule Loge.Tptp.BackendTest do
     assert Backend.outcome({:ok, @result}, :e, [{:badge, "x", :neutral}]) ==
              {:ok,
               %Outcome{
-                szs: :theorem,
+                status: :theorem,
                 raw: "out",
                 engine: :e,
                 views: [{:badge, "x", :neutral}],

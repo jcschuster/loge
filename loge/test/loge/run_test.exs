@@ -35,7 +35,7 @@ defmodule Loge.RunTest do
     assert_receive {:running, work}
     send(work, :finish)
 
-    assert {:ok, %Loge.Outcome{szs: :theorem, raw: "p.", engine: :fake_engine}} =
+    assert {:ok, %Loge.Outcome{status: :theorem, raw: "p.", engine: :fake_engine}} =
              Task.await(task)
   end
 end

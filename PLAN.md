@@ -3,30 +3,31 @@
 Design reference: `OUTLINE.md`. Phases 1 to 4 are ordered by how much new parsing each
 needs; phases 2 and 4 can run beside 3. Phases 5 to 9 follow the scope of OUTLINE §0, in
 order: core contracts, cells, the existing languages, translations, new formalisms. Each
-phase has one gate that must pass before the next starts. Phase 0 is issue-only and
-nothing waits on its answers.
+phase has one gate that must pass before the next starts. Phase 10 needs phases 5 and 6
+only and can run beside 7 to 9. Phase 0 is issue-only and nothing waits on its answers.
 
 ## Phase 0 — Upstream issues and PRs
 
 Open these first; every item has a fallback inside Loge.
 
-| Repo                       | Change                                                                                                                                                                                                                                                                                                                                                                                              | Size                      | Fallback if declined                                                                       | Status                                                                                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS | diagnostics listed under the editor (phase 1 default anyway)                               | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column. Loge no longer waits on it (bundled editor) |
-| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs           | —                                                                                          | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open; as above                                                                         |
-| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile      | plain-text editor for TPTP                                                                 | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), merged; the cell uses its own bundle                                             |
-| livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                     | —                                                                                          | [ ]                                                                                                                                               |
-| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                     | not needed: `loge_asp` lints through the executable                                        | [ ]                                                                                                                                               |
-| davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so                                                                                                | report                    | `loge_asp` runs the executable                                                             | [ ]                                                                                                                                               |
-| davfuenmayor/egglog_elixir | Return spans structurally from the NIF                                                                                                                                                                                                                                                                                                                                                              | —                         | —                                                                                          | [x] parse errors carry `location` since 45e8e55; type errors still text only                                                                      |
-| davfuenmayor/egglog_elixir | Structured locations for type and unbound-name errors, so a lint could report them; and a type-check-only entry point (today types are checked only while running)                                                                                                                                                                                                                                  | small Rust                | parse errors only                                                                          | [ ]                                                                                                                                               |
-| davfuenmayor/egglog_elixir | An interruptible run (a flag checked between rule iterations), so an engine can cancel without a peer node                                                                                                                                                                                                                                                                                          | small Rust                | `Loge.Peer` (130 ms per run)                                                               | [ ]                                                                                                                                               |
-| davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog              | not needed (lint via `SWI.query`)                                                          | [ ]                                                                                                                                               |
-| davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests                                                                                                                                                                                                                                        | small                     | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard` | [ ]                                                                                                                                               |
-| davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only)                                                                                                                                                                                          | release                   | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI                             | [ ]                                                                                                                                               |
-| bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies                                                                                                                                                                           | small C                   | no Picosat engine; clasp covers DIMACS                                                     | [ ]                                                                                                                                               |
-| jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild                                                                                                                                                                                                                            | small generator change    | TPTP brackets uncoloured                                                                   | [x] 0.1.3                                                                                                                                         |
-| davfuenmayor/rudof_elixir  | Publish to Hex with the native bundles hosted as release assets (its README names their size as the obstacle); bundles beyond linux x86_64; locations in `Rudof.Error` (today `kind` and `message`)                                                                                                                                                                                                 | release + small Rust      | none for publishing `loge_rdf`; linting by readers of our own                              | [ ]                                                                                                                                               |
+| Repo                       | Change                                                                                                                                                                                                                                                                                                                                                                                              | Size                      | Fallback if declined                                                                        | Status                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS | diagnostics listed under the editor (phase 1 default anyway)                                | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column. Loge no longer waits on it (bundled editor) |
+| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs           | —                                                                                           | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open; as above                                                                         |
+| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile      | plain-text editor for TPTP                                                                  | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), merged; the cell uses its own bundle                                             |
+| livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                     | —                                                                                           | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                     | not needed: `loge_asp` lints through the executable                                         | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so                                                                                                | report                    | `loge_asp` runs the executable                                                              | [ ]                                                                                                                                               |
+| davfuenmayor/egglog_elixir | Return spans structurally from the NIF                                                                                                                                                                                                                                                                                                                                                              | —                         | —                                                                                           | [x] parse errors carry `location` since 45e8e55; type errors still text only                                                                      |
+| davfuenmayor/egglog_elixir | Structured locations for type and unbound-name errors, so a lint could report them; and a type-check-only entry point (today types are checked only while running)                                                                                                                                                                                                                                  | small Rust                | parse errors only                                                                           | [ ]                                                                                                                                               |
+| davfuenmayor/egglog_elixir | An interruptible run (a flag checked between rule iterations), so an engine can cancel without a peer node                                                                                                                                                                                                                                                                                          | small Rust                | `Loge.Peer` (130 ms per run)                                                                | [ ]                                                                                                                                               |
+| davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog              | not needed (lint via `SWI.query`)                                                           | [ ]                                                                                                                                               |
+| davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests                                                                                                                                                                                                                                        | small                     | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard`  | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only)                                                                                                                                                                                          | release                   | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI                              | [ ]                                                                                                                                               |
+| bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies                                                                                                                                                                           | small C                   | no Picosat engine; clasp covers DIMACS                                                      | [ ]                                                                                                                                               |
+| jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild                                                                                                                                                                                                                            | small generator change    | TPTP brackets uncoloured                                                                    | [x] 0.1.3                                                                                                                                         |
+| davfuenmayor/rudof_elixir  | Publish to Hex with the native bundles hosted as release assets (its README names their size as the obstacle); bundles beyond linux x86_64                                                                                                                                                                                                                                                          | release                   | none for publishing; `Mix.install` takes the git dependency meanwhile, on linux x86_64 only | [ ]                                                                                                                                               |
+| rudof-project/rudof        | Line and column of a parse error as fields of its errors (at 393f45e they are inside `error: String`; the ShEx reader has them as fields before that)                                                                                                                                                                                                                                               | small Rust                | positions read from the message text, as for clingo, z3 and cvc5                            | [ ]                                                                                                                                               |
 
 Not PR targets: `codemirror/legacy-modes` (ports CM5 modes only), `SirBogman/codemirror-lang-prolog`
 (fork after evaluation), potassco/clingo, egraphs-good/egglog.
@@ -82,7 +83,7 @@ in `kino_loge`.
 
 - [x] CodeMirror 6 bundle with `codemirror-lang-tptp`, Livebook's dark theme, inline diagnostics, grammar switched with the language
 - [x] Collaboration: `@codemirror/collab`, the cell as authority, `KinoLoge.ChangeSet`; convergence simulated, Elixir checked against CodeMirror
-- [ ] Run in Livebook with two browsers: sync, persistence across restart, notebook shortcuts from inside the editor
+- [x] Run in Livebook with two browsers: sync, persistence across restart, notebook shortcuts from inside the editor
 - [x] Evaluation right after typing: the `ctx.handleSync` handler resolves when the cell has confirmed the client's edits
 - [x] Search and replace (Ctrl+F); brackets coloured by nesting depth from the syntax tree (`closedBy`)
 - [x] `.devcontainer` built with Podman; the bundle rebuilt in it
@@ -116,7 +117,7 @@ in `kino_loge`.
 
 ### Gate
 
-- [ ] A second language works with one added dependency and no change to `loge` or `kino_loge` (ASP needed one language-neutral fix in `kino_loge`: an empty integer field unsets a control without a default. Both: `notebooks/dimacs.livemd` and `notebooks/asp.livemd` cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
+- [x] A second language works with one added dependency and no change to `loge` or `kino_loge` (ASP needed one language-neutral fix in `kino_loge`: an empty integer field unsets a control without a default. Both: `notebooks/dimacs.livemd` and `notebooks/asp.livemd` cells generate, solve and render through `KinoLoge.Setup` and `KinoLoge.Outcome` under `Mix.install`; to be checked in Livebook)
 
 ## Phase 3 — Prolog, egglog, local Isabelle
 
@@ -126,7 +127,7 @@ in `kino_loge`.
 - [x] `Loge.Tptp.IsabelleServer`: local Isabelle server started on first use when no password is configured, killed with the node by a Port watchdog; a session per run; Isabelle settings no longer required
 - [x] `Loge.Guard`: release outside-BEAM resources when the caller dies (now also used by `loge_asp`)
 - [x] `Loge.Peer`: call in a fresh peer node stopped with the caller, for uninterruptible NIFs
-- [x] `Loge.Outcome.szs` optional (`nil` where SZS does not describe the result; badge view instead); the cell shows the verdict only when present
+- [x] `Loge.Outcome.szs` optional (`nil` where SZS does not describe the result; badge view instead); the cell shows the verdict only when present. Superseded by `Loge.Status` (phase 10)
 
 ### `loge_prolog`
 
@@ -264,8 +265,8 @@ Goal: the first translations (OUTLINE §8) in Elixir, each with its verification
 
 ## Phase 9 — Course formalisms
 
-Goal: the remaining topics of OUTLINE §0. Each is added without a change to `loge` or
-`kino_loge`, except the one named below.
+Goal: modal and description logics (OUTLINE §0). Each is added without a change to
+`loge` or `kino_loge`. The semantic web is phase 10.
 
 ### Modal logic (`loge_tptp`)
 
@@ -278,16 +279,74 @@ Goal: the remaining topics of OUTLINE §0. Each is added without a change to `lo
 - [ ] Decide the concrete syntax and the reasoner (open question below)
 - [ ] Translations between description logic, modal logic and first-order logic as the course states them
 
-### Semantic web (`loge_rdf`)
-
-- [ ] `Loge.Role` and `c:Loge.Engine.roles/0` in `loge`; role selects in `KinoLoge.Cell`; `roles:` in `Loge.Engine.to_source/4`. The one planned core change of this phase
-- [ ] Languages Turtle, SPARQL, ShExC; their Lezer grammars in the editor bundle
-- [ ] Engines: SPARQL query (`:solve`; role `data`, or an endpoint control), SHACL and ShEx validation (`:check`; role `data`), each in a `Loge.Peer` (rudof's NIF cannot be interrupted)
-- [ ] Blocked on rudof_elixir on Hex (phase 0)
-
 ### Gate
 
 - [ ] Each formalism has a section in `notebooks/demo.livemd` and a smoke-test notebook
+
+## Phase 10 — Statuses, roles and the semantic web
+
+Goal: Turtle, SPARQL, SHACL and ShEx (OUTLINE §0, §3) through rudof_elixir. Needs phases
+5 and 6 only. Statuses and roles are the two core changes it brings; both come first.
+
+Not in this phase: RDFS and OWL entailment (rudof has none), validation against an
+endpoint, RDF syntaxes other than Turtle.
+
+### Statuses (`loge`, every package)
+
+- [x] `Loge.Status`: the ontology's values and `:yes`, `:no`, `:conformant`, `:nonconformant`, each with name, description and tone (OUTLINE §3)
+- [x] `Loge.Outcome.szs` becomes `status`, never `nil`; `Loge.Verdict.of/2` and `KinoLoge.Outcome` read `Loge.Status`; the `preserves` of a task is a `Loge.Status.t()`
+- [x] `loge_prolog`: `true` → `:yes`, `false` → `:no`, `consulted` → `:success`. `loge_egglog`: `completed` → `:success`, `check failed` → `:no`. `loge_smtlib`: a script with no or several `check-sat` → `:success`; one `check-sat` the solver stopped before answering → `:input_error` with a solver error, `:stopped` without. Their verdict badges go; clingo's `optimum found` stays
+- [x] Notebooks: no generated source changed, so none regenerated; the expected verdicts in their prose and `outcome.status` in `demo.livemd` updated (to be checked in Livebook); `mix dialyzer` clean in every package
+
+### Roles (`loge`, `kino_loge`)
+
+- [ ] `Loge.Role` and `c:Loge.Engine.roles/0`; every existing engine returns `[]`
+- [ ] `Loge.run!/3` takes role keys as options, and raises `ArgumentError` for a missing required role and for a value in a language the role does not list
+- [ ] `roles:` in `Loge.Engine.to_source/4`
+- [ ] `KinoLoge.Cell`: one select per role over the bound inputs of its languages, the widget of the input select; attr `"roles"`
+- [ ] A fake engine with a required and an optional role in both `test/support/fakes.ex`
+
+### Probe (the agent determines; record the findings in OUTLINE §6)
+
+Run with a checkout of rudof_elixir as a path dependency of a scratch project.
+
+- [ ] The linux x86_64 bundle loads in this environment (NixOS, OTP 29) and in `.devcontainer`; rudof_elixir's own `mix test` passes
+- [ ] Time of a `Loge.Peer` start plus a first `Rudof` call, and of a parse in the node itself; whether a killed caller leaves the node sound
+- [ ] The error text of each reader for a broken input: Turtle, SPARQL, ShExC, ShapeMap. Where line and column stand in it, their base and their unit
+- [ ] The shape of the diagnostics of `Rudof.Session.check_shex_schema/3`, and of the maps `Rudof.query/3`, `Rudof.validate_shacl/3` and `Rudof.validate_shex/4` return
+- [ ] Against which prefixes a shape map is read: its own, the schema's, the data's. If the schema's or the data's, `c:Loge.Language.analyze/2` receives roles as it receives includes
+- [ ] Whether `Rudof.validate_shacl/3` with one text as data and as shapes validates a graph against the shapes it contains
+- [ ] Which endpoint names rudof's default configuration knows, and how a URL is given
+- [ ] From these: lint in the node or in a peer; how a time limit ends a run
+
+### `loge_turtle`
+
+- [ ] `Loge.Turtle.Language` (`:turtle`, `.ttl`): lint by rudof's reader, its first error, positioned from the message
+- [ ] `Loge.Turtle.Engines.Shacl`, task `:check`: the source is the shapes graph, the role `data` is optional; `:conformant` or `:nonconformant`; a table of the results (focus node, path, value, shape, constraint, severity, message); in a `Loge.Peer`
+
+### `loge_sparql`
+
+- [ ] `Loge.Sparql.Language` (`:sparql`, `.rq`): lint by rudof's query reader
+- [ ] `Loge.Sparql.Engines.Query`, task `:solve`: required role `data`. `SELECT` → a table, and `:yes` or `:no`; `ASK` → `:yes` or `:no`; `CONSTRUCT` and `DESCRIBE` → `:success` with the graph as Turtle `output`
+- [ ] `Loge.Sparql.Engines.Endpoint`: the same on an endpoint named by an `endpoint` control (a `:text` with the known names as suggestions); no role
+
+### `loge_shex`
+
+- [ ] `Loge.Shex.Language` (`:shex`, `.shex`) and the shape map language (`:shapemap`, `.sm`), both linted by rudof's readers. One package, two languages: a shape map is ShEx's own notation and has no use without a schema
+- [ ] `Loge.Shex.Engines.Validate`, task `:check`: the source is the shape map, the roles `schema` and `data` are required; `:conformant` when every pair is, else `:nonconformant`; a table of node, shape, status and details
+
+### Editor
+
+- [ ] Evaluate `codemirror-lang-sparql` and `codemirror-lang-turtle` against what the bundle needs (highlight tags, `closedBy`/`openedBy` on brackets); take, fork or write
+- [ ] ShExC and ShapeMap grammars, each a Lezer grammar in its own repository, as the five of phase 1
+- [ ] Imports in `kino_loge/assets/editor.js`; `npm run build`
+
+### Gate
+
+- [ ] `notebooks/rdf.livemd`: a Turtle Source cell; a `SELECT` over it; a `CONSTRUCT` bound to a name and queried by a further cell; SHACL with a `data` role and with the shapes inside the data; a ShEx schema in a Source cell with two shape-map cells; one endpoint query
+- [ ] A section of `notebooks/demo.livemd`
+- [ ] The three packages needed no change in `loge` or `kino_loge` beyond statuses and roles
+- [ ] Tests that load the NIF are tagged and excluded where the bundle does not load; CI runs them on linux x86_64
 
 ## Cross-cutting (from day one)
 
@@ -303,7 +362,7 @@ Goal: the remaining topics of OUTLINE §0. Each is added without a change to `lo
 ## Open questions
 
 - [x] Smart-cell self-evaluation API in Kino: does not exist (0.19.1)
-- [x] SZS vocabulary for non-ATP outcomes: not everything maps; `szs: nil` with a badge for Prolog answers and egglog runs
+- [x] SZS vocabulary for non-ATP outcomes: not everything maps; `szs: nil` with a badge for Prolog answers and egglog runs. Superseded by `Loge.Status` (phase 10)
 - [x] SZS descriptions for satisfiability problems: they speak of Ax and C, so `Loge.Outcome.problem` is `:satisfiability` for DIMACS, ASP and SMT-LIB and their verdict has no description; one status vocabulary, no per-language labels
 - [x] Sessions: dropped (OUTLINE §5)
 - [x] Livebook maintainers' stance on smart-cell-only languages: not asked; niche languages are highlighted by the bundled editor instead
@@ -314,8 +373,10 @@ Goal: the remaining topics of OUTLINE §0. Each is added without a change to `lo
 - [x] DPLL as an algorithm to show, and a Datalog language: out of scope (OUTLINE §0)
 - [x] Where the formula type for translations lives: in `loge_tptp`, as `Loge.Tptp.Formula` (OUTLINE §8)
 - [x] How SZS statuses are read is Loge's own decision: Ax of a TPTP problem is its axioms with the negated conjecture; across logics each side has its models in its own logic (OUTLINE §8)
-- [ ] Loge's own statuses, for results and relations no SZS value states (a data graph conforming to SHACL shapes, for one): badges as today, or a status type of Loge's that includes the ontology's values. `Loge.Outcome.szs` and the `preserves` of a task are `Tptp.Szs.Ontology.t()` today. Needed before `loge_rdf`
+- [x] Loge's own statuses: a status type, `Loge.Status`, holding the ontology's values and Loge's own; every outcome has one (OUTLINE §3, phase 10)
 - [ ] Rules for carrying a verdict back along a translation: not written, not scheduled
 - [ ] Equality in `Ground` and `Dimacs`: reject it, or add the ground instances of the equality axioms
 - [ ] Description logics: concrete syntax (OWL functional syntax, Manchester syntax, a TPTP encoding) and reasoner
-- [ ] ShEx shape map: a role with a language of its own, or part of the schema source
+- [x] ShEx shape map: the source of the ShEx engine and a language of `loge_shex`; schema and data are its roles (OUTLINE §3)
+- [x] Semantic web packages: one per language, `loge_turtle`, `loge_sparql`, `loge_shex`; SHACL is an engine of `loge_turtle`, and `loge_shex` holds ShExC with its shape maps
+- [x] SPARQL on an endpoint: an engine of its own with an `endpoint` control, no role

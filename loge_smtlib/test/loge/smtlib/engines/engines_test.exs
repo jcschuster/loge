@@ -38,7 +38,8 @@ defmodule Loge.Smtlib.EnginesTest do
   test "z3 solves a script and gives its model" do
     assert Z3.verify([]) == :ok
 
-    assert {:ok, %Outcome{szs: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
+    assert {:ok,
+            %Outcome{status: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
              Z3.run(@script, [])
 
     assert Enum.map(rows, &Enum.take(&1, 2)) |> Enum.sort() == [["x", "Int"], ["y", "Int"]]
@@ -48,12 +49,13 @@ defmodule Loge.Smtlib.EnginesTest do
   test "cvc5 solves a script and gives its model" do
     assert Cvc5.verify([]) == :ok
 
-    assert {:ok, %Outcome{szs: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
+    assert {:ok,
+            %Outcome{status: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
              Cvc5.run(@script, [])
 
     assert length(rows) == 2
 
-    assert {:ok, %Outcome{szs: :unsatisfiable}} =
+    assert {:ok, %Outcome{status: :unsatisfiable}} =
              Cvc5.run("(assert false)\n(check-sat)\n(push 1)\n(pop 1)", [])
   end
 

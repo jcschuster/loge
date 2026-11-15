@@ -34,7 +34,7 @@ defmodule Loge.Tptp.Engines.IsabelleTest do
     problem = "thf(excluded_middle, conjecture, ![X: $o]: (X | ~ X))."
 
     assert {:ok,
-            %Loge.Outcome{szs: :theorem, views: [{:table, _, [["excluded_middle", :theorem]]}]}} =
+            %Loge.Outcome{status: :theorem, views: [{:table, _, [["excluded_middle", :theorem]]}]}} =
              Isabelle.run(problem, [])
   end
 end

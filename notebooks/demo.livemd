@@ -168,7 +168,7 @@ Loge.run!(
 
 In **Prolog**, the colouring is a predicate and the question is a goal. The engine
 consults the program and asks the goal; the table shows the bindings of its
-variables, one row per answer. Expected: **true**, one row.
+variables, one row per answer. Expected: **Yes**, one row.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiYXVzdHJhbGlhKFdBLCBOVCwgU0EsIFEsIE5TVywgViwgVCkiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLiBjb2xvdXIoYmx1ZSkuXG5cbmF1c3RyYWxpYShXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFQpIDotXG4gICAgbWFwbGlzdChjb2xvdXIsIFtXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFRdKSxcbiAgICBXQSBcXD09IE5ULCBXQSBcXD09IFNBLCBOVCBcXD09IFNBLCBOVCBcXD09IFEsIFNBIFxcPT0gUSxcbiAgICBTQSBcXD09IE5TVywgU0EgXFw9PSBWLCBRIFxcPT0gTlNXLCBOU1cgXFw9PSBWLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -182,13 +182,13 @@ Loge.run!(
 )
 ```
 
-Prolog answers are not SZS statuses, so the verdict is the toplevel's: `true` or
-`false`. A timeout is still SZS **Timeout**.
+Prolog answers are not SZS statuses, so the verdict is one of Loge's own: **Yes** or
+**No**, the toplevel's `true` or `false`. A timeout is still SZS **Timeout**.
 
 ## Rewriting: egglog
 
 egglog saturates an e-graph with rewrite rules and extracts the cheapest equivalent
-term. Here `x · 1 + 0` simplifies to `x`. Expected: **completed**, the extracted term
+term. Here `x · 1 + 0` simplifies to `x`. Expected: **Success**, the extracted term
 `(Var "x")` and, with *Show the e-graph* on, the e-graph: each box an e-class, holding
 the e-nodes found equal.
 
@@ -286,10 +286,10 @@ paintings =
     end
   end
 
-{outcome.szs, length(paintings), hd(paintings)}
+{outcome.status, length(paintings), hd(paintings)}
 ```
 
-The `Loge.Outcome` holds the SZS status, the raw output and the views the Result tab
+The `Loge.Outcome` holds the status, the raw output and the views the Result tab
 draws; it renders as a cell's result does:
 
 ```elixir

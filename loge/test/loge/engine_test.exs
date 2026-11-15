@@ -77,7 +77,7 @@ defmodule Loge.EngineTest do
 
     {_outcome, binding} = Code.eval_string(translate)
 
-    assert {%Loge.Outcome{szs: :satisfiable, raw: "P."}, _binding} =
+    assert {%Loge.Outcome{status: :satisfiable, raw: "P."}, _binding} =
              Code.eval_string(solve, binding)
   end
 end

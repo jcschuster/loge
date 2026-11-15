@@ -14,7 +14,7 @@ defmodule Loge.Tptp.Engines.SystemOnTptpTest do
   test "runs the chosen system" do
     url = HttpStub.start("% SZS status Theorem for problem\n")
 
-    assert {:ok, %Outcome{szs: :theorem, engine: :system_on_tptp, details: %{result: result}}} =
+    assert {:ok, %Outcome{status: :theorem, engine: :system_on_tptp, details: %{result: result}}} =
              SystemOnTptp.run("fof(a, conjecture, $true).",
                system: "E",
                time_limit: 1,

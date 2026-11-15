@@ -12,7 +12,7 @@ Mix.install([
 
 ## Solving
 
-Expected: **true**, a table with `Z` = `ann` and `pat`.
+Expected: **Yes**, a table with `Z` = `ann` and `pat`.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJnb2FsIjoiZ3JhbmRwYXJlbnQodG9tLCBaKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -26,7 +26,7 @@ Loge.run!(
 )
 ```
 
-Expected: **false**, no table.
+Expected: **No**, no table.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JhbmRwYXJlbnQoYW5uLCBfKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -40,7 +40,7 @@ Loge.run!(
 )
 ```
 
-What the program prints is the Output tab. Expected: **true**, Output `hello, world`.
+What the program prints is the Output tab. Expected: **Yes**, Output `hello, world`.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JlZXQod29ybGQpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJncmVldChOYW1lKSA6LSBmb3JtYXQoXCJoZWxsbywgfnd+blwiLCBbTmFtZV0pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 

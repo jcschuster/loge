@@ -20,7 +20,7 @@ defmodule Loge.Asp.Engines.ClingoTest do
   test "a satisfiable program yields its first stable model" do
     assert {:ok,
             %Outcome{
-              szs: :satisfiable,
+              status: :satisfiable,
               problem: :satisfiability,
               engine: :clingo,
               views: [{:models, [["a", "b"]]}]
@@ -45,7 +45,7 @@ defmodule Loge.Asp.Engines.ClingoTest do
 
     assert {:ok,
             %Outcome{
-              szs: :satisfiable,
+              status: :satisfiable,
               views: [{:badge, "optimum found", :positive}, {:models, models}]
             } = outcome} = Clingo.run(program, [])
 
@@ -54,22 +54,22 @@ defmodule Loge.Asp.Engines.ClingoTest do
   end
 
   test "clingo's warnings do not reach the output" do
-    assert {:ok, %Outcome{szs: :satisfiable}} =
+    assert {:ok, %Outcome{status: :satisfiable}} =
              Clingo.run("{a; b}. #minimize {1,a : a; 2,b : b}.", models: 1)
   end
 
   test "an optimisation stopped by the model limit is not an optimum" do
-    assert {:ok, %Outcome{szs: :satisfiable, views: [{:models, _models}]}} =
+    assert {:ok, %Outcome{status: :satisfiable, views: [{:models, _models}]}} =
              Clingo.run("{a; b}. #minimize {1,a : a; 2,b : b}.", models: 1)
   end
 
   test "a time limit reached without a model is a timeout" do
-    assert {:ok, %Outcome{szs: :timeout, views: []}} =
+    assert {:ok, %Outcome{status: :timeout, views: []}} =
              Clingo.run("p(0). p(X+1) :- p(X).", time_limit: 1)
   end
 
   test "an unsatisfiable program has no models" do
-    assert {:ok, %Outcome{szs: :unsatisfiable, views: []}} = Clingo.run("a. :- a.", [])
+    assert {:ok, %Outcome{status: :unsatisfiable, views: []}} = Clingo.run("a. :- a.", [])
   end
 
   test "an erroneous program is an error carrying its diagnostics" do
@@ -80,6 +80,6 @@ defmodule Loge.Asp.Engines.ClingoTest do
   end
 
   test "Loge.run!/3 solves through the engine" do
-    assert %Outcome{szs: :satisfiable} = Loge.run!(Clingo, "a.", models: 1)
+    assert %Outcome{status: :satisfiable} = Loge.run!(Clingo, "a.", models: 1)
   end
 end

@@ -24,13 +24,13 @@ defmodule Loge.Registry do
 
   @typedoc """
   A translation between two languages: the engine, the language it reads, the
-  language it writes, and the SZS status it preserves.
+  language it writes, and the status it preserves.
   """
   @type translation :: %{
           engine: module(),
           from: atom(),
           to: atom(),
-          preserves: Loge.Engine.relation()
+          preserves: Loge.Status.t()
         }
 
   @doc """

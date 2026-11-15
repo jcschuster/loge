@@ -22,9 +22,11 @@ defmodule Loge.ConsumerTest do
           do: {control.key, value}
 
     translated = Loge.run!(translator, "p | q.", [])
-    assert %Loge.Outcome{szs: :equi_satisfiable, output: %Loge.Source{language: ^to}} = translated
 
-    assert %Loge.Outcome{szs: :satisfiable, raw: "P | Q.", details: %{options: [limit: 3]}} =
+    assert %Loge.Outcome{status: :equi_satisfiable, output: %Loge.Source{language: ^to}} =
+             translated
+
+    assert %Loge.Outcome{status: :satisfiable, raw: "P | Q.", details: %{options: [limit: 3]}} =
              Loge.run!(solver, translated, options)
   end
 

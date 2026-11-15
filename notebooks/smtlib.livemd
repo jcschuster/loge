@@ -36,7 +36,7 @@ Loge.run!(
 )
 ```
 
-Several `check-sat` commands give a table of results and no single verdict.
+Several `check-sat` commands give a table of results, and the verdict **Success**.
 Expected: `sat`, `unsat`, `sat`.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6IihkZWNsYXJlLWNvbnN0IHAgQm9vbClcbihjaGVjay1zYXQpXG4ocHVzaCAxKVxuKGFzc2VydCAoYW5kIHAgKG5vdCBwKSkpXG4oY2hlY2stc2F0KVxuKHBvcCAxKVxuKGNoZWNrLXNhdClcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->

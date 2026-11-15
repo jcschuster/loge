@@ -107,7 +107,7 @@ defmodule Loge.Asp.Engines.Clingo do
 
         {:ok,
          %Outcome{
-           szs: szs(result, status),
+           status: szs(result, status),
            problem: :satisfiability,
            raw: output,
            engine: id(),

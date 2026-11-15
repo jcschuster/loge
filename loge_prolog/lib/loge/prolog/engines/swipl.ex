@@ -10,12 +10,13 @@ defmodule Loge.Prolog.Engines.Swipl do
     * `:answers` - the number of answers to find, `0` for all. Defaults to `1`.
     * `:time_limit` - seconds for consulting and for each answer. Defaults to `10`.
 
-  The outcome states the toplevel's verdict as a badge, `true` or `false`, or
-  `consulted` without a goal, and has no SZS status: with cut and side effects, an
-  answer is not a theorem of the program in general. Running out of time before an
-  answer is SZS `:timeout`. The `{:table, variables, rows}` view has a row per answer
-  with the bindings of the goal's named variables as the toplevel writes them. The raw
-  output is what consulting and solving printed.
+  The status is the toplevel's verdict: `:yes` for `true`, `:no` for `false`. These
+  are not SZS `Theorem` and `CounterSatisfiable`: with cut and side effects, an answer
+  is not a theorem of the program in general. Without a goal the program is only
+  consulted, which asks nothing, so the status is `:success`. Running out of time
+  before an answer is `:timeout`. The `{:table, variables, rows}` view has a row per
+  answer with the bindings of the goal's named variables as the toplevel writes them.
+  The raw output is what consulting and solving printed.
 
   A program with syntax errors is `{:error, {:invalid_program, diagnostics}}`, with the
   diagnostics of `Loge.Prolog.Language`; an exception the goal raises is
@@ -93,19 +94,15 @@ defmodule Loge.Prolog.Engines.Swipl do
 
   defp outcome({:error, reason}, _output), do: {:error, reason}
 
-  defp outcome(:consulted, output),
-    do: {:ok, outcome(nil, [{:badge, "consulted", :positive}], output)}
-
-  defp outcome({:answers, [], :exhausted}, output),
-    do: {:ok, outcome(nil, [{:badge, "false", :neutral}], output)}
-
+  defp outcome(:consulted, output), do: {:ok, outcome(:success, [], output)}
+  defp outcome({:answers, [], :exhausted}, output), do: {:ok, outcome(:no, [], output)}
   defp outcome({:answers, [], :timeout}, output), do: {:ok, outcome(:timeout, [], output)}
 
   defp outcome({:answers, [first | _] = answers, _completion}, output),
-    do: {:ok, outcome(nil, [{:badge, "true", :positive} | table(first, answers)], output)}
+    do: {:ok, outcome(:yes, table(first, answers), output)}
 
-  defp outcome(szs, views, output),
-    do: %Outcome{szs: szs, raw: output, engine: id(), views: views}
+  defp outcome(status, views, output),
+    do: %Outcome{status: status, raw: output, engine: id(), views: views}
 
   defp table([], _answers), do: []
 

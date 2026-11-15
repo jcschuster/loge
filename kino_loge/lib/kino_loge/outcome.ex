@@ -1,15 +1,14 @@
 defmodule KinoLoge.Outcome do
   @moduledoc """
-  A `Loge.Outcome` as kinos: a Result tab with the verdict, when the outcome has an
-  SZS status, the outcome's views and its output, and an Output tab with the engine's
-  raw output. Raw output and text without a language are shown as a terminal shows
+  A `Loge.Outcome` as kinos: a Result tab with the verdict, the outcome's views and
+  its output, and an Output tab with the engine's raw output. Raw output and text without a language are shown as a terminal shows
   them, in a monospace font; text in a language is highlighted by `KinoLoge.Code`; a
   graph view is drawn by `Kino.Mermaid`. The output is titled with its language's
   label, and is plain text when its language has no grammar or is not installed.
 
-  The verdict is the status's name and mnemonic in its tone's colour, its
-  description and legend if it has them, and a link to the SZS ontology. `Kino.Render` is implemented for
-  `Loge.Outcome` through `kino/1`.
+  The verdict is the status's name, with its mnemonic if it has one, in its tone's
+  colour; its description and legend if it has them; and a link to the SZS ontology for
+  a value of it. `Kino.Render` is implemented for `Loge.Outcome` through `kino/1`.
   """
 
   alias Loge.{Diagnostic, Outcome, Range, Verdict}
@@ -19,7 +18,7 @@ defmodule KinoLoge.Outcome do
   def kino(%Outcome{} = outcome) do
     Kino.Layout.tabs(
       Result:
-        Kino.Layout.grid(verdict(outcome) ++ Enum.map(outcome.views, &view/1) ++ output(outcome)),
+        Kino.Layout.grid([verdict(outcome) | Enum.map(outcome.views, &view/1)] ++ output(outcome)),
       Output: Kino.Text.new(outcome.raw, terminal: true)
     )
   end
@@ -30,22 +29,23 @@ defmodule KinoLoge.Outcome do
   def color(:negative), do: "#c0392b"
   def color(:neutral), do: "#5d6d7e"
 
-  defp verdict(%Outcome{szs: nil}), do: []
+  defp verdict(%Outcome{status: status, problem: problem}) do
+    verdict = Verdict.of(status, problem)
 
-  defp verdict(%Outcome{szs: status, problem: problem}),
-    do: [verdict_kino(Verdict.of(status, problem))]
-
-  defp verdict_kino(%Verdict{} = verdict) do
     Kino.Layout.grid(
-      [label("#{verdict.name} (#{verdict.mnemonic})", verdict.tone)] ++
-        text(verdict.description) ++
-        text(verdict.legend) ++
-        [Kino.Markdown.new("[SZS ontology](#{verdict.source})")]
+      [label(name(verdict), verdict.tone)] ++
+        text(verdict.description) ++ text(verdict.legend) ++ link(verdict.source)
     )
   end
 
+  defp name(%Verdict{name: name, mnemonic: nil}), do: name
+  defp name(%Verdict{name: name, mnemonic: mnemonic}), do: "#{name} (#{mnemonic})"
+
   defp text(nil), do: []
   defp text(text), do: [Kino.Text.new(text)]
+
+  defp link(nil), do: []
+  defp link(source), do: [Kino.Markdown.new("[SZS ontology](#{source})")]
 
   defp output(%Outcome{output: nil}), do: []
 

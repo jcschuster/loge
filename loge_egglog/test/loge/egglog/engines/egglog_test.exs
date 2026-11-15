@@ -20,29 +20,23 @@ defmodule Loge.Egglog.Engines.EgglogTest do
     assert [%Control{key: :graph, type: :boolean, default: false}] = Egglog.controls()
   end
 
-  test "a program that runs to its end completes and shows its outputs" do
-    assert {:ok,
-            %Outcome{
-              szs: nil,
-              engine: :egglog,
-              views: [{:badge, "completed", :positive}, text],
-              raw: raw
-            }} =
+  test "a program that runs to its end is a success and shows its outputs" do
+    assert {:ok, %Outcome{status: :success, engine: :egglog, views: [text], raw: raw}} =
              Egglog.run(@math <> "(check (= e (Add (Num 3) (Num 2))))\n(extract e)", [])
 
     assert raw in ["(Add (Num 3) (Num 2))\n", "(Add (Num 2) (Num 3))\n"]
     assert text == {:text, raw, nil}
   end
 
-  test "a failed check stops the program and shows egglog's message" do
-    assert {:ok, %Outcome{szs: nil, views: [{:badge, "check failed", :negative}], raw: raw}} =
+  test "a failed check stops the program with no, and shows egglog's message" do
+    assert {:ok, %Outcome{status: :no, views: [], raw: raw}} =
              Egglog.run(@math <> "(check (= e (Num 5)))", [])
 
     assert raw =~ "Check failed"
   end
 
   test "the e-graph as a Mermaid flowchart" do
-    assert {:ok, %Outcome{views: [{:badge, _, _}, {:graph, "flowchart TB\n" <> _}]}} =
+    assert {:ok, %Outcome{views: [{:graph, "flowchart TB\n" <> _}]}} =
              Egglog.run(@math, graph: true)
   end
 
@@ -62,7 +56,6 @@ defmodule Loge.Egglog.Engines.EgglogTest do
   end
 
   test "Loge.run!/3 runs the engine" do
-    assert %Outcome{views: [{:badge, "completed", _tone}]} =
-             Loge.run!(Egglog, @math, graph: false)
+    assert %Outcome{status: :success, views: []} = Loge.run!(Egglog, @math, graph: false)
   end
 end

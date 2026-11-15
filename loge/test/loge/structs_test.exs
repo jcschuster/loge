@@ -4,10 +4,13 @@ defmodule Loge.StructsTest do
   alias Loge.{Analysis, Config.Field, Control, Outcome}
 
   test "an outcome defaults to no views and no details" do
-    assert %Outcome{szs: :theorem, raw: "", engine: :e}.views == []
-    assert %Outcome{szs: :theorem, raw: "", engine: :e}.details == %{}
-    assert %Outcome{raw: "", engine: :e}.szs == nil
-    assert %Outcome{raw: "", engine: :e}.problem == :entailment
+    assert %Outcome{status: :theorem, raw: "", engine: :e}.views == []
+    assert %Outcome{status: :theorem, raw: "", engine: :e}.details == %{}
+    assert %Outcome{status: :theorem, raw: "", engine: :e}.problem == :entailment
+  end
+
+  test "an outcome has a status" do
+    assert_raise ArgumentError, ~r/:status/, fn -> struct!(Outcome, raw: "", engine: :e) end
   end
 
   test "an analysis has no native analysis unless the language provides one" do

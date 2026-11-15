@@ -83,7 +83,7 @@ defmodule Loge.SourceTest do
     test "an outcome carries the includes of its output" do
       defs = Loge.source(:fake, "q.")
       output = Loge.source(:fake, "include(defs)", includes: %{"defs" => defs})
-      outcome = %Loge.Outcome{raw: "", engine: :e, output: output}
+      outcome = %Loge.Outcome{status: :equivalent, raw: "", engine: :e, output: output}
 
       assert Source.closure(outcome, %{}) == %{"defs" => defs}
     end

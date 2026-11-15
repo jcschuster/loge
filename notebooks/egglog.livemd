@@ -12,7 +12,7 @@ Mix.install([
 
 ## Running
 
-Expected: **completed**, the extracted term `(Add (Num 2) (Num 3))` or `(Add (Num 3) (Num 2))`.
+Expected: **Success**, the extracted term `(Add (Num 2) (Num 3))` or `(Add (Num 3) (Num 2))`.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIE1hdGggKE51bSBpNjQpIChBZGQgTWF0aCBNYXRoKSAoTXVsIE1hdGggTWF0aCkpXG4ocmV3cml0ZSAoQWRkIGEgYikgKEFkZCBiIGEpKVxuKHJld3JpdGUgKE11bCBhIChOdW0gMSkpIGEpXG5cbihsZXQgZSAoQWRkIChNdWwgKE51bSAyKSAoTnVtIDEpKSAoTnVtIDMpKSlcbihydW4gNSlcbihjaGVjayAoPSBlIChBZGQgKE51bSAzKSAoTnVtIDIpKSkpXG4oZXh0cmFjdCBlKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -36,7 +36,7 @@ Loge.run!(
 )
 ```
 
-A failed check: expected **check failed**, egglog's message in the Output tab.
+A failed check: expected **No**, egglog's message in the Output tab.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJsYW5ndWFnZSI6ImVnZ2xvZyIsIm9wdGlvbnMiOnsiZ3JhcGgiOmZhbHNlfSwic291cmNlIjoiKGRhdGF0eXBlIE1hdGggKE51bSBpNjQpIChBZGQgTWF0aCBNYXRoKSAoTXVsIE1hdGggTWF0aCkpXG4ocmV3cml0ZSAoQWRkIGEgYikgKEFkZCBiIGEpKVxuKHJld3JpdGUgKE11bCBhIChOdW0gMSkpIGEpXG5cbihsZXQgZSAoQWRkIChNdWwgKE51bSAyKSAoTnVtIDEpKSAoTnVtIDMpKSlcbihydW4gNSlcbihjaGVjayAoPSBlIChOdW0gNSkpKVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 

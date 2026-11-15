@@ -5,7 +5,8 @@ defmodule LogeTest do
 
   describe "run!/3" do
     test "returns the outcome" do
-      assert %Loge.Outcome{szs: :satisfiable, raw: "p."} = Loge.run!(Fake.Solver, "p.", limit: 1)
+      assert %Loge.Outcome{status: :satisfiable, raw: "p."} =
+               Loge.run!(Fake.Solver, "p.", limit: 1)
     end
 
     test "takes the engine's controls, its settings and includes" do
