@@ -1,0 +1,192 @@
+# Loge: RDF smoke test
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_turtle, path: Path.join(root, "loge_turtle")},
+  {:loge_sparql, path: Path.join(root, "loge_sparql")},
+  {:loge_shex, path: Path.join(root, "loge_shex")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+## Data
+
+A **Logic Source** cell binds a graph in Turtle to `people`. Expected: no diagnostics.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InR1cnRsZSIsInNvdXJjZSI6IkBwcmVmaXggOiA8aHR0cDovL2V4YW1wbGUub3JnLz4gLlxuXG46YWxpY2UgOm5hbWUgXCJBbGljZVwiIDsgOmFnZSAzMCA7IDprbm93cyA6Ym9iIC5cbjpib2IgOm5hbWUgXCJCb2JcIiA7IDphZ2UgXCJ1bmtub3duXCIgOyA6a25vd3MgOmNhcm9sIC5cbjpjYXJvbCA6bmFtZSBcIkNhcm9sXCIgLlxuIiwidmFyaWFibGUiOiJwZW9wbGUifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+people =
+  Loge.source(
+    :turtle,
+    "@prefix : <http://example.org/> .\n\n:alice :name \"Alice\" ; :age 30 ; :knows :bob .\n:bob :name \"Bob\" ; :age \"unknown\" ; :knows :carol .\n:carol :name \"Carol\" .\n"
+  )
+```
+
+## Querying
+
+A query is asked of a graph: the cell's **Data** select is the query's role, here
+`people`. Expected: **Yes**, a table of who knows whom: Alice knows Bob, Bob knows Carol.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSJ9LCJzb3VyY2UiOiJQUkVGSVggOiA8aHR0cDovL2V4YW1wbGUub3JnLz5cblxuU0VMRUNUID9wZXJzb24gP2ZyaWVuZCBXSEVSRSB7XG4gID9wIDprbm93cyA/ZiAuXG4gID9wIDpuYW1lID9wZXJzb24gLlxuICA/ZiA6bmFtZSA/ZnJpZW5kXG59XG5PUkRFUiBCWSA/cGVyc29uXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Sparql.Engines.Query,
+  "PREFIX : <http://example.org/>\n\nSELECT ?person ?friend WHERE {\n  ?p :knows ?f .\n  ?p :name ?person .\n  ?f :name ?friend\n}\nORDER BY ?person\n",
+  data: people,
+  time_limit: 30
+)
+```
+
+A `CONSTRUCT` builds a graph, bound to `acquaintances`. Expected: **Success**, the graph
+in Turtle under the Result tab.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSJ9LCJzb3VyY2UiOiJQUkVGSVggOiA8aHR0cDovL2V4YW1wbGUub3JnLz5cblxuQ09OU1RSVUNUIHsgP2IgOmtub3duQnkgP2EgfSBXSEVSRSB7ID9hIDprbm93cyA/YiB9XG4iLCJ2YXJpYWJsZSI6ImFjcXVhaW50YW5jZXMifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+acquaintances =
+  Loge.run!(
+    Loge.Sparql.Engines.Query,
+    "PREFIX : <http://example.org/>\n\nCONSTRUCT { ?b :knownBy ?a } WHERE { ?a :knows ?b }\n",
+    data: people,
+    time_limit: 30
+  )
+```
+
+That graph is the data of the next query. Expected: **Yes**, two rows.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6ImFjcXVhaW50YW5jZXMifSwic291cmNlIjoiUFJFRklYIDogPGh0dHA6Ly9leGFtcGxlLm9yZy8+XG5cblNFTEVDVCA/eCA/eSBXSEVSRSB7ID94IDprbm93bkJ5ID95IH1cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Sparql.Engines.Query,
+  "PREFIX : <http://example.org/>\n\nSELECT ?x ?y WHERE { ?x :knownBy ?y }\n",
+  data: acquaintances,
+  time_limit: 30
+)
+```
+
+Expected: **No**: Carol knows nobody.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSJ9LCJzb3VyY2UiOiJQUkVGSVggOiA8aHR0cDovL2V4YW1wbGUub3JnLz5cblxuQVNLIHsgOmNhcm9sIDprbm93cyA/YW55b25lIH1cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Sparql.Engines.Query,
+  "PREFIX : <http://example.org/>\n\nASK { :carol :knows ?anyone }\n",
+  data: people,
+  time_limit: 30
+)
+```
+
+## Validating with SHACL
+
+The cell holds the shapes and its **Data** role the graph they validate. Expected:
+**Nonconformant**, one result: Bob's age is not an integer.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGFjbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InR1cnRsZSIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MzB9LCJyb2xlcyI6eyJkYXRhIjoicGVvcGxlIn0sInNvdXJjZSI6IkBwcmVmaXggOiA8aHR0cDovL2V4YW1wbGUub3JnLz4gLlxuQHByZWZpeCBzaDogPGh0dHA6Ly93d3cudzMub3JnL25zL3NoYWNsIz4gLlxuQHByZWZpeCB4c2Q6IDxodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSM+IC5cblxuOlBlcnNvbiBhIHNoOk5vZGVTaGFwZSA7XG4gIHNoOnRhcmdldFN1YmplY3RzT2YgOm5hbWUgO1xuICBzaDpwcm9wZXJ0eSBbIHNoOnBhdGggOm5hbWUgOyBzaDpkYXRhdHlwZSB4c2Q6c3RyaW5nIDsgc2g6bWluQ291bnQgMSBdIDtcbiAgc2g6cHJvcGVydHkgWyBzaDpwYXRoIDphZ2UgOyBzaDpkYXRhdHlwZSB4c2Q6aW50ZWdlciA7IHNoOm1heENvdW50IDEgXSAuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Turtle.Engines.Shacl,
+  "@prefix : <http://example.org/> .\n@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n:Person a sh:NodeShape ;\n  sh:targetSubjectsOf :name ;\n  sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;\n  sh:property [ sh:path :age ; sh:datatype xsd:integer ; sh:maxCount 1 ] .\n",
+  data: people,
+  time_limit: 30
+)
+```
+
+Without data, a graph is validated against the shapes it contains. Expected:
+**Conformant**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGFjbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InR1cnRsZSIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MzB9LCJyb2xlcyI6e30sInNvdXJjZSI6IkBwcmVmaXggOiA8aHR0cDovL2V4YW1wbGUub3JnLz4gLlxuQHByZWZpeCBzaDogPGh0dHA6Ly93d3cudzMub3JnL25zL3NoYWNsIz4gLlxuQHByZWZpeCB4c2Q6IDxodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSM+IC5cblxuOkJvb2sgYSBzaDpOb2RlU2hhcGUgO1xuICBzaDp0YXJnZXRDbGFzcyA6Qm9vayA7XG4gIHNoOnByb3BlcnR5IFsgc2g6cGF0aCA6dGl0bGUgOyBzaDpkYXRhdHlwZSB4c2Q6c3RyaW5nIDsgc2g6bWluQ291bnQgMSBdIC5cblxuOmR1bmUgYSA6Qm9vayA7IDp0aXRsZSBcIkR1bmVcIiAuXG46c29sYXJpcyBhIDpCb29rIDsgOnRpdGxlIFwiU29sYXJpc1wiIC5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Turtle.Engines.Shacl,
+  "@prefix : <http://example.org/> .\n@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n:Book a sh:NodeShape ;\n  sh:targetClass :Book ;\n  sh:property [ sh:path :title ; sh:datatype xsd:string ; sh:minCount 1 ] .\n\n:dune a :Book ; :title \"Dune\" .\n:solaris a :Book ; :title \"Solaris\" .\n",
+  time_limit: 30
+)
+```
+
+## Validating with ShEx
+
+A ShEx schema in a **Logic Source** cell, bound to `schema`:
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InNoZXgiLCJzb3VyY2UiOiJQUkVGSVggOiA8aHR0cDovL2V4YW1wbGUub3JnLz5cblBSRUZJWCB4c2Q6IDxodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSM+XG5cbjpQZXJzb24ge1xuICA6bmFtZSB4c2Q6c3RyaW5nIDtcbiAgOmFnZSB4c2Q6aW50ZWdlciA/IDtcbiAgOmtub3dzIElSSSAqXG59XG4iLCJ2YXJpYWJsZSI6InNjaGVtYSJ9","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+schema =
+  Loge.source(
+    :shex,
+    "PREFIX : <http://example.org/>\nPREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n\n:Person {\n  :name xsd:string ;\n  :age xsd:integer ? ;\n  :knows IRI *\n}\n"
+  )
+```
+
+A shape map says which nodes are validated against which shapes; its roles are the
+schema and the data. Expected: **Conformant**, Alice and Carol.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGV4IiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoic2hhcGVtYXAiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSIsInNjaGVtYSI6InNjaGVtYSJ9LCJzb3VyY2UiOiI6YWxpY2VAOlBlcnNvbiwgOmNhcm9sQDpQZXJzb25cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Shex.Engines.Validate, ":alice@:Person, :carol@:Person\n",
+  schema: schema,
+  data: people,
+  time_limit: 30
+)
+```
+
+Expected: **Nonconformant**, with the reason: Bob's age is a string.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGV4IiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoic2hhcGVtYXAiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSIsInNjaGVtYSI6InNjaGVtYSJ9LCJzb3VyY2UiOiI6Ym9iQDpQZXJzb25cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Shex.Engines.Validate, ":bob@:Person\n",
+  schema: schema,
+  data: people,
+  time_limit: 30
+)
+```
+
+## An endpoint
+
+A query on a public endpoint, here Wikidata, chosen in the *Endpoint* field. It needs
+the network. Expected: **Yes**, three cats.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfZW5kcG9pbnQiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7ImVuZHBvaW50IjoiV2lraWRhdGEiLCJ0aW1lX2xpbWl0IjozMH0sInJvbGVzIjp7fSwic291cmNlIjoiU0VMRUNUID9jYXQgV0hFUkUge1xuICA/Y2F0IDxodHRwOi8vd3d3Lndpa2lkYXRhLm9yZy9wcm9wL2RpcmVjdC9QMzE+IDxodHRwOi8vd3d3Lndpa2lkYXRhLm9yZy9lbnRpdHkvUTE0Nj5cbn1cbkxJTUlUIDNcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Sparql.Engines.Endpoint,
+  "SELECT ?cat WHERE {\n  ?cat <http://www.wikidata.org/prop/direct/P31> <http://www.wikidata.org/entity/Q146>\n}\nLIMIT 3\n",
+  endpoint: "Wikidata",
+  time_limit: 30
+)
+```
+
+## Linting
+
+Expected: under the editor, a syntax error where the reader stopped, at the end of the
+pattern `?x ?y`; evaluating raises `Loge.Error` with it.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSJ9LCJzb3VyY2UiOiJTRUxFQ1QgKiBXSEVSRSB7ID94ID95IH1cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Sparql.Engines.Query, "SELECT * WHERE { ?x ?y }\n", data: people, time_limit: 30)
+```
+
+A shape map is read with the data's and the schema's prefixes. Expected: under the
+editor, `ex` is not declared.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGV4IiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoic2hhcGVtYXAiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6InBlb3BsZSIsInNjaGVtYSI6InNjaGVtYSJ9LCJzb3VyY2UiOiJleDphbGljZUA6UGVyc29uXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Shex.Engines.Validate, "ex:alice@:Person\n",
+  schema: schema,
+  data: people,
+  time_limit: 30
+)
+```

@@ -35,6 +35,51 @@ defmodule Loge.Range do
   end
 
   @doc """
+  A range whose columns are given in characters (code points), as many tools count
+  them, converted to UTF-16 columns of `source`. Options are those of `new/2`; the
+  end column is counted on `:end_line`, or on `line` without one. A column past the
+  end of its line, or on a line `source` does not have, counts one per character
+  beyond.
+
+      iex> Loge.Range.from_characters("a😀b c", 1, column: 3, end_column: 4)
+      %Loge.Range{line: 1, column: 4, end_line: nil, end_column: 5}
+  """
+  @spec from_characters(binary(), pos_integer(), keyword()) :: t()
+  def from_characters(source, line, options) when is_binary(source) do
+    options = Keyword.validate!(options, [:column, :end_line, :end_column])
+    end_line = options[:end_line] || line
+
+    new(line,
+      column: utf16_column(source, line, options[:column]),
+      end_line: options[:end_line],
+      end_column: utf16_column(source, end_line, options[:end_column])
+    )
+  end
+
+  defp utf16_column(_source, _line, nil), do: nil
+
+  defp utf16_column(source, line, column),
+    do: source |> line_text(line) |> units(column - 1, 1)
+
+  defp line_text(source, 1), do: source |> :binary.split("\n") |> hd()
+
+  defp line_text(source, line) do
+    case :binary.split(source, "\n") do
+      [_first, rest] -> line_text(rest, line - 1)
+      [_last] -> ""
+    end
+  end
+
+  defp units(_text, 0, column), do: column
+
+  defp units(<<char::utf8, rest::binary>>, n, column) when char > 0xFFFF,
+    do: units(rest, n - 1, column + 2)
+
+  defp units(<<_char::utf8, rest::binary>>, n, column), do: units(rest, n - 1, column + 1)
+  defp units(<<_byte, rest::binary>>, n, column), do: units(rest, n - 1, column + 1)
+  defp units(<<>>, n, column), do: column + n
+
+  @doc """
   Converts `length` bytes at byte `offset` of `source` into a range.
 
   Scans the source once, up to the end of the range.

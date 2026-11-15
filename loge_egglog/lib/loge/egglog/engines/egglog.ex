@@ -81,7 +81,7 @@ defmodule Loge.Egglog.Engines.Egglog do
     File.mkdir_p!(directory)
     guard = Loge.Guard.start(fn -> File.rm_rf(directory) end)
     Enum.each(files, fn {name, content} -> File.write!(Path.join(directory, name), content) end)
-    result = Loge.Peer.call(Runner, :run, [program, snapshot, directory])
+    {:ok, result} = Loge.Peer.call(Runner, :run, [program, snapshot, directory])
     Loge.Guard.dismiss(guard)
     File.rm_rf(directory)
     result

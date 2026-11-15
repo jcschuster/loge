@@ -27,6 +27,10 @@ Open these first; every item has a fallback inside Loge.
 | bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies                                                                                                                                                                           | small C                   | no Picosat engine; clasp covers DIMACS                                                      | [ ]                                                                                                                                               |
 | jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild                                                                                                                                                                                                                            | small generator change    | TPTP brackets uncoloured                                                                    | [x] 0.1.3                                                                                                                                         |
 | davfuenmayor/rudof_elixir  | Publish to Hex with the native bundles hosted as release assets (its README names their size as the obstacle); bundles beyond linux x86_64                                                                                                                                                                                                                                                          | release                   | none for publishing; `Mix.install` takes the git dependency meanwhile, on linux x86_64 only | [ ]                                                                                                                                               |
+| aatauil/codemirror-lang-turtle | `closedBy`/`openedBy` on `(` `)`, and `true`/`false` tagged inside a collection | small grammar change | Turtle's parentheses uncoloured | [ ] |
+| aatauil/codemirror-lang-sparql | `closedBy`/`openedBy` on `(` `)` `{` `}` `[` `]`; tags for braces and prefixed names | small grammar change | SPARQL's brackets uncoloured, prefixed names plain | [ ] |
+| rudof-project/rudof        | A timeout for fetching a ShEx `IMPORT` (a check waits for good on a server that does not answer), and a reader setting that refuses imports | small Rust | lint of ShExC and shape maps in a `Loge.Peer` with a deadline | [ ] |
+| davfuenmayor/rudof_elixir  | `Rudof.Session.read_data/3` costs about 176 ms of CPU whatever its input, where `read_shacl/3` reads the same Turtle in 0.3 ms: find where the fixed cost comes from | report | a Turtle lint costs 176 ms of CPU per edit | [ ] |
 | rudof-project/rudof        | Line and column of a parse error as fields of its errors (at 393f45e they are inside `error: String`; the ShEx reader has them as fields before that)                                                                                                                                                                                                                                               | small Rust                | positions read from the message text, as for clingo, z3 and cvc5                            | [ ]                                                                                                                                               |
 
 Not PR targets: `codemirror/legacy-modes` (ports CM5 modes only), `SirBogman/codemirror-lang-prolog`
@@ -310,43 +314,43 @@ endpoint, RDF syntaxes other than Turtle.
 
 Run with a checkout of rudof_elixir as a path dependency of a scratch project.
 
-- [ ] The linux x86_64 bundle loads in this environment (NixOS, OTP 29) and in `.devcontainer`; rudof_elixir's own `mix test` passes
-- [ ] Time of a `Loge.Peer` start plus a first `Rudof` call, and of a parse in the node itself; whether a killed caller leaves the node sound
-- [ ] The error text of each reader for a broken input: Turtle, SPARQL, ShExC, ShapeMap. Where line and column stand in it, their base and their unit
-- [ ] The shape of the diagnostics of `Rudof.Session.check_shex_schema/3`, and of the maps `Rudof.query/3`, `Rudof.validate_shacl/3` and `Rudof.validate_shex/4` return
-- [ ] Against which prefixes a shape map is read: its own, the schema's, the data's. If the schema's or the data's, `c:Loge.Language.analyze/2` receives roles as it receives includes
-- [ ] Whether `Rudof.validate_shacl/3` with one text as data and as shapes validates a graph against the shapes it contains
-- [ ] Which endpoint names rudof's default configuration knows, and how a URL is given
-- [ ] From these: lint in the node or in a peer; how a time limit ends a run
+- [x] The linux x86_64 bundle loads in this environment (Debian trixie, glibc 2.41, OTP 29; this container is not NixOS); rudof_elixir's own `mix test` passes 120 of 123, the three failures needing Graphviz `dot` for images. Not tried: `.devcontainer` (no podman here) and the NixOS host, where Livebook runs (OUTLINE §6)
+- [x] Time of a `Loge.Peer` start plus a first `Rudof` call (about 335 ms, 445 ms the first time), and of a parse in the node itself (SPARQL 0.1 ms, ShExC 1 ms, Turtle as data 176 ms of CPU whatever its size); a killed caller leaves the node answering, but its native work keeps a core busy; in a peer it ends
+- [x] The error text of each reader for a broken input: Turtle, SPARQL, ShExC, ShapeMap. Line and column are 1-based and count code points; only Turtle gives a range (end exclusive); SPARQL gives the furthest point its parser reached, ShExC and ShapeMap the start of the production that failed (OUTLINE §6)
+- [x] The shape of the diagnostics of `Rudof.Session.check_shex_schema/3` (`{:ok, {valid?, text}}`, no structure), and of the maps `Rudof.query/3`, `Rudof.validate_shacl/3` and `Rudof.validate_shex/4` return (OUTLINE §6)
+- [x] Against which prefixes a shape map is read: its nodes against the data's, its shape labels against the schema's; it has none of its own and is read only once both are loaded. So `c:Loge.Language.analyze/2` receives roles as it receives includes: a contract change to design before `loge_shex`
+- [x] Whether `Rudof.validate_shacl/3` with one text as data and as shapes validates a graph against the shapes it contains: it does
+- [x] Which endpoint names rudof's default configuration knows (`UniProt`, `togoid`, `mardi`, `Wikidata_qlever`, `DBpedia`, `Wikidata`), and how a URL is given: `read_endpoint/2` takes a name, case-insensitively, or the URL; observed against a local server only
+- [x] From these: Turtle and SPARQL lint in the node; ShExC and shape-map lint in a peer with a deadline, as a schema's `IMPORT` is fetched without a timeout; runs in a peer, and a time limit ends a run by ending its peer
 
 ### `loge_turtle`
 
-- [ ] `Loge.Turtle.Language` (`:turtle`, `.ttl`): lint by rudof's reader, its first error, positioned from the message
-- [ ] `Loge.Turtle.Engines.Shacl`, task `:check`: the source is the shapes graph, the role `data` is optional; `:conformant` or `:nonconformant`; a table of the results (focus node, path, value, shape, constraint, severity, message); in a `Loge.Peer`
+- [x] `Loge.Turtle.Language` (`:turtle`, `.ttl`): lint by rudof's reader, its first error, positioned from the message (`Loge.Turtle.Messages`, character columns through `Loge.Range.from_characters/3`); in the node
+- [x] `Loge.Turtle.Engines.Shacl`, task `:check`: the source is the shapes graph, the role `data` is optional; `:conformant` or `:nonconformant`; a table of the results (focus node, path, value, shape, constraint, severity, message); the validation report as Turtle `output`; in a `Loge.Peer` with `time_limit`
 
 ### `loge_sparql`
 
-- [ ] `Loge.Sparql.Language` (`:sparql`, `.rq`): lint by rudof's query reader
-- [ ] `Loge.Sparql.Engines.Query`, task `:solve`: required role `data`. `SELECT` → a table, and `:yes` or `:no`; `ASK` → `:yes` or `:no`; `CONSTRUCT` and `DESCRIBE` → `:success` with the graph as Turtle `output`
-- [ ] `Loge.Sparql.Engines.Endpoint`: the same on an endpoint named by an `endpoint` control (a `:text` with the known names as suggestions); no role
+- [x] `Loge.Sparql.Language` (`:sparql`, `.rq`): lint by rudof's query reader, in the node; one character where the reader stopped
+- [x] `Loge.Sparql.Engines.Query`, task `:solve`: required role `data`. `SELECT` → a table, and `:yes` or `:no`; `ASK` → `:yes` or `:no`; `CONSTRUCT` and `DESCRIBE` → `:success` with the graph as Turtle `output`; raw output rudof's CSV; in a `Loge.Peer` with `time_limit`
+- [x] `Loge.Sparql.Engines.Endpoint`: the same on an endpoint named by an `endpoint` control (a `:text` with the names of rudof's configuration as suggestions, read from `Rudof.Session.config/1`: `list_endpoints/1` needs loaded data); no role; tested against a local stub only
 
 ### `loge_shex`
 
-- [ ] `Loge.Shex.Language` (`:shex`, `.shex`) and the shape map language (`:shapemap`, `.sm`), both linted by rudof's readers. One package, two languages: a shape map is ShEx's own notation and has no use without a schema
-- [ ] `Loge.Shex.Engines.Validate`, task `:check`: the source is the shape map, the roles `schema` and `data` are required; `:conformant` when every pair is, else `:nonconformant`; a table of node, shape, status and details
+- [x] `Loge.Shex.Languages.Shexc` (`:shex`, `.shex`) and `Loge.Shex.Languages.ShapeMap` (`:shapemap`, `.sm`), both linted by rudof's readers in a `Loge.Peer` stopped after 10 s (a schema's `IMPORT` is fetched without a timeout). A shape map's lint takes the roles `schema` and `data` (`analyze/2`'s `:roles`), and only its syntax without them. One package, two languages: a shape map is ShEx's own notation and has no use without a schema
+- [x] `Loge.Shex.Engines.Validate`, task `:check`: the source is the shape map, the roles `schema` and `data` are required; `:conformant` when every pair is, else `:nonconformant`; a table of node, shape, status and details; in a `Loge.Peer` with `time_limit`
 
 ### Editor
 
-- [ ] Evaluate `codemirror-lang-sparql` and `codemirror-lang-turtle` against what the bundle needs (highlight tags, `closedBy`/`openedBy` on brackets); take, fork or write
-- [ ] ShExC and ShapeMap grammars, each a Lezer grammar in its own repository, as the five of phase 1
-- [ ] Imports in `kino_loge/assets/editor.js`; `npm run build`
+- [x] Evaluate `codemirror-lang-sparql` and `codemirror-lang-turtle` against what the bundle needs (highlight tags, `closedBy`/`openedBy` on brackets); take, fork or write. Taken (OUTLINE §7): both highlight, but only Turtle's `[ ]` carry `closedBy`; upstream rows in phase 0
+- [ ] ShExC and ShapeMap grammars, each a Lezer grammar in its own repository, as the five of phase 1. Until then both are plain text
+- [x] Imports in `kino_loge/assets/editor.js`; `npm run build` (Turtle and SPARQL; ShExC and ShapeMap once their grammars exist). `.devcontainer` aligned with the image this container's Node comes from (`node:26-trixie`, user `node`); not run here
 
 ### Gate
 
-- [ ] `notebooks/rdf.livemd`: a Turtle Source cell; a `SELECT` over it; a `CONSTRUCT` bound to a name and queried by a further cell; SHACL with a `data` role and with the shapes inside the data; a ShEx schema in a Source cell with two shape-map cells; one endpoint query
-- [ ] A section of `notebooks/demo.livemd`
-- [ ] The three packages needed no change in `loge` or `kino_loge` beyond statuses and roles
-- [ ] Tests that load the NIF are tagged and excluded where the bundle does not load; CI runs them on linux x86_64
+- [x] `notebooks/rdf.livemd`: a Turtle Source cell; a `SELECT` over it; a `CONSTRUCT` bound to a name and queried by a further cell; SHACL with a `data` role and with the shapes inside the data; a ShEx schema in a Source cell with two shape-map cells; one endpoint query. Every cell evaluated in order outside Livebook with the expected verdicts, but the endpoint query (Wikidata; not sent); to be checked in Livebook
+- [x] A section of `notebooks/demo.livemd` (Turtle, SPARQL, SHACL), its cells evaluated outside Livebook; to be checked in Livebook
+- [x] The three packages needed no change in `loge` or `kino_loge` beyond statuses and roles, and two more in `loge`: a deadline for `Loge.Peer.call/4` (`timeout:`), and `Loge.Range.from_characters/3`; roles reach `analyze/2`, and the Engine cell lints with them
+- [x] The packages are built and tested on linux x86_64 only, the one platform rudof_elixir ships a bundle for: without it rudof_elixir does not compile, so there is nothing to tag. CI runs them (ubuntu-latest, x86_64)
 
 ## Cross-cutting (from day one)
 

@@ -19,11 +19,17 @@ defmodule Loge.Fake.Language do
   end
 
   @impl true
-  def analyze(source, _options) do
-    diagnostics =
+  def analyze(source, options) do
+    empty =
       if source == "", do: [Diagnostic.new("FAKE0001", :warning, Range.new(1), "empty")], else: []
 
-    %Analysis{language: :fake, source: source, diagnostics: diagnostics}
+    roles =
+      for {key, input} <- Keyword.get(options, :roles, []) do
+        text = IO.iodata_to_binary(Loge.Input.to_iodata(input))
+        Diagnostic.new("FAKE0003", :info, Range.new(1), "#{key}: #{text}")
+      end
+
+    %Analysis{language: :fake, source: source, diagnostics: empty ++ roles}
   end
 end
 

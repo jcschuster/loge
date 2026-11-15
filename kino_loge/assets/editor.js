@@ -19,10 +19,12 @@ import { asp } from "codemirror-lang-asp";
 import { dimacs } from "codemirror-lang-dimacs";
 import { egglog } from "codemirror-lang-egglog";
 import { smtlib } from "codemirror-lang-smtlib";
+import { sparql } from "codemirror-lang-sparql";
 import { prolog } from "codemirror-lang-swipl";
 import { tptp } from "codemirror-lang-tptp";
+import { turtle } from "codemirror-lang-turtle";
 
-const languages = { asp, dimacs, egglog, prolog, smtlib, tptp };
+const languages = { asp, dimacs, egglog, prolog, smtlib, sparql, tptp, turtle };
 
 // https://github.com/livebook-dev/livebook/blob/main/assets/js/hooks/cell_editor/live_editor/codemirror/theme.js
 const colors = {

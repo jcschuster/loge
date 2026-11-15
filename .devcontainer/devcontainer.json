@@ -1,5 +1,6 @@
 {
   "name": "loge",
-  "build": { "dockerfile": "Dockerfile" },
-  "postCreateCommand": "mix local.hex --force && mix local.rebar --force && npm --prefix kino_loge/assets ci"
+  "image": "docker.io/library/node:26-trixie",
+  "remoteUser": "node",
+  "postCreateCommand": "npm --prefix kino_loge/assets ci"
 }

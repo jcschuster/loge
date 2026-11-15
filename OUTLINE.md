@@ -51,8 +51,8 @@ representations ("if this can be a satisfiability problem, translate it and solv
 | Propositional logic, SAT                                | DIMACS and SAT solving; TPTP to CNF to DIMACS                                         | DIMACS with clasp; translations phase 8  |
 | Predicate logic, Horn logic, Datalog, logic programming | TPTP provers, Prolog, egglog; clausification, grounding                               | engines exist; translations phase 8      |
 | Modal and description logics, correspondences           | non-classical TPTP; embedding into THF; translations between DL, modal logic and FOL  | phase 9                                  |
-| TPTP infrastructure                                     | provers, verifiers (GDV, AGMV), problem tools                                         | provers exist; verifiers phase 7         |
-| Semantic web                                            | RDF (Turtle), SPARQL, SHACL, ShEx                                                     | phase 10: `loge_turtle`, `loge_sparql`, `loge_shex` |
+| TPTP infrastructure                                     | provers, verifiers (GDV, AGMV), problem tools                                         | provers and verifiers exist              |
+| Semantic web                                            | RDF (Turtle), SPARQL, SHACL, ShEx                                                     | `loge_turtle`, `loge_sparql`, `loge_shex` exist |
 
 ## 1. Decisions (fixed)
 
@@ -115,6 +115,12 @@ for publishing via an env flag (`LOGE_HEX=1`). Per-package git tags `loge_tptp-v
 @callback analyze(binary(), keyword()) :: Loge.Analysis.t()
 @callback format(binary(), keyword()) :: {:ok, binary()} | {:error, term()}   # optional
 ```
+
+`analyze/2` takes `includes:` (below) and `roles:`, the values of the roles of the
+engine the source runs on, by role key (`t:Loge.Language.roles/0`), for a language whose
+source cannot be read without them: a ShEx shape map names nodes by the data's prefixes
+and shapes by the schema's. A language reads only the role keys of its own package's
+engines. The Engine cell lints with the bound values of the roles it has set.
 
 `Loge.Analysis`: `%{language: atom, source: binary, diagnostics: [Loge.Diagnostic.t],
 native: term}`. `native` is the language package's own analysis (`Tptp.Analysis` for TPTP);
@@ -300,7 +306,8 @@ diagnostics (kino#522, livebook#3235): `line` 1-based and required; `column` 1-b
 UTF-16 code units, `nil` = first non-whitespace character; `end_line` `nil` = `line`;
 `end_column` exclusive, `nil` = end of line without trailing whitespace. Each language
 package converts its tool's convention once; `Loge.Range.from_offsets/3` does it for
-byte offsets (tptp, Elixir lexers). The cell passes ranges through unchanged, renaming
+byte offsets (tptp, Elixir lexers), `Loge.Range.from_characters/3` for columns counted
+in characters (rudof). The cell passes ranges through unchanged, renaming
 `message` to `description`.
 
 ### `Loge.Outcome` (struct)
@@ -399,10 +406,13 @@ Work outside the BEAM's reach needs more, and core provides three pieces:
 - `Loge.Guard.start(release)`: a process monitoring its starter that calls `release`
   when the starter dies, unless dismissed. Used to kill a process holding a Port
   (`loge_prolog`'s SWI session, whose `swipl` exits when its stdin closes).
-- `Loge.Peer.call(m, f, a)`: applies `m.f(a)` in a fresh `:peer` node (`standard_io`
+- `Loge.Peer.call(m, f, a, timeout: ms)`: applies `m.f(a)` in a fresh `:peer` node (`standard_io`
   connection, this node's code path, about 130 ms to start), stopped by a guard when the
   caller dies. For NIFs on dirty schedulers, which nothing in the BEAM can interrupt
-  (`loge_egglog`). Arguments and results are copied; NIF resources cannot cross.
+  (`loge_egglog`, and the rudof engines and ShEx lints). Arguments and results are
+  copied; NIF resources cannot cross. Its result is `{:ok, result}`; past the
+  `:timeout` the peer is stopped and the call is `{:error, :timeout}`, which is how a
+  time limit ends a run in a peer.
 
 ## 4. Data flow in the cells (`kino_loge`)
 
@@ -508,6 +518,9 @@ All read from source, not executed. Links in §11.
 | SWI-Prolog 10.0.1 (executed) | `read_term/3` on a UTF-8 file stream with `subterm_positions`, `singletons`; `error(syntax_error(M), stream(S, Line, LinePos, CharNo))` | `message_to_string/2` of the error | character offsets (`char_count`), 0-based | all: after a syntax error `read_term/3` resumes after the next full stop | error; singletons as warnings positioned on the variable |
 | z3 5.3.3 (executed) | stdout; continues after an error | `(error "line L column C: msg")`; responses in command order; `echo` text unquoted | 1/0 (bytes assumed) | every error | error; z3 accepts some ill-sorted terms cvc5 rejects (`(> x true)`) |
 | cvc5 1.4.2 (executed) | stdout; warnings on stderr; stops at the first error | `(error "Parse Error: <file>:L.C: msg")`, or no position (`cannot push …` without `--incremental`); exit 1 | 1/1 | first | error |
+| rudof 0.3.24, Turtle (rudof_elixir b9f5f4f, executed) | `Rudof.Session.read_data/3` → `{:error, %Rudof.Error{kind: :data_error, message: m}}`; the position is only in `m` | `… Parser error at line L between columns C and C2: msg`, or `… between line L column C and line L2 column C2: msg` | 1/1, code points, end exclusive | first | error |
+| rudof 0.3.24, SPARQL (executed) | `Rudof.Session.load_sparql_query/2` → `:query_error` | `… error at L:C: expected one of …`: the furthest point the parser reached, often the end of the input rather than the fault; an undeclared prefix is reported as such a syntax error | 1/1, code points, one position | first | error |
+| rudof 0.3.24, ShExC and ShapeMap (executed) | `Rudof.Session.check_shex/3` → `{:ok, {false, text}}`; `read_shex/3`, `read_shapemap/3` → `:shex_error` | `Parse error on line L, column C: msg`, then `Context:` lines, each the start of a production that failed, outermost first; an undeclared prefix has no position (`Alias 'ex' not found in prefix map`) | 1/1, code points | first | error |
 | kissat / CaDiCaL     | stderr                                                                                                                                                            | `<name>:<line>: parse error: msg`, exit 1                                            | line only                            | first                                                             | error                                                                             |
 
 Notes:
@@ -558,14 +571,59 @@ Notes:
   filename `None`. Runs are not interruptible: a run whose caller died kept a core busy
   (measured); egglog's own early stop is only triggered from primitives. Hence
   `Loge.Peer`.
+- rudof (rudof_elixir b9f5f4f, rudof 0.3.24; executed in this Debian trixie container,
+  glibc 2.41, OTP 29, with rudof_elixir as a path dependency of a scratch project):
+  - The linux x86_64 bundle loads; rudof_elixir's own `mix test` passes 120 of 123. The
+    three failures render SVG through Graphviz's `dot`, not installed here; images are
+    the only use of the bundled `rudof_render` executable, and Loge needs none. The NIF
+    links libc and libm and a bundled `libgcc_s` (RUNPATH `$ORIGIN`); its README
+    requires glibc 2.39. Not tried: `.devcontainer` (no podman here) and the NixOS host,
+    where `rudof_render`'s interpreter `/lib64/ld-linux-x86-64.so.2` is missing without
+    nix-ld; the NIF itself is loaded by the BEAM's own loader.
+  - Cost: `read_data/3` takes about 176 ms of CPU whatever the input (180 ms empty,
+    220 ms for 5000 triples, about 88 ms before a parse error); `read_shacl/3` reads
+    the same Turtle in 0.3 ms with the same parser messages; `load_sparql_query/2`
+    0.1 ms, `check_shex/3` 1 ms, a fresh session 1 ms. `Rudof.query/3` in the node is
+    about 177 ms, through `Loge.Peer.call/3` about 335 ms (445 ms the first time).
+  - Native work runs on dirty CPU schedulers and has no timeout. A query whose caller
+    was killed kept a core busy (measured 2 s later), though the node went on
+    answering; in a `Loge.Peer` the peer was gone within 1 s of the caller's death.
+  - A ShExC `IMPORT <url>` is fetched while the schema is checked, without a timeout:
+    `check_shex/3` with an import from a local server that never answers had not
+    returned after 5 s. A lint of ShExC, or of a shape map, which reads the schema,
+    can therefore block for good in the node.
+  - Results: `Rudof.query/3` gives `%{kind: :select, variables, rows}` (terms as
+    N-Triples strings, `nil` unbound; an empty result has `variables: []`),
+    `%{kind: :ask, boolean}`, or `%{kind: :graph, graph}` in N-Triples-like Turtle for
+    `CONSTRUCT` and `DESCRIBE`. `Rudof.validate_shacl/3` gives `%{conforms, results}`,
+    each result `%{focus_node, path, value, severity, source_shape,
+    constraint_component, messages: [%{text, lang}]}`, IRIs without `<>` and `value` a
+    term string. `Rudof.validate_shex/4` gives `%{conforms, entries}`, each `%{node,
+    shape, status: :conformant | :nonconformant, details}`; an unknown shape label is a
+    nonconformant entry, not an error.
+  - A shape map is read after data and a schema (`No data loaded`, `No ShEx schema
+    loaded`). Its nodes are read with the data's prefixes and its shape labels with
+    the schema's (`Available aliases` names them); it declares none of its own.
+  - `Rudof.validate_shacl/3` with one text as data and as shapes validates the graph
+    against the shapes it contains.
+  - Endpoints: `Rudof.Session.list_endpoints/1` knows `UniProt`, `togoid`, `mardi`,
+    `Wikidata_qlever`, `DBpedia` and `Wikidata` with their URLs. `read_endpoint/2`
+    takes such a name, case-insensitively, or a URL, and sends nothing; a query then
+    sends `GET <url>?query=…` with `accept: application/sparql-results+json`
+    (observed against a local server only).
+  - Hence: runs in a `Loge.Peer`, whose end is also how a time limit ends one, as
+    rudof has no limit of its own. Parsing Turtle and SPARQL ends and needs no network,
+    so those lints can run in the node; a ShExC or shape-map lint fetches imports, so
+    it runs in a peer with a deadline, as the ASP lint has one.
 
 ## 7. Editor facts (Kino 0.19.1, Livebook main on 2026-11-11)
 
 - The editor is CodeMirror 6. Its source is `kino_loge/assets/editor.js`; `npm run build`
   there bundles it with esbuild into `kino_loge/lib/assets/editor.js`, which is committed
-  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 533 kB
-  with the six grammars. Node comes from `.devcontainer` (Elixir image plus Debian's
-  `nodejs` and `npm`).
+  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 596 kB
+  with the eight grammars. Node comes from `.devcontainer`: `docker.io/library/node:26-trixie`
+  as user `node`, the image the Node of the agent's container is copied from, so both
+  sides share `node_modules` and the lockfile.
 - Output: `KinoLoge.Code` shows a `{:text, text, language}` view through the same bundle,
   read-only, with line numbers, search and coloured brackets, at most 300 px high. A
   text view without a language and the raw output stay terminal text: raw output mixes
@@ -585,7 +643,12 @@ Notes:
 - Grammars are npm packages imported in `editor.js` and keyed by the name
   `c:Loge.Language.editor_language/0` returns; `nil` or a name without a grammar is plain
   text. A language change reconfigures the editor in place. Bundled, keyed by language id:
-  `codemirror-lang-tptp`, `-asp`, `-dimacs`, `-egglog`, `-smtlib`, `-swipl` (as `prolog`).
+  `codemirror-lang-tptp`, `-asp`, `-dimacs`, `-egglog`, `-smtlib`, `-swipl` (as `prolog`),
+  and from other authors `codemirror-lang-turtle` 0.0.2 and `codemirror-lang-sparql`
+  2.1.0. Checked in Node only: both parse and highlight samples, but only Turtle's
+  `[ ]` carry `closedBy`, so their other brackets are not coloured by depth, and SPARQL
+  leaves `{ }` and prefixed names untagged. ShExC (`"shex"`) and shape maps
+  (`"shapemap"`) have no grammar yet and are plain text.
 - Collaboration is `@codemirror/collab` with the cell process as the authority. A client
   pushes `%{"version" => n, "updates" => [%{"clientID" => id, "changes" => change_set}]}`.
   The cell applies a push made against its current version (`KinoLoge.ChangeSet`, lengths

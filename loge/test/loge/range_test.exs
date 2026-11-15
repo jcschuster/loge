@@ -20,6 +20,29 @@ defmodule Loge.RangeTest do
     end
   end
 
+  describe "from_characters/3" do
+    test "ASCII columns stay as they are" do
+      assert Range.from_characters("abc def", 1, column: 5, end_column: 8) ==
+               Range.new(1, column: 5, end_column: 8)
+    end
+
+    test "a character outside the BMP counts two UTF-16 units" do
+      assert Range.from_characters("x\na😀b c", 2, column: 3, end_column: 5) ==
+               Range.new(2, column: 4, end_column: 6)
+    end
+
+    test "the end column is counted on the end line" do
+      assert Range.from_characters("😀ab\n😀cd", 1, column: 2, end_line: 2, end_column: 3) ==
+               Range.new(1, column: 3, end_line: 2, end_column: 4)
+    end
+
+    test "a column past the end of its line or a missing one is kept" do
+      assert Range.from_characters("ab", 1, column: 6) == Range.new(1, column: 6)
+      assert Range.from_characters("ab", 3, column: 1) == Range.new(3, column: 1)
+      assert Range.from_characters("ab", 1, []) == Range.new(1)
+    end
+  end
+
   describe "from_offsets/3" do
     test "ASCII" do
       assert Range.from_offsets("abc def", 4, 3) ==

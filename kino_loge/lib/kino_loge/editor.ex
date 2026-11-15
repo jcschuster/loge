@@ -14,7 +14,8 @@ defmodule KinoLoge.Editor do
 
   The sources bound in the notebook come from `scan_binding/2`: every bound
   `Loge.Input` with a language, as a `Loge.Source`, by variable name. Those of the
-  cell's language are what its includes resolve against.
+  cell's language are what its includes resolve against, and those its setup names
+  for the roles of its engine are the lint's `:roles` (`t:Loge.Language.roles/0`).
   """
 
   import Kino.JS.Live.Context, only: [assign: 2, update: 3, broadcast_event: 3]
@@ -24,13 +25,21 @@ defmodule KinoLoge.Editor do
 
   @lint_delay 300
 
-  defstruct [:lint, :timer, version: 0, diagnostics: [], sources: %{}]
+  @enforce_keys [:roles]
+  defstruct [:roles, :lint, :timer, version: 0, diagnostics: [], sources: %{}]
 
   @typedoc """
-  The version of the source, the diagnostics last sent, the bound sources, the running
-  lint and the pending one.
+  The variables a setup names for the roles of its engine, by role key; `nil` for a
+  role that is not set.
+  """
+  @type roles :: (setup :: struct() -> [{atom(), String.t() | nil}])
+
+  @typedoc """
+  How the setup names its roles, the version of the source, the diagnostics last sent,
+  the bound sources, the running lint and the pending one.
   """
   @type t :: %__MODULE__{
+          roles: roles(),
           version: non_neg_integer(),
           diagnostics: [map()],
           sources: %{String.t() => Loge.Source.t()},
@@ -38,9 +47,16 @@ defmodule KinoLoge.Editor do
           timer: reference() | nil
         }
 
-  @doc "Starts the editor of a cell and schedules the first lint."
-  @spec init(Kino.JS.Live.Context.t()) :: Kino.JS.Live.Context.t()
-  def init(ctx), do: ctx |> assign(editor: %__MODULE__{}) |> schedule_lint()
+  @doc """
+  Starts the editor of a cell and schedules the first lint. The `:roles` option reads
+  from the cell's setup the variables of its engine's roles (`t:roles/0`); a cell
+  without roles leaves it out.
+  """
+  @spec init(Kino.JS.Live.Context.t(), roles: roles()) :: Kino.JS.Live.Context.t()
+  def init(ctx, options \\ []) do
+    [roles: roles] = Keyword.validate!(options, roles: fn _setup -> [] end)
+    ctx |> assign(editor: %__MODULE__{roles: roles}) |> schedule_lint()
+  end
 
   @doc "What a client needs to start editing: the source, its version and the diagnostics."
   @spec connect(Kino.JS.Live.Context.t()) :: map()
@@ -155,8 +171,9 @@ defmodule KinoLoge.Editor do
     end)
   end
 
-  defp lint(%{assigns: %{editor: editor, setup: %{language: language, source: source}}} = ctx) do
+  defp lint(%{assigns: %{editor: editor, setup: setup}} = ctx) do
     if editor.lint, do: Task.shutdown(editor.lint, :brutal_kill)
+    %{language: language, source: source} = setup
 
     includes =
       for {name, %Loge.Source{language: id} = source} <- editor.sources,
@@ -164,7 +181,14 @@ defmodule KinoLoge.Editor do
           into: %{},
           do: {name, source}
 
-    task = Loge.Run.async(fn -> Loge.lint(language, source, includes: includes) end)
+    roles =
+      for {key, name} <- editor.roles.(setup),
+          %Loge.Source{} = source <- [editor.sources[name]],
+          do: {key, source}
+
+    task =
+      Loge.Run.async(fn -> Loge.lint(language, source, includes: includes, roles: roles) end)
+
     assign(ctx, editor: %{editor | lint: task, timer: nil})
   end
 

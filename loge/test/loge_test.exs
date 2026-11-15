@@ -68,6 +68,13 @@ defmodule LogeTest do
                Loge.lint(Fake.Language, "", [])
     end
 
+    test "passes the roles to the language" do
+      assert [%Loge.Diagnostic{code: "FAKE0003", message: "schema: s"}] =
+               Fake.Language
+               |> Loge.lint("roles", roles: [schema: Loge.source(:fake, "s")])
+               |> Enum.filter(&(&1.code == "FAKE0003"))
+    end
+
     test "passes the analyzers their options" do
       :ok = Loge.register(Fake.Analyzer)
       diagnostics = Loge.lint(Fake.Language, "src", analyzers: [fake_analyzer: [say: "hi"]])

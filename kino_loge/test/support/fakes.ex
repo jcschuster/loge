@@ -25,7 +25,13 @@ defmodule KinoLoge.Fake.Language do
           not Map.has_key?(includes, name),
           do: Diagnostic.new("FAKE0601", :error, Range.new(line), "cannot include #{name}")
 
-    %Analysis{language: :fake, source: source, diagnostics: diagnostics}
+    roles =
+      for {key, input} <- Keyword.get(options, :roles, []) do
+        text = IO.iodata_to_binary(Loge.Input.to_iodata(input))
+        Diagnostic.new("FAKE0602", :info, Range.new(1), "#{key}: #{text}")
+      end
+
+    %Analysis{language: :fake, source: source, diagnostics: diagnostics ++ roles}
   end
 end
 

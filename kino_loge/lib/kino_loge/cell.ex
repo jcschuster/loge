@@ -26,7 +26,7 @@ defmodule KinoLoge.Cell do
 
   @impl true
   def init(attrs, ctx) do
-    {:ok, ctx |> assign(setup: Setup.from_attrs(attrs)) |> Editor.init()}
+    {:ok, ctx |> assign(setup: Setup.from_attrs(attrs)) |> Editor.init(roles: & &1.roles)}
   end
 
   @impl true

@@ -27,7 +27,8 @@ defmodule Loge.Outcome do
   `:satisfiability` for a problem stated without them, whose satisfiability is asked
   (DIMACS, ASP, SMT-LIB); `:translation` for the relation between a translation's
   input, as the axioms, and its output, as the conjecture; `:verification` for a
-  verifier's judgement of a solution.
+  checker's judgement of a structure: a verifier's of a solution, a validator's of
+  data against shapes.
   """
   @type problem :: :entailment | :satisfiability | :translation | :verification
 

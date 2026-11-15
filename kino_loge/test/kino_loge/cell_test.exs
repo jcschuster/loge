@@ -239,5 +239,20 @@ defmodule KinoLoge.CellTest do
     assert_broadcast_event(kino, "diagnostics", [], 1_000)
   end
 
+  test "the source is linted with the bound values of its roles" do
+    {kino, _source} = start_smart_cell!(Cell, %{"engine" => "validator"})
+    assert_broadcast_event(kino, "diagnostics", [], 1_000)
+
+    push_event(kino, "set_role", %{"key" => "data", "name" => "graph"})
+    Cell.scan_binding(kino.pid, [graph: Loge.source(:other, "g")], __ENV__)
+
+    assert_broadcast_event(
+      kino,
+      "diagnostics",
+      [%{code: "FAKE0602", description: "data: g"}],
+      1_000
+    )
+  end
+
   defp edit(client, changes), do: %{"clientID" => client, "changes" => changes}
 end

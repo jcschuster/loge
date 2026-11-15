@@ -11,6 +11,9 @@ Mix.install([
   {:loge_prolog, path: Path.join(root, "loge_prolog")},
   {:loge_egglog, path: Path.join(root, "loge_egglog")},
   {:loge_smtlib, path: Path.join(root, "loge_smtlib")},
+  {:loge_turtle, path: Path.join(root, "loge_turtle")},
+  {:loge_sparql, path: Path.join(root, "loge_sparql")},
+  {:loge_shex, path: Path.join(root, "loge_shex")},
   {:kino_loge, path: Path.join(root, "kino_loge")}
 ])
 ```
@@ -29,6 +32,9 @@ installs all of them:
 | `loge_prolog` | Prolog                 | SWI-Prolog                                       |
 | `loge_egglog` | egglog                 | egglog                                           |
 | `loge_smtlib` | SMT-LIB 2.6            | z3, cvc5                                         |
+| `loge_turtle` | RDF in Turtle          | SHACL                                            |
+| `loge_sparql` | SPARQL                 | queries on a graph or an endpoint                |
+| `loge_shex`   | ShExC and shape maps   | ShEx                                             |
 
 Every problem below sits in a **Logic Engine** smart cell (`+ Smart` → *Logic Engine*).
 From top to bottom, a cell has:
@@ -37,7 +43,9 @@ From top to bottom, a cell has:
    solve, check or translate;
 2. the **input**, which appears once a cell above has bound a source or result in
    the cell's language: this cell's editor or that variable; and **Bind to**, a
-   variable for the outcome, so a later cell can take it as its input;
+   variable for the outcome, so a later cell can take it as its input; and, for an
+   engine that asks its input of another source, such as the data a SPARQL query
+   reads, a select per **role**;
 3. the engine's **controls**, such as a time limit;
 4. the **editor**, and under it the problems the linter finds as you type;
 5. once evaluated, the outcome: a **Result** tab with the verdict and the details the
@@ -257,6 +265,50 @@ Loge.run!(
 Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 5\n1 2 0\n2 -2 0\n-1 1 0\n1 0\n2 0", models: 1)
 ```
 
+## The semantic web: Turtle, SPARQL, SHACL
+
+A graph in Turtle, bound to `friends`:
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InR1cnRsZSIsInNvdXJjZSI6IkBwcmVmaXggOiA8aHR0cDovL2V4YW1wbGUub3JnLz4gLlxuXG46YWxpY2UgOm5hbWUgXCJBbGljZVwiIDsgOmFnZSAzMCA7IDprbm93cyA6Ym9iIC5cbjpib2IgOm5hbWUgXCJCb2JcIiA7IDphZ2UgXCJ1bmtub3duXCIgOyA6a25vd3MgOmNhcm9sIC5cbjpjYXJvbCA6bmFtZSBcIkNhcm9sXCIgLlxuIiwidmFyaWFibGUiOiJmcmllbmRzIn0","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+friends =
+  Loge.source(
+    :turtle,
+    "@prefix : <http://example.org/> .\n\n:alice :name \"Alice\" ; :age 30 ; :knows :bob .\n:bob :name \"Bob\" ; :age \"unknown\" ; :knows :carol .\n:carol :name \"Carol\" .\n"
+  )
+```
+
+A SPARQL query is asked of a graph: the **Data** select is its role. Expected:
+**Yes**, who knows whom.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzcGFycWxfcXVlcnkiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJzcGFycWwiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjMwfSwicm9sZXMiOnsiZGF0YSI6ImZyaWVuZHMifSwic291cmNlIjoiUFJFRklYIDogPGh0dHA6Ly9leGFtcGxlLm9yZy8+XG5cblNFTEVDVCA/cGVyc29uID9mcmllbmQgV0hFUkUge1xuICA/cCA6a25vd3MgP2YgLlxuICA/cCA6bmFtZSA/cGVyc29uIC5cbiAgP2YgOm5hbWUgP2ZyaWVuZFxufVxuT1JERVIgQlkgP3BlcnNvblxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Sparql.Engines.Query,
+  "PREFIX : <http://example.org/>\n\nSELECT ?person ?friend WHERE {\n  ?p :knows ?f .\n  ?p :name ?person .\n  ?f :name ?friend\n}\nORDER BY ?person\n",
+  data: friends,
+  time_limit: 30
+)
+```
+
+SHACL shapes validate the same graph. Expected: **Nonconformant**, Bob's age is not
+an integer; the validation report, a graph itself, is the outcome's output.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzaGFjbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InR1cnRsZSIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MzB9LCJyb2xlcyI6eyJkYXRhIjoiZnJpZW5kcyJ9LCJzb3VyY2UiOiJAcHJlZml4IDogPGh0dHA6Ly9leGFtcGxlLm9yZy8+IC5cbkBwcmVmaXggc2g6IDxodHRwOi8vd3d3LnczLm9yZy9ucy9zaGFjbCM+IC5cbkBwcmVmaXggeHNkOiA8aHR0cDovL3d3dy53My5vcmcvMjAwMS9YTUxTY2hlbWEjPiAuXG5cbjpQZXJzb24gYSBzaDpOb2RlU2hhcGUgO1xuICBzaDp0YXJnZXRTdWJqZWN0c09mIDpuYW1lIDtcbiAgc2g6cHJvcGVydHkgWyBzaDpwYXRoIDpuYW1lIDsgc2g6ZGF0YXR5cGUgeHNkOnN0cmluZyA7IHNoOm1pbkNvdW50IDEgXSA7XG4gIHNoOnByb3BlcnR5IFsgc2g6cGF0aCA6YWdlIDsgc2g6ZGF0YXR5cGUgeHNkOmludGVnZXIgOyBzaDptYXhDb3VudCAxIF0gLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Turtle.Engines.Shacl,
+  "@prefix : <http://example.org/> .\n@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n:Person a sh:NodeShape ;\n  sh:targetSubjectsOf :name ;\n  sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;\n  sh:property [ sh:path :age ; sh:datatype xsd:integer ; sh:maxCount 1 ] .\n",
+  data: friends,
+  time_limit: 30
+)
+```
+
+ShEx, CONSTRUCT chains and an endpoint are in `rdf.livemd`.
+
 ## Linting as you type
 
 Every language has a linter, run as you type. The program below has two problems:
@@ -347,7 +399,8 @@ outcome
 ## Where to go next
 
 Each language has a notebook of its own beside this one (`tptp.livemd`,
-`dimacs.livemd`, `asp.livemd`, `prolog.livemd`, `egglog.livemd`, `smtlib.livemd`),
+`dimacs.livemd`, `asp.livemd`, `prolog.livemd`, `egglog.livemd`, `smtlib.livemd`,
+`rdf.livemd`),
 with more cases per engine. A language or engine of your own is an Elixir module
 implementing `Loge.Language` or `Loge.Engine`, registered with `Loge.register/1`;
 the smart cells pick it up with no change.

@@ -40,8 +40,8 @@ defmodule Loge do
   Every diagnostic about `source`: those of `c:Loge.Language.analyze/2`, then those
   of the analyzers registered for the language.
 
-  Options other than `:analyzers` go to `analyze/2`; `:analyzers` are the options of
-  `Loge.Analyzer.run_all/3`.
+  Options other than `:analyzers` go to `analyze/2`, such as `:includes` and `:roles`;
+  `:analyzers` are the options of `Loge.Analyzer.run_all/3`.
   """
   @spec lint(module(), binary(), keyword()) :: [Loge.Diagnostic.t()]
   def lint(language, source, options) do

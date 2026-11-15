@@ -22,6 +22,14 @@ defmodule Loge.Language do
   """
   @type includes :: %{String.t() => Loge.Input.t()}
 
+  @typedoc """
+  The values of the roles of the engine a source is run by, by role key
+  (`c:Loge.Engine.roles/0`). Passed as the `:roles` option of `c:analyze/2` to a
+  language whose source cannot be read without them, such as a ShEx shape map, which
+  names nodes and shapes by the prefixes of its data and its schema.
+  """
+  @type roles :: [{atom(), Loge.Input.t()}]
+
   @doc """
   The names the includes in a source use, in order, whether or not they resolve. A
   language without includes returns `[]`.
@@ -30,7 +38,9 @@ defmodule Loge.Language do
 
   @doc """
   Parses and checks a source. A source that does not parse still yields an analysis.
-  The `:includes` option holds the `t:includes/0` the source may include.
+  The `:includes` option holds the `t:includes/0` the source may include, and the
+  `:roles` option the `t:roles/0` of the engine it is run by; a language reads only
+  the role keys of the engines of its own package.
   """
   @callback analyze(binary(), keyword()) :: Loge.Analysis.t()
 
