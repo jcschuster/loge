@@ -12,7 +12,24 @@ defmodule Loge.ExecutableTest do
   test "runs the executable on the input, written to a file passed last" do
     assert {:ok, %Executable.Exit{status: 0, output: "input\n", file: file}} = run("")
     assert Path.extname(file) == ""
-    refute File.exists?(file)
+    refute File.exists?(Path.dirname(file))
+  end
+
+  test "files are written beside the input, under their names" do
+    script = ~S|cat "$(dirname "$0")/defs" "$0"|
+
+    assert {:ok, %Executable.Exit{output: "defs\ninput\n", file: file}} =
+             Executable.run("sh", ["-c", script], "input\n", files: [{"defs", "defs\n"}])
+
+    refute File.exists?(Path.dirname(file))
+  end
+
+  test "a file name is one path component other than the input's" do
+    for name <- ["../escape", "sub/defs", "", "..", "input.lp"] do
+      assert_raise ArgumentError, ~r/file name/, fn ->
+        Executable.run("cat", [], "", extension: ".lp", files: [{name, ""}])
+      end
+    end
   end
 
   test "the file takes the given extension" do
@@ -45,8 +62,7 @@ defmodule Loge.ExecutableTest do
              result
 
     assert microseconds < 2_000_000
-    refute File.exists?(file)
-    File.rm(file <> ".pid")
+    refute File.exists?(Path.dirname(file))
   end
 
   @tag :tmp_dir
@@ -78,7 +94,7 @@ defmodule Loge.ExecutableTest do
 
   defp wait_for_pid(attempts \\ 100) do
     pids =
-      for file <- Path.wildcard(Path.join(System.tmp_dir!(), "loge_*.pid")),
+      for file <- Path.wildcard(Path.join([System.tmp_dir!(), "loge_*", "*.pid"])),
           {:ok, os_pid} <- [File.read(file)],
           os_pid = String.trim(os_pid),
           os_pid != "" and File.exists?("/proc/#{os_pid}"),

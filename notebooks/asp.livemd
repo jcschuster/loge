@@ -67,6 +67,29 @@ Grounding this never ends. Expected: **Timeout** after two seconds; the lint giv
 Loge.run!(Loge.Asp.Engines.Clingo, "nat(0).\nnat(N + 1) :- nat(N).\n", time_limit: 2)
 ```
 
+## Includes
+
+A **Logic Source** cell binds a graph to `graph`; a cell that includes it with
+`#include "graph".` computes what is reachable. Expected: **Satisfiable**, one model
+with nine `reach` atoms.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6ImFzcCIsInNvdXJjZSI6ImVkZ2UoMSwgMikuIGVkZ2UoMiwgMykuIGVkZ2UoMywgMSkuXG4iLCJ2YXJpYWJsZSI6ImdyYXBoIn0","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+graph = Loge.source(:asp, "edge(1, 2). edge(2, 3). edge(3, 1).\n")
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJhc3AiLCJvcHRpb25zIjp7Im1vZGVscyI6bnVsbCwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiIjaW5jbHVkZSBcImdyYXBoXCIuXG5cbnJlYWNoKFgsIFkpIDotIGVkZ2UoWCwgWSkuXG5yZWFjaChYLCBaKSA6LSByZWFjaChYLCBZKSwgZWRnZShZLCBaKS5cblxuI3Nob3cgcmVhY2gvMi5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Asp.Engines.Clingo,
+  "#include \"graph\".\n\nreach(X, Y) :- edge(X, Y).\nreach(X, Z) :- reach(X, Y), edge(Y, Z).\n\n#show reach/2.\n",
+  time_limit: 10,
+  includes: %{"graph" => graph}
+)
+```
+
 ## Linting
 
 Expected: under the editor, a syntax error on line 2; evaluating raises `Loge.Error` with it.

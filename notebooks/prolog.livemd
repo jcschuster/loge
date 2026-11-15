@@ -14,13 +14,12 @@ Mix.install([
 
 Expected: **Yes**, a table with `Z` = `ann` and `pat`.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJnb2FsIjoiZ3JhbmRwYXJlbnQodG9tLCBaKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6InBhcmVudCh0b20sIGJvYikuXG5wYXJlbnQodG9tLCBsaXopLlxucGFyZW50KGJvYiwgYW5uKS5cbnBhcmVudChib2IsIHBhdCkuXG5cbmdyYW5kcGFyZW50KFgsIFopIDotIHBhcmVudChYLCBZKSwgcGFyZW50KFksIFopLlxuXG4/LSBncmFuZHBhcmVudCh0b20sIFopLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Prolog.Engines.Swipl,
-  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n",
-  goal: "grandparent(tom, Z)",
+  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n\n?- grandparent(tom, Z).\n",
   answers: 0,
   time_limit: 10
 )
@@ -28,13 +27,12 @@ Loge.run!(
 
 Expected: **No**, no table.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JhbmRwYXJlbnQoYW5uLCBfKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicGFyZW50KHRvbSwgYm9iKS5cbnBhcmVudCh0b20sIGxpeikuXG5wYXJlbnQoYm9iLCBhbm4pLlxucGFyZW50KGJvYiwgcGF0KS5cblxuZ3JhbmRwYXJlbnQoWCwgWikgOi0gcGFyZW50KFgsIFkpLCBwYXJlbnQoWSwgWikuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6InBhcmVudCh0b20sIGJvYikuXG5wYXJlbnQodG9tLCBsaXopLlxucGFyZW50KGJvYiwgYW5uKS5cbnBhcmVudChib2IsIHBhdCkuXG5cbmdyYW5kcGFyZW50KFgsIFopIDotIHBhcmVudChYLCBZKSwgcGFyZW50KFksIFopLlxuXG4/LSBncmFuZHBhcmVudChhbm4sIF8pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Prolog.Engines.Swipl,
-  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n",
-  goal: "grandparent(ann, _)",
+  "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n\n?- grandparent(ann, _).\n",
   answers: 1,
   time_limit: 10
 )
@@ -42,11 +40,12 @@ Loge.run!(
 
 What the program prints is the Output tab. Expected: **Yes**, Output `hello, world`.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiZ3JlZXQod29ybGQpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJncmVldChOYW1lKSA6LSBmb3JtYXQoXCJoZWxsbywgfnd+blwiLCBbTmFtZV0pLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImdyZWV0KE5hbWUpIDotIGZvcm1hdChcImhlbGxvLCB+d35uXCIsIFtOYW1lXSkuXG5cbj8tIGdyZWV0KHdvcmxkKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Prolog.Engines.Swipl, "greet(Name) :- format(\"hello, ~w~n\", [Name]).\n",
-  goal: "greet(world)",
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  "greet(Name) :- format(\"hello, ~w~n\", [Name]).\n\n?- greet(world).\n",
   answers: 1,
   time_limit: 10
 )
@@ -54,10 +53,35 @@ Loge.run!(Loge.Prolog.Engines.Swipl, "greet(Name) :- format(\"hello, ~w~n\", [Na
 
 Expected: **Timeout** after two seconds.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoibG9vcCIsInRpbWVfbGltaXQiOjJ9LCJzb3VyY2UiOiJsb29wIDotIGxvb3AuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJ0aW1lX2xpbWl0IjoyfSwic291cmNlIjoibG9vcCA6LSBsb29wLlxuXG4/LSBsb29wLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Prolog.Engines.Swipl, "loop :- loop.\n", goal: "loop", answers: 1, time_limit: 2)
+Loge.run!(Loge.Prolog.Engines.Swipl, "loop :- loop.\n\n?- loop.\n", answers: 1, time_limit: 2)
+```
+
+## Includes
+
+A **Logic Source** cell binds the program to `family`; a cell that consults it with
+`:- [family].` asks a query of its own. Expected: **Yes**, `Z` = `ann` and `pat`.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InByb2xvZyIsInNvdXJjZSI6InBhcmVudCh0b20sIGJvYikuXG5wYXJlbnQodG9tLCBsaXopLlxucGFyZW50KGJvYiwgYW5uKS5cbnBhcmVudChib2IsIHBhdCkuXG5cbmdyYW5kcGFyZW50KFgsIFopIDotIHBhcmVudChYLCBZKSwgcGFyZW50KFksIFopLlxuIiwidmFyaWFibGUiOiJmYW1pbHkifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+family =
+  Loge.source(
+    :prolog,
+    "parent(tom, bob).\nparent(tom, liz).\nparent(bob, ann).\nparent(bob, pat).\n\ngrandparent(X, Z) :- parent(X, Y), parent(Y, Z).\n"
+  )
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnsiYW5zd2VycyI6MCwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiI6LSBbZmFtaWx5XS5cblxuPy0gZ3JhbmRwYXJlbnQodG9tLCBaKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Prolog.Engines.Swipl, ":- [family].\n\n?- grandparent(tom, Z).\n",
+  answers: 0,
+  time_limit: 10,
+  includes: %{"family" => family}
+)
 ```
 
 ## Linting
@@ -65,11 +89,10 @@ Loge.run!(Loge.Prolog.Engines.Swipl, "loop :- loop.\n", goal: "loop", answers: 1
 Expected: under the editor, `Y` is a singleton (warning, on `Y`) and line 3 has a syntax
 error; evaluating raises `Loge.Error` with the syntax error.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoicChhKSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoicChYKSA6LSBxKFgsIFkpLlxucShhLCBiKS5cbnIoIDotIHMuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6InAoWCkgOi0gcShYLCBZKS5cbnEoYSwgYikuXG5yKCA6LSBzLlxuXG4/LSBwKGEpLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Prolog.Engines.Swipl, "p(X) :- q(X, Y).\nq(a, b).\nr( :- s.\n",
-  goal: "p(a)",
+Loge.run!(Loge.Prolog.Engines.Swipl, "p(X) :- q(X, Y).\nq(a, b).\nr( :- s.\n\n?- p(a).\n",
   answers: 1,
   time_limit: 10
 )

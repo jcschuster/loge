@@ -1,17 +1,18 @@
-:- module(loge, [lint/2, capture/1, solve/2]).
+:- module(loge, [read_program/3, capture/1, solve/2]).
 
 % The Prolog half of Loge.Prolog.Swipl, loaded into a fresh swipl per lint or run.
 
-% Reads every clause of a UTF-8 file as consult would, in a temporary module so
-% that op/3 directives apply to the clauses after them, and collects findings as
-% finding(Severity, Kind, From, To, Message), From and To character offsets.
-lint(File, Findings) :-
+% Reads every term of a UTF-8 file as consult would, in a temporary module so that
+% op/3 directives apply to the terms after them. Collects findings as
+% finding(Severity, Kind, From, To, Message) and the goal of each query ?- Goal as
+% query(From, To), From and To character offsets.
+read_program(File, Findings, Queries) :-
     in_temporary_module(Module, true,
         loge:setup_call_cleanup(open(File, read, Stream, [encoding(utf8)]),
-                           loge:clauses(Stream, Module, Findings),
+                           loge:terms(Stream, Module, Findings, Queries),
                            close(Stream))).
 
-clauses(Stream, Module, Findings) :-
+terms(Stream, Module, Findings, Queries) :-
     stream_property(Stream, position(Before)),
     catch(read_term(Stream, Term,
                     [ module(Module), subterm_positions(Position),
@@ -19,21 +20,37 @@ clauses(Stream, Module, Findings) :-
                     ]),
           error(syntax_error(Message), Context),
           Term = '$syntax_error'(Message, Context)),
-    clause_findings(Term, Stream, Before, Module, Position, Singletons, Findings, Rest),
+    term_findings(Term, Stream, Before, Module, Position, Singletons, Findings, RestFindings),
+    term_queries(Term, Position, Queries, RestQueries),
     (   Term == end_of_file
-    ->  Rest = []
-    ;   clauses(Stream, Module, Rest)
+    ->  RestFindings = [], RestQueries = []
+    ;   terms(Stream, Module, RestFindings, RestQueries)
     ).
 
-clause_findings(end_of_file, _, _, _, _, _, Findings, Findings) :- !.
-clause_findings('$syntax_error'(Message, Context), Stream, Before, _, _, _,
-                [finding(error, syntax_error, From, To, Text)|Findings], Findings) :- !,
+term_findings(end_of_file, _, _, _, _, _, Findings, Findings) :- !.
+term_findings('$syntax_error'(Message, Context), Stream, Before, _, _, _,
+              [finding(error, syntax_error, From, To, Text)|Findings], Findings) :- !,
     syntax_error_offset(Context, Stream, Before, From),
     To is From + 1,
     message_to_string(error(syntax_error(Message), _), Text).
-clause_findings(Term, _, _, Module, Position, Singletons, Findings, Rest) :-
+term_findings(Term, _, _, _, _, _, Findings, Findings) :-
+    query(Term), !.
+term_findings(Term, _, _, Module, Position, Singletons, Findings, Rest) :-
     directive(Term, Module),
     singleton_findings(Singletons, Term, Position, Findings, Rest).
+
+% A query's variables are what it asks for, so none of them is a singleton.
+query(Term) :- subsumes_term((?- _), Term).
+
+term_queries(Term, term_position(_, _, _, _, [Goal]), [query(From, To)|Queries], Queries) :-
+    query(Term), !,
+    arg(1, Goal, From),
+    arg(2, Goal, To).
+term_queries(_, _, Queries, Queries).
+
+% Consulting leaves the queries out; the engine asks them one by one after it.
+:- multifile user:term_expansion/2.
+user:term_expansion((?- _), []).
 
 syntax_error_offset(stream(_, _, _, CharNo), _, _, CharNo) :- !.
 syntax_error_offset(file(_, _, _, CharNo), _, _, CharNo) :- !.

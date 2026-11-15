@@ -13,6 +13,20 @@ defmodule Loge.Tptp.Engines.LocalExecTest do
     assert raw =~ "SZS status Theorem"
   end
 
+  test "the derivation the prover prints is the outcome's output, an input in TPTP" do
+    echo = Path.expand("../../../fixtures/echo_prover", __DIR__)
+    derivation = "cnf(c, plain, $false)."
+
+    problem =
+      "% SZS output start CNFRefutation\n#{derivation}\n% SZS output end CNFRefutation\n"
+
+    assert {:ok, %Outcome{views: [], output: output} = outcome} =
+             LocalExec.run(problem, binary: echo, time_limit: 1)
+
+    assert output == Loge.source(:tptp, derivation)
+    assert Loge.Input.language(outcome) == :tptp
+  end
+
   test "a missing binary is an error with a message" do
     assert {:error, reason} = LocalExec.run("p.", binary: "loge-no-such-prover")
     assert LocalExec.format_error(reason) =~ "not found on PATH: loge-no-such-prover"

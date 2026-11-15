@@ -4,6 +4,8 @@ defmodule Loge.Prolog.LanguageTest do
   alias Loge.{Analysis, Diagnostic, Range}
   alias Loge.Prolog.Language
 
+  doctest Loge.Prolog.Includes
+
   defp diagnostics(source), do: Language.analyze(source, []).diagnostics
 
   test "describes Prolog" do
@@ -11,7 +13,31 @@ defmodule Loge.Prolog.LanguageTest do
     assert Language.label() == "Prolog"
     assert Language.extensions() == [".pl", ".pro"]
     assert Language.editor_language() == "prolog"
-    assert Language.include_names(":- [defs].") == []
+  end
+
+  test "a source names what it includes in its directives, by atoms" do
+    source = """
+    :- [defs, library(lists), 'my defs'].
+    :- include(facts).
+    :- consult(more).% a comment after the full stop
+    :- ensure_loaded(rules).
+    p :- [not_a_directive].
+    :- initialization(main).
+    """
+
+    assert Language.include_names(source) == ["defs", "my defs", "facts", "more", "rules"]
+  end
+
+  test "names in comments, strings and quoted atoms are not includes" do
+    source = """
+    % :- [commented].
+    /* :- [blocked]. */
+    p("\\":- [quoted].").
+    q(0'., ':- [atom].').
+    :- [real].
+    """
+
+    assert Language.include_names(source) == ["real"]
   end
 
   test "a clean program has no diagnostics" do
@@ -25,6 +51,10 @@ defmodule Loge.Prolog.LanguageTest do
 
     assert range == Range.new(2, column: 3, end_line: 2, end_column: 4)
     assert message == "Singleton variable X"
+  end
+
+  test "a query's variables are what it asks for, not singletons" do
+    assert diagnostics("p(a).\n?- p(X).") == []
   end
 
   test "variables starting with an underscore may occur once" do

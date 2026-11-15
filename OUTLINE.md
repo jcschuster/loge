@@ -223,8 +223,7 @@ run is thereby the input of the next, in a notebook and in a pipeline alike.
 Where a language has syntax for the question, the question is part of the source: a TPTP
 conjecture, SMT-LIB's `(check-sat)`, egglog's `(check …)`, a Prolog `?- Goal.`.
 `Loge.Prolog.Engines.Swipl` consults the clauses and directives of its source and answers
-each `?- Goal.` in it, in order (phase 7; until then the goal is a `:text` control, the
-one place where part of a problem travels outside a source).
+each `?- Goal.` in it, in order, as the toplevel would.
 
 ### Includes
 
@@ -245,6 +244,17 @@ fetches from tptp.org and caches on disk). Findings inside an include are placed
 directive that reaches it, prefixed `in '<name>': `. Engines receive the problem with every
 include inlined (a `Tptp.Unit`) when includes are given, the source as written otherwise; an
 unresolved include is `{:error, {:unresolved_includes, diagnostics}}`.
+
+Prolog, ASP and egglog include files, which their tools read themselves. A run writes
+each source of the closure whose name is a word (letters, digits, underscores: the
+names a cell can bind) as the file the tool looks for: `<name>.pl` beside the program
+for SWI-Prolog's `:- [name].`, `include/1`, `consult/1` and `ensure_loaded/1`; `<name>`
+beside it for clingo's `#include "name".` (`Loge.Executable`'s `:files`); `<name>` in
+egglog's working directory, a directory of the run's, for `(include "name")`. Other
+names are left to the tool. `include_names/1` reads the directives with a scanner of
+the language's comments, strings and quoted atoms, without starting the tool. The ASP
+lint grounds with the includes and names an included file in a finding on line 1;
+the Prolog and egglog lints read the program alone.
 
 ### Roles (`Loge.Role`, phase 10)
 
@@ -373,9 +383,10 @@ work and so honours the engine cancellation contract.
 Work outside the BEAM's reach needs more, and core provides three pieces:
 
 - `Loge.Executable.run(executable, arguments, input, options)`: runs a command-line
-  tool on its input written to a temporary file, under a `/bin/sh` wrapper that
-  SIGKILLs the tool and removes the file when the Port's pipe closes or receives a
-  line. The pipe closes when the caller dies and when the node halts or crashes, so no
+  tool on its input written to a file in a temporary directory of its own, beside the
+  `:files` it is given, under a `/bin/sh` wrapper that SIGKILLs the tool and removes
+  the directory when the Port's pipe closes or receives a line. A file name is one path
+  component, so no name written by a user reaches outside the directory. The pipe closes when the caller dies and when the node halts or crashes, so no
   tool outlives either; a line is how `:timeout` stops it, keeping the output so far.
   stderr is merged or discarded (the wrapper's own `Killed` notices are discarded).
   Used by `loge_asp` (clingo) and `loge_smtlib` (z3, cvc5); the template for further
@@ -513,10 +524,19 @@ Notes:
 - clingo_elixir's dispatcher monitors the process that opened the session and aborts the
   native search when it dies (`Clingo.Dispatcher.terminate/2`). Grounding is not aborted;
   for a CNF, whose translation grounds in time linear in its size, it ends late but ends.
+- Include resolution (executed): SWI-Prolog 10.0.1 reads `:- [defs].` and
+  `:- include(defs).` as `defs.pl` beside the loading file; clingo 5.8.2 reads
+  `#include "defs".` as `defs` beside the including file, adding no extension, and an
+  included file's messages name its path; egglog reads `(include "defs")` from the
+  working directory, and `Egglog.parse/1` does not open it.
 - Prolog linting lives in Prolog, `loge_prolog/priv/loge.pl`, loaded into a fresh `swipl`:
   `read_term/3` over the program file in a temporary module, executing `op/3` directives;
-  singletons located by walking `subterm_positions`; `_`-prefixed names skipped. The
-  bridge runs each query in a Prolog engine whose stream aliases are its own: output is
+  singletons located by walking `subterm_positions`; `_`-prefixed names skipped, and a
+  query's variables, which are what it asks for. The same reading gives the goal of each
+  `?- Goal.` by its position. `SWI.load/3` consults a path, and the bridge cannot skip
+  terms of it, so a `user:term_expansion/2` clause in `loge.pl` expands each query to
+  nothing while consulting; the engine then asks the goals one by one. The bridge runs
+  each query in a Prolog engine whose stream aliases are its own: output is
   captured by redirecting in the worker thread (a loaded directive) and again in each
   `solve/2`. `SWI.query/3` raises on timeouts and Prolog errors; `Loge.Prolog.Swipl`
   rescues `SWI.Error` once per answer pull to keep earlier answers.
@@ -544,10 +564,12 @@ Notes:
 - Output: `KinoLoge.Code` shows a `{:text, text, language}` view through the same bundle,
   read-only, with line numbers, search and coloured brackets, at most 300 px high. A
   text view without a language and the raw output stay terminal text: raw output mixes
-  languages, so an engine names the parts that are in one. The TPTP engines emit what
-  the system derived as TPTP text views titled by dataform (`CNFRefutation`): the solution
-  region of a TSTP reply (`details.tstp`, SystemOnTPTP's default) and each SZS output
-  block (`AtpClient.Result.blocks`). The Engine cell shows a bound input with the same
+  languages, so an engine names the parts that are in one. A TPTP engine's outcome has
+  what the system derived as its output, in TPTP: the derivation
+  (`AtpClient.Result.derivation/1`), else the interpretation (`interpretation/1`). When
+  neither reads, what the system printed is shown as TPTP text views titled by dataform
+  (`CNFRefutation`): the solution region of a TSTP reply (`details.tstp`, SystemOnTPTP's
+  default) and each SZS output block (`AtpClient.Result.blocks`). The Engine cell shows a bound input with the same
   read-only viewer in place of its editor. Both cells wire the editor and its
   diagnostics through the hand-written `editing.js`.
 - Beside editing: search and replace (`@codemirror/search`, Ctrl+F), matching brackets,

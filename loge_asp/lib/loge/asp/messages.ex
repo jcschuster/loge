@@ -20,7 +20,7 @@ defmodule Loge.Asp.Messages do
   @doc """
   The diagnostics in clingo's `output` about `source`, which clingo read from `file`.
   A message about another file, such as an included one, is placed on the first line
-  and names that file.
+  and names that file, by its path from the directory of `file`.
   """
   @spec parse(binary(), binary(), Path.t()) :: [Diagnostic.t()]
   def parse(output, source, file) when is_binary(output) and is_binary(source) do
@@ -77,8 +77,8 @@ defmodule Loge.Asp.Messages do
     {Range.from_offsets(source, start, stop - start), text}
   end
 
-  defp place({other, _line, _column, _end_line, _end_column}, text, _source, _lines, _file),
-    do: {Range.new(1), "in '#{other}': " <> text}
+  defp place({other, _line, _column, _end_line, _end_column}, text, _source, _lines, file),
+    do: {Range.new(1), "in '#{Path.relative_to(other, Path.dirname(file))}': " <> text}
 
   defp line_offsets(source) do
     starts = for {at, 1} <- :binary.matches(source, "\n"), do: at + 1

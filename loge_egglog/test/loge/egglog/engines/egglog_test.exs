@@ -40,6 +40,27 @@ defmodule Loge.Egglog.Engines.EgglogTest do
              Egglog.run(@math, graph: true)
   end
 
+  test "the includes of the run and those the source carries are run with it" do
+    defs = Loge.source(:egglog, "(datatype M (Num i64))")
+
+    program =
+      Loge.source(:egglog, "(include \"defs\")\n(let x (Num 1))\n(extract x)",
+        includes: %{"defs" => defs}
+      )
+
+    assert {:ok, %Outcome{status: :success, raw: "(Num 1)\n"}} = Egglog.run(program, [])
+
+    assert {:ok, %Outcome{raw: "(Num 1)\n"}} =
+             Egglog.run("(include \"defs\")\n(let x (Num 1))\n(extract x)",
+               includes: %{"defs" => defs}
+             )
+  end
+
+  test "an include no source of that name holds is an error with egglog's message" do
+    assert {:error, {:egglog, message}} = Egglog.run("(include \"defs\")", [])
+    assert message =~ "No such file"
+  end
+
   test "a type error is an error with egglog's message" do
     assert {:error, {:egglog, message} = reason} =
              Egglog.run("(datatype M (Num i64))\n(let x (Num \"s\"))", [])

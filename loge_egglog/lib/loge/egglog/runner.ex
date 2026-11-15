@@ -5,11 +5,15 @@ defmodule Loge.Egglog.Runner do
   """
 
   @doc """
-  Runs `source` in a fresh `Egglog.Program`, with a JSON snapshot of the e-graph
-  when `snapshot` is `:json`. Returns what `Egglog.Program.run/3` returns.
+  Runs `source` in a fresh `Egglog.Program` from `directory`, where egglog reads the
+  files the source includes, with a JSON snapshot of the e-graph when `snapshot` is
+  `:json`. Returns what `Egglog.Program.run/3` returns. The peer is a node of its
+  own, so changing its working directory changes no other run's.
   """
-  @spec run(binary(), :json | :none) :: {:ok, map()} | {:error, term()}
-  def run(source, snapshot) when is_binary(source) and snapshot in [:json, :none] do
+  @spec run(binary(), :json | :none, Path.t()) :: {:ok, map()} | {:error, term()}
+  def run(source, snapshot, directory)
+      when is_binary(source) and snapshot in [:json, :none] and is_binary(directory) do
+    File.cd!(directory)
     Egglog.Program.with_program("", &Egglog.Program.run(&1, source, snapshot: snapshot))
   end
 end

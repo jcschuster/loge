@@ -3,9 +3,10 @@ defmodule Loge.Executable do
   Runs an executable on an input, as an engine over a command-line tool does, and
   ends it with the caller.
 
-  The input is written to a temporary file passed as the last argument. The tool runs
-  under a `/bin/sh` wrapper that kills it with SIGKILL when the wrapper's stdin, the
-  Port's pipe, closes or receives a line, and removes the file once the tool is gone.
+  The input is written to a file in a temporary directory of its own, passed as the
+  last argument. The tool runs under a `/bin/sh` wrapper that kills it with SIGKILL
+  when the wrapper's stdin, the Port's pipe, closes or receives a line, and removes the
+  directory once the tool is gone.
   The pipe closes when the caller dies and when the node halts or crashes, so a
   cancelled run never leaves the tool running; a line is how `:timeout` stops it,
   keeping what it printed until then.
@@ -13,6 +14,9 @@ defmodule Loge.Executable do
   Options:
 
     * `:extension` - of the input file, such as `".smt2"`. Defaults to none.
+    * `:files` - `{name, iodata}` pairs written beside the input, where a tool looks
+      for the files the input includes. A name is one path component other than the
+      input's; any other raises `ArgumentError`. Defaults to none.
     * `:stderr` - `:merge` to read stderr interleaved with stdout, `:discard` to drop
       it. Defaults to `:discard`.
     * `:timeout` - milliseconds after which the tool is killed, or `:infinity`, the
@@ -39,7 +43,7 @@ defmodule Loge.Executable do
   end
 
   @wrapper ~S"""
-  stderr=$1; file=$2; shift 2
+  stderr=$1; directory=$2; file=$3; shift 3
   exec 3<&0 2>/dev/null
   if [ "$stderr" = merge ]; then "$@" "$file" </dev/null 2>&1 & else "$@" "$file" </dev/null & fi
   tool=$!
@@ -48,7 +52,7 @@ defmodule Loge.Executable do
   wait "$tool"
   status=$?
   kill "$watcher" 2>/dev/null
-  rm -f "$file"
+  rm -rf "$directory"
   exit "$status"
   """
 
@@ -60,7 +64,16 @@ defmodule Loge.Executable do
           {:ok, Exit.t()} | {:error, {:executable_not_found, String.t()}}
   def run(executable, arguments, input, options) when is_list(arguments) do
     options =
-      Keyword.validate!(options, extension: "", stderr: :discard, timeout: :infinity, env: [])
+      Keyword.validate!(options,
+        extension: "",
+        files: [],
+        stderr: :discard,
+        timeout: :infinity,
+        env: []
+      )
+
+    input_name = "input" <> options[:extension]
+    Enum.each(options[:files], fn {name, _content} -> check_name!(name, input_name) end)
 
     case System.find_executable(executable) do
       nil -> {:error, {:executable_not_found, executable}}
@@ -68,20 +81,25 @@ defmodule Loge.Executable do
     end
   end
 
-  defp run_found(path, arguments, input, options) do
-    file =
-      Path.join(
-        System.tmp_dir!(),
-        "loge_#{System.unique_integer([:positive])}#{options[:extension]}"
-      )
+  defp check_name!(name, input_name) do
+    if name in ["", ".", "..", input_name] or Path.basename(name) != name do
+      raise ArgumentError, "not a file name beside the input: #{inspect(name)}"
+    end
+  end
 
-    File.write!(file, input)
+  defp run_found(path, arguments, input, options) do
+    directory = Path.join(System.tmp_dir!(), "loge_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(directory)
+    file = Path.join(directory, "input" <> options[:extension])
+
+    for {name, content} <- [{Path.basename(file), input} | options[:files]],
+        do: File.write!(Path.join(directory, name), content)
 
     port =
       Port.open({:spawn_executable, "/bin/sh"}, [
         :binary,
         :exit_status,
-        args: ["-c", @wrapper, "sh", stderr(options[:stderr]), file, path | arguments],
+        args: ["-c", @wrapper, "sh", stderr(options[:stderr]), directory, file, path | arguments],
         env: Enum.map(options[:env], fn {name, value} -> {~c"#{name}", ~c"#{value}"} end)
       ])
 

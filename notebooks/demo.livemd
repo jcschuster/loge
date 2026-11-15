@@ -88,16 +88,27 @@ commutes. The cell includes `groups` and asks the E prover on SystemOnTPTP.
 Expected: **Theorem**. If you edit the axioms above, this cell becomes stale, as any
 cell that reads a variable does.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7InN5c3RlbSI6IkUiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2Yoc2VsZl9pbnZlcnNlLCBoeXBvdGhlc2lzLCAhW1hdOiBtdWx0KFgsIFgpID0gZSkuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7InN5c3RlbSI6IkUiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2Yoc2VsZl9pbnZlcnNlLCBoeXBvdGhlc2lzLCAhW1hdOiBtdWx0KFgsIFgpID0gZSkuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS5cbiIsInZhcmlhYmxlIjoicHJvb2YifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(
-  Loge.Tptp.Engines.SystemOnTptp,
-  "include('groups').\n\nfof(self_inverse, hypothesis, ![X]: mult(X, X) = e).\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).\n",
-  system: "E",
-  time_limit: 10,
-  includes: %{"groups" => groups}
-)
+proof =
+  Loge.run!(
+    Loge.Tptp.Engines.SystemOnTptp,
+    "include('groups').\n\nfof(self_inverse, hypothesis, ![X]: mult(X, X) = e).\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).\n",
+    system: "E",
+    time_limit: 10,
+    includes: %{"groups" => groups}
+  )
+```
+
+The cell binds its outcome to `proof`. Its output is the derivation E found, in TPTP,
+so another cell can take `proof` as its input. This one sends it to GDV, the TPTP
+World's derivation verifier, which checks each inference. Expected: **VerifiedGood**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ2ZXJpZnkiLCJpbnB1dCI6InByb29mIiwibGFuZ3VhZ2UiOiJ0cHRwIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0Ijo2MH0sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Tptp.Engines.Verify, proof, time_limit: 60)
 ```
 
 Without that hypothesis, commutativity does not follow. Vampire can tell, and
@@ -166,17 +177,16 @@ Loge.run!(
 )
 ```
 
-In **Prolog**, the colouring is a predicate and the question is a goal. The engine
-consults the program and asks the goal; the table shows the bindings of its
-variables, one row per answer. Expected: **Yes**, one row.
+In **Prolog**, the colouring is a predicate and the question a query, `?- …`, in the
+program. The engine consults the program and asks the query; the table shows the
+bindings of its variables, one row per answer. Expected: **Yes**, one row.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJnb2FsIjoiYXVzdHJhbGlhKFdBLCBOVCwgU0EsIFEsIE5TVywgViwgVCkiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLiBjb2xvdXIoYmx1ZSkuXG5cbmF1c3RyYWxpYShXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFQpIDotXG4gICAgbWFwbGlzdChjb2xvdXIsIFtXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFRdKSxcbiAgICBXQSBcXD09IE5ULCBXQSBcXD09IFNBLCBOVCBcXD09IFNBLCBOVCBcXD09IFEsIFNBIFxcPT0gUSxcbiAgICBTQSBcXD09IE5TVywgU0EgXFw9PSBWLCBRIFxcPT0gTlNXLCBOU1cgXFw9PSBWLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLiBjb2xvdXIoYmx1ZSkuXG5cbmF1c3RyYWxpYShXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFQpIDotXG4gICAgbWFwbGlzdChjb2xvdXIsIFtXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFRdKSxcbiAgICBXQSBcXD09IE5ULCBXQSBcXD09IFNBLCBOVCBcXD09IFNBLCBOVCBcXD09IFEsIFNBIFxcPT0gUSxcbiAgICBTQSBcXD09IE5TVywgU0EgXFw9PSBWLCBRIFxcPT0gTlNXLCBOU1cgXFw9PSBWLlxuXG4/LSBhdXN0cmFsaWEoV0EsIE5ULCBTQSwgUSwgTlNXLCBWLCBUKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Prolog.Engines.Swipl,
-  "colour(red). colour(green). colour(blue).\n\naustralia(WA, NT, SA, Q, NSW, V, T) :-\n    maplist(colour, [WA, NT, SA, Q, NSW, V, T]),\n    WA \\== NT, WA \\== SA, NT \\== SA, NT \\== Q, SA \\== Q,\n    SA \\== NSW, SA \\== V, Q \\== NSW, NSW \\== V.\n",
-  goal: "australia(WA, NT, SA, Q, NSW, V, T)",
+  "colour(red). colour(green). colour(blue).\n\naustralia(WA, NT, SA, Q, NSW, V, T) :-\n    maplist(colour, [WA, NT, SA, Q, NSW, V, T]),\n    WA \\== NT, WA \\== SA, NT \\== SA, NT \\== Q, SA \\== Q,\n    SA \\== NSW, SA \\== V, Q \\== NSW, NSW \\== V.\n\n?- australia(WA, NT, SA, Q, NSW, V, T).\n",
   answers: 1,
   time_limit: 10
 )
@@ -184,6 +194,45 @@ Loge.run!(
 
 Prolog answers are not SZS statuses, so the verdict is one of Loge's own: **Yes** or
 **No**, the toplevel's `true` or `false`. A timeout is still SZS **Timeout**.
+
+One program can be asked many questions. This **Logic Source** cell binds the
+colouring to `colouring`, and each cell after it consults it with `:- [colouring].`
+and asks its own query. Expected: **Yes**, the six paintings with Western Australia
+red; then **No**, as South Australia borders it.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InByb2xvZyIsInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLiBjb2xvdXIoYmx1ZSkuXG5cbmF1c3RyYWxpYShXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFQpIDotXG4gICAgbWFwbGlzdChjb2xvdXIsIFtXQSwgTlQsIFNBLCBRLCBOU1csIFYsIFRdKSxcbiAgICBXQSBcXD09IE5ULCBXQSBcXD09IFNBLCBOVCBcXD09IFNBLCBOVCBcXD09IFEsIFNBIFxcPT0gUSxcbiAgICBTQSBcXD09IE5TVywgU0EgXFw9PSBWLCBRIFxcPT0gTlNXLCBOU1cgXFw9PSBWLlxuIiwidmFyaWFibGUiOiJjb2xvdXJpbmcifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+colouring =
+  Loge.source(
+    :prolog,
+    "colour(red). colour(green). colour(blue).\n\naustralia(WA, NT, SA, Q, NSW, V, T) :-\n    maplist(colour, [WA, NT, SA, Q, NSW, V, T]),\n    WA \\== NT, WA \\== SA, NT \\== SA, NT \\== Q, SA \\== Q,\n    SA \\== NSW, SA \\== V, Q \\== NSW, NSW \\== V.\n"
+  )
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnsiYW5zd2VycyI6MCwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiI6LSBbY29sb3VyaW5nXS5cblxuPy0gYXVzdHJhbGlhKHJlZCwgTlQsIFNBLCBRLCBOU1csIFYsIFQpLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  ":- [colouring].\n\n?- australia(red, NT, SA, Q, NSW, V, T).\n",
+  answers: 0,
+  time_limit: 10,
+  includes: %{"colouring" => colouring}
+)
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnsiYW5zd2VycyI6MCwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiI6LSBbY29sb3VyaW5nXS5cblxuPy0gYXVzdHJhbGlhKHJlZCwgTlQsIHJlZCwgUSwgTlNXLCBWLCBUKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  ":- [colouring].\n\n?- australia(red, NT, red, Q, NSW, V, T).\n",
+  answers: 0,
+  time_limit: 10,
+  includes: %{"colouring" => colouring}
+)
+```
 
 ## Rewriting: egglog
 
@@ -215,13 +264,12 @@ Every language has a linter, run as you type. The program below has two problems
 last clause is missing a parenthesis (an error). Evaluating it raises `Loge.Error`
 naming the error; fix the clause and it runs.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJnb2FsIjoicGFpbnQod2EsIEMpIiwidGltZV9saW1pdCI6MTB9LCJzb3VyY2UiOiJjb2xvdXIocmVkKS4gY29sb3VyKGdyZWVuKS5cblxucGFpbnQoUmVnaW9uLCBDKSA6LSBjb2xvdXIoQykuXG5wYWludCh3YSwgcmVkIDotIHRydWUuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6eyJhbnN3ZXJzIjowLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImNvbG91cihyZWQpLiBjb2xvdXIoZ3JlZW4pLlxuXG5wYWludChSZWdpb24sIEMpIDotIGNvbG91cihDKS5cbnBhaW50KHdhLCByZWQgOi0gdHJ1ZS5cblxuPy0gcGFpbnQod2EsIEMpLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Prolog.Engines.Swipl,
-  "colour(red). colour(green).\n\npaint(Region, C) :- colour(C).\npaint(wa, red :- true.\n",
-  goal: "paint(wa, C)",
+  "colour(red). colour(green).\n\npaint(Region, C) :- colour(C).\npaint(wa, red :- true.\n\n?- paint(wa, C).\n",
   answers: 0,
   time_limit: 10
 )

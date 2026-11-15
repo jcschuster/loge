@@ -59,40 +59,60 @@ defmodule Loge.Tptp.Backend do
   end
 
   @doc """
-  The outcome of an `AtpClient` query run by `engine`: `views`, then what the system
-  derived (a proof, a model) as text views in TPTP titled by dataform. That is the
-  solution of a TSTP reply (`details.tstp`) and each SZS output block of the result. The
-  `AtpClient.Result` stays in `details.result`.
+  The outcome of an `AtpClient` query run by `engine`. Its output is what the system
+  derived, as TPTP source: the derivation (`AtpClient.Result.derivation/1`), else the
+  interpretation (`AtpClient.Result.interpretation/1`). When neither reads, what the
+  system printed follows `views` as TPTP text views titled by dataform: the solution
+  of a TSTP reply (`details.tstp`, SystemOnTPTP's default) and each SZS output block
+  of the result. The `AtpClient.Result` stays in `details.result`.
   """
   @spec outcome({:ok, Result.t()} | {:error, term()}, atom(), [Outcome.view()]) ::
           {:ok, Outcome.t()} | {:error, term()}
   def outcome(query, engine, views \\ [])
 
   def outcome({:ok, %Result{} = result}, engine, views) do
+    output = output(result)
+
     {:ok,
      %Outcome{
        status: result.status,
        raw: result.output,
        engine: engine,
-       views: views ++ solution(result) ++ Enum.map(result.blocks, &block/1),
+       views: views ++ printed(result, output),
+       output: output,
        details: %{result: result}
      }}
   end
 
   def outcome({:error, _reason} = error, _engine, _views), do: error
 
+  defp output(result) do
+    Enum.find_value([&Result.derivation/1, &Result.interpretation/1], fn read ->
+      case read.(result) do
+        {:ok, derived, _diagnostics} ->
+          Loge.source(Language.id(), IO.iodata_to_binary(AtpClient.Input.to_iodata(derived)))
+
+        _none_or_unreadable ->
+          nil
+      end
+    end)
+  end
+
+  defp printed(_result, %Loge.Source{}), do: []
+  defp printed(result, nil), do: solution(result) ++ Enum.map(result.blocks, &block/1)
+
   defp solution(%Result{
          output: output,
          details: %{tstp: %Solution{span: %{solution: {start, length}}} = solution}
        })
        when length > 0,
-       do: [derivation(title(solution.output), binary_part(output, start, length))]
+       do: [titled(title(solution.output), binary_part(output, start, length))]
 
   defp solution(%Result{}), do: []
 
-  defp block(%{dataform: dataform, body: body}), do: derivation(title(dataform), body)
+  defp block(%{dataform: dataform, body: body}), do: titled(title(dataform), body)
 
-  defp derivation(title, text), do: {:titled, title, {:text, text, Language.editor_language()}}
+  defp titled(title, text), do: {:titled, title, {:text, text, Language.editor_language()}}
 
   defp title(nil), do: "Solution"
   defp title(dataform), do: Ontology.name(dataform)

@@ -112,7 +112,7 @@ in `kino_loge`.
 - [x] Engine `Loge.Asp.Engines.Clingo` (`--outf=2`): `models` control (unset: clingo's default, which runs an optimisation to its optimum), `time_limit` (`:timeout`); models view of shown atoms; `OPTIMUM FOUND` adds an `optimum found` badge
 - [x] `to_source/2`: covered by core `Loge.Engine.to_source/4`
 - [x] Engine ids unique across packages: the DIMACS engine is `Loge.Dimacs.Engines.Clasp` (`:clasp`)
-- [ ] Includes: `#include` resolves files only; a definitions cell cannot be included yet (needs a language-side resolution like TPTP's)
+- [x] Includes: `#include` resolves files only; a definitions cell cannot be included yet (needs a language-side resolution like TPTP's). Done in phase 7
 - [x] Highlighting: `codemirror-lang-asp`
 
 ### Gate
@@ -135,13 +135,13 @@ in `kino_loge`.
 - [x] Engine `Loge.Prolog.Engines.Swipl`: fresh `swipl` per run, lint then consult then goal; controls `goal`, `answers` (0 = all), `time_limit` (per answer); badge `true`/`false`/`consulted`, SZS only for `:timeout`; table of bindings written by `term_string/3`; printed output captured as raw
 - [x] Cancellation: `Loge.Guard` kills the `swipl` process; tested
 - [x] Highlighting: `codemirror-lang-swipl`
-- [ ] Includes (`:- [defs].`, `:- include(defs).`) from definitions cells
+- [x] Includes (`:- [defs].`, `:- include(defs).`) from definitions cells. Done in phase 7
 
 ### `loge_egglog`
 
 - [x] Linter via `Egglog.parse/1` with its structured location (first parse error; no type errors, see phase 0)
 - [x] Engine `Loge.Egglog.Engines.Egglog` over `Egglog.Program` in a `Loge.Peer`; `{:graph, mermaid}` view (`Egglog.Snapshot.to_mermaid/1` of a JSON snapshot) with the `graph` control; badge `completed`/`check failed`, no SZS status; cancellation tested
-- [ ] Includes (`(include "…")`) from definitions cells
+- [x] Includes (`(include "…")`) from definitions cells. Done in phase 7
 
 ### Gate
 
@@ -219,24 +219,24 @@ languages that exist.
 
 ### `loge_tptp`
 
-- [ ] Prover outcomes carry `output`: the derivation of a solved problem, else its interpretation, as TPTP source (`AtpClient.Result.derivation/1`, `interpretation/1`)
-- [ ] `Loge.Tptp.Engines.Verify`, task `:check`, over `AtpClient.verify/2`: GDV for a derivation, AGMV for an interpretation; `:verified_good` or `:verified_bad`, `problem: :verification`; tests against a local HTTP stub
-- [ ] Before that: read in `deps/atp_client` how `AtpClient.verify/2` is given a derivation or an interpretation that arrives as text
+- [x] Prover outcomes carry `output`: the derivation of a solved problem, else its interpretation, as TPTP source (`AtpClient.Result.derivation/1`, `interpretation/1`); the text views of what the system printed remain only when neither reads
+- [x] `Loge.Tptp.Engines.Verify`, task `:check`, over `AtpClient.verify/2`: GDV for a derivation, AGMV for an interpretation; `:verified_good` or `:verified_bad`, `problem: :verification`; tests against a local HTTP stub. Not run against SystemOnTSTP itself
+- [x] Before that: read in `deps/atp_client` how `AtpClient.verify/2` is given a derivation or an interpretation that arrives as text. It is not: it takes a `Tptp.Derivation`, an `AtpClient.Interpretation` or a `Result`. The engine parses the text and sends what `AtpClient.Interpretation.from_file/2` reads as an interpretation, the rest as a `Tptp.Derivation`
 
 ### `loge_prolog`
 
-- [ ] Queries are the `?- Goal.` terms of the source, answered in order; the `goal` control goes; one `{:titled, "?- Goal", {:table, …}}` view per query; a source without a query is consulted only
-- [ ] `priv/loge.pl` reports the position of each query term, so the engine consults the rest and asks each query; read in `deps/swi_elixir` what the bridge offers for this before choosing the mechanism
-- [ ] Includes from Source cells (the open item of phase 3)
+- [x] Queries are the `?- Goal.` terms of the source, answered in order; the `goal` control goes; one `{:titled, "?- Goal.", {:table, …}}` view per query with bindings, and with several queries a badge for each without; a source without a query is consulted only. One query gives `:yes`, `:no` or `:timeout`, none or several `:success`; a query that raises ends the run with `{:error, {:prolog, message}}`
+- [x] `priv/loge.pl` reports the position of each query's goal, so the engine consults the rest and asks each query. The bridge consults paths only and cannot skip terms (`SWI.load/3`, `bridge.pl`), so a `user:term_expansion/2` clause drops the queries while consulting; the lint no longer reports a query's variables as singletons
+- [x] Includes from Source cells (the open item of phase 3): `Loge.Prolog.Includes` reads `:- [name].`, `include/1`, `consult/1`, `ensure_loaded/1`; each source of the closure whose name is a word is written as `<name>.pl` beside the program
 
 ### `loge_asp`, `loge_egglog`
 
-- [ ] Includes from Source cells (the open items of phases 2 and 3)
+- [x] Includes from Source cells (the open items of phases 2 and 3): `Loge.Asp.Includes` and `Loge.Egglog.Includes` read the directives; the sources are written beside the program (`Loge.Executable` gains `:files` and a directory per run) or into egglog's working directory, a directory of the run's in its peer; the ASP lint grounds with them
 
 ### Gate
 
-- [ ] `notebooks/demo.livemd`: prove a TPTP problem, bind the result, verify it in a second cell; a Prolog program in a Source cell and two cells that include it and ask one query each
-- [ ] No control holds part of a problem (the Prolog `goal` was the one)
+- [ ] `notebooks/demo.livemd`: prove a TPTP problem, bind the result, verify it in a second cell; a Prolog program in a Source cell and two cells that include it and ask one query each. The cells are there, their code regenerated from their attrs with each cell's `to_source/1`; outside Livebook the Prolog, ASP, egglog and DIMACS cells of `demo`, `prolog`, `asp` and `egglog` were evaluated in order and gave the expected verdicts. Not run: the SystemOnTPTP and Verify cells (remote services), Isabelle and z3 (not installed here). To be checked in Livebook
+- [x] No control holds part of a problem (the Prolog `goal` was the one)
 
 ## Phase 8 — Translations, verified
 

@@ -2,15 +2,17 @@ defmodule Loge.Prolog.Language do
   @moduledoc """
   SWI-Prolog as a `Loge.Language`.
 
-  A source is read clause by clause in a fresh `swipl` (`Loge.Prolog.Swipl.lint/2`):
+  A source is read term by term in a fresh `swipl` (`Loge.Prolog.Swipl.read/2`):
   syntax errors are `"syntax_error"` errors, and a named variable occurring once in a
-  clause is a `"singleton"` warning on that variable, unless its name starts with an
-  underscore. The analysis has no `native` and takes no options.
+  clause or directive is a `"singleton"` warning on that variable, unless its name
+  starts with an underscore. A query `?- Goal.` asks for its variables, so they are
+  not singletons. The analysis has no `native` and takes no options. The include names
+  are those of `Loge.Prolog.Includes`.
   """
 
   @behaviour Loge.Language
 
-  alias Loge.Prolog.Swipl
+  alias Loge.Prolog.{Includes, Swipl}
 
   @impl true
   def id, do: :prolog
@@ -25,11 +27,11 @@ defmodule Loge.Prolog.Language do
   def editor_language, do: "prolog"
 
   @impl true
-  def include_names(source) when is_binary(source), do: []
+  def include_names(source) when is_binary(source), do: Includes.names(source)
 
   @impl true
   def analyze(source, _options) when is_binary(source) do
-    {:ok, diagnostics, _output} = Swipl.with_session(&Swipl.lint(&1, source))
+    {:ok, {diagnostics, _goals}, _output} = Swipl.with_session(&Swipl.read(&1, source))
     %Loge.Analysis{language: :prolog, source: source, diagnostics: diagnostics, native: nil}
   end
 end

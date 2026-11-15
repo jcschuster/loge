@@ -60,6 +60,33 @@ Loge.run!(
 )
 ```
 
+## Includes
+
+A **Logic Source** cell binds a datatype and its rules to `math`; a cell that includes
+it with `(include "math")` runs them. Expected: **Success**, the extracted term
+`(Add (Num 1) (Num 2))` or `(Add (Num 2) (Num 1))`.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6ImVnZ2xvZyIsInNvdXJjZSI6IihkYXRhdHlwZSBNYXRoIChOdW0gaTY0KSAoQWRkIE1hdGggTWF0aCkpXG4ocmV3cml0ZSAoQWRkIGEgYikgKEFkZCBiIGEpKVxuIiwidmFyaWFibGUiOiJtYXRoIn0","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+math =
+  Loge.source(
+    :egglog,
+    "(datatype Math (Num i64) (Add Math Math))\n(rewrite (Add a b) (Add b a))\n"
+  )
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJlZ2dsb2ciLCJvcHRpb25zIjp7ImdyYXBoIjpmYWxzZX0sInNvdXJjZSI6IihpbmNsdWRlIFwibWF0aFwiKVxuXG4obGV0IGUgKEFkZCAoTnVtIDEpIChOdW0gMikpKVxuKHJ1biAzKVxuKGNoZWNrICg9IGUgKEFkZCAoTnVtIDIpIChOdW0gMSkpKSlcbihleHRyYWN0IGUpXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Egglog.Engines.Egglog,
+  "(include \"math\")\n\n(let e (Add (Num 1) (Num 2)))\n(run 3)\n(check (= e (Add (Num 2) (Num 1))))\n(extract e)\n",
+  graph: false,
+  includes: %{"math" => math}
+)
+```
+
 ## Linting
 
 Expected: under the editor, a parse error at the extra `)` on line 2.

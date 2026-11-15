@@ -36,6 +36,23 @@ defmodule Loge.Asp.Engines.ClingoTest do
     assert Enum.sort(models) == [[], ["a"], ["b"]]
   end
 
+  test "the includes of the run and those the source carries are grounded with it" do
+    defs = Loge.source(:asp, "b.")
+    program = Loge.source(:asp, "#include \"defs\".\na :- b.", includes: %{"defs" => defs})
+
+    assert {:ok, %Outcome{views: [{:models, [["b", "a"]]}]}} = Clingo.run(program, [])
+
+    assert {:ok, %Outcome{views: [{:models, [["b", "a"]]}]}} =
+             Clingo.run("#include \"defs\".\na :- b.", includes: %{"defs" => defs})
+  end
+
+  test "an include no source of that name holds is an invalid program" do
+    assert {:error, {:invalid_program, [%Diagnostic{severity: :error, message: message}]}} =
+             Clingo.run("#include \"defs\".", [])
+
+    assert message =~ "could not be opened"
+  end
+
   test "atoms keep their text, spaces included" do
     assert {:ok, %Outcome{views: [{:models, [[~s|p("a b")|]]}]}} = Clingo.run(~s|p("a b").|, [])
   end

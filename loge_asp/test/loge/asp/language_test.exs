@@ -4,12 +4,42 @@ defmodule Loge.Asp.LanguageTest do
   alias Loge.{Analysis, Diagnostic, Range}
   alias Loge.Asp.Language
 
+  doctest Loge.Asp.Includes
+
   test "describes ASP" do
     assert Language.id() == :asp
     assert Language.label() == "ASP"
     assert Language.extensions() == [".lp"]
     assert Language.editor_language() == "asp"
-    assert Language.include_names("#include \"a.lp\".") == []
+  end
+
+  test "a source names what it includes by the strings of its #include directives" do
+    source = """
+    #include "defs".
+    #include <incmode>.
+    % #include "commented".
+    %* #include "blocked". *%
+    p("#include \\"quoted\\".").
+    #include  "more.lp" .
+    """
+
+    assert Language.include_names(source) == ["defs", "more.lp"]
+  end
+
+  test "the sources a program includes are grounded with it" do
+    includes = %{"defs" => Loge.source(:asp, "#include \"base\".\nb :- c."), "base" => "c."}
+
+    assert Language.analyze("#include \"defs\".\na :- b.", includes: includes).diagnostics == []
+  end
+
+  test "a finding in an included source names it" do
+    includes = %{"defs" => "b :- c."}
+
+    assert [%Diagnostic{code: "atom-undefined", range: range, message: message}] =
+             Language.analyze("#include \"defs\".\na :- b.", includes: includes).diagnostics
+
+    assert range == Range.new(1)
+    assert message =~ ~r/^in 'defs': atom does not occur/
   end
 
   test "a clean program has no diagnostics" do

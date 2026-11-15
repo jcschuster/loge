@@ -4,7 +4,9 @@ defmodule Loge.Egglog.Language do
 
   The analysis parses the program without running it, so it reports the first syntax
   error, as a `"parse_error"`, but not type errors: egglog checks types as it runs each
-  command, and running may not end. The analysis has no `native` and takes no options.
+  command, and running may not end. It does not read the files the program includes.
+  The analysis has no `native` and takes no options; the include names are those of
+  `Loge.Egglog.Includes`.
   """
 
   @behaviour Loge.Language
@@ -24,7 +26,7 @@ defmodule Loge.Egglog.Language do
   def editor_language, do: "egglog"
 
   @impl true
-  def include_names(source) when is_binary(source), do: []
+  def include_names(source) when is_binary(source), do: Loge.Egglog.Includes.names(source)
 
   @impl true
   def analyze(source, _options) when is_binary(source) do

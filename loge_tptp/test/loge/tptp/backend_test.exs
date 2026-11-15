@@ -21,40 +21,82 @@ defmodule Loge.Tptp.BackendTest do
               }}
   end
 
-  test "the output blocks follow the views, as TPTP text titled by dataform" do
-    block = %{dataform: :cnf_refutation, problem: nil, body: "cnf(a, axiom, p).\n", prefix: []}
+  test "a derivation the system printed is the output, and no view repeats it" do
+    block = %{
+      dataform: :cnf_refutation,
+      problem: nil,
+      body: "cnf(a, axiom, $false).\n",
+      prefix: []
+    }
 
-    assert {:ok, %Outcome{views: views}} =
+    assert {:ok, %Outcome{views: views, output: output}} =
              Backend.outcome({:ok, %{@result | blocks: [block]}}, :e, [{:badge, "x", :neutral}])
 
-    assert views == [
-             {:badge, "x", :neutral},
-             {:titled, "CNFRefutation", {:text, "cnf(a, axiom, p).\n", "tptp"}}
-           ]
+    assert views == [{:badge, "x", :neutral}]
+    assert output == Loge.source(:tptp, "cnf(a, axiom, $false).\n")
   end
 
-  test "a TSTP reply's derivation is a view, titled by the header's dataform" do
+  test "a TSTP reply's derivation is the output" do
     rule = "%----\n"
     derivation = "cnf(c, plain, $false)."
 
-    for {header, title} <- [
-          {"% Output   : CNFRefutation 0.1s\n", "CNFRefutation"},
-          {"", "Solution"}
-        ] do
-      text = rule <> "% File     : E---3.5.1\n" <> header <> rule <> derivation <> "\n"
-      {:ok, solution, []} = Tptp.Tstp.from_string(text)
-      result = %{@result | output: text, details: %{tstp: solution}}
+    text =
+      rule <>
+        "% File     : E---3.5.1\n% Output   : CNFRefutation 0.1s\n" <> rule <> derivation <> "\n"
 
-      assert {:ok, %Outcome{views: [view]}} = Backend.outcome({:ok, result}, :e)
-      assert view == {:titled, title, {:text, derivation, "tptp"}}
-    end
+    {:ok, solution, []} = Tptp.Tstp.from_string(text)
+    result = %{@result | output: text, details: %{tstp: solution}}
+
+    assert {:ok, %Outcome{views: [], output: output}} = Backend.outcome({:ok, result}, :e)
+    assert output == Loge.source(:tptp, derivation)
+  end
+
+  test "without a derivation, the interpretation the system printed is the output" do
+    model = ~s|fof(m, interpretation, ! [X] : (X = "d0" \| X = "d1") & a = "d0" & p("d1")).\n|
+    block = %{dataform: :finite_model, problem: nil, body: model, prefix: []}
+    result = %{@result | status: :counter_satisfiable, blocks: [block]}
+
+    assert {:ok, %Outcome{views: [], output: %Loge.Source{language: :tptp, text: text}}} =
+             Backend.outcome({:ok, result}, :e)
+
+    assert {:ok, file, []} = Tptp.from_string(text)
+    assert {:ok, %AtpClient.Interpretation{}} = AtpClient.Interpretation.from_file(file)
+  end
+
+  test "what the system printed and does not read as a derivation or model stays a view" do
+    formulae = %{
+      dataform: :list_of_formulae,
+      problem: nil,
+      body: "cnf(a, axiom, p).\n",
+      prefix: []
+    }
+
+    broken = %{dataform: :cnf_refutation, problem: nil, body: "cnf(a, axiom, p", prefix: []}
+
+    assert {:ok, %Outcome{views: views, output: nil}} =
+             Backend.outcome({:ok, %{@result | blocks: [formulae, broken]}}, :e)
+
+    assert views == [
+             {:titled, "ListOfFormulae", {:text, "cnf(a, axiom, p).\n", "tptp"}},
+             {:titled, "CNFRefutation", {:text, "cnf(a, axiom, p", "tptp"}}
+           ]
+  end
+
+  test "a TSTP reply without an Output header keeps its solution as a view" do
+    rule = "%----\n"
+    text = rule <> "% File     : E---3.5.1\n" <> rule <> "cnf(c, plain, $false).\n"
+    {:ok, solution, []} = Tptp.Tstp.from_string(text)
+    result = %{@result | output: text, details: %{tstp: solution}}
+
+    assert {:ok, %Outcome{views: [view], output: nil}} = Backend.outcome({:ok, result}, :e)
+    assert view == {:titled, "Solution", {:text, "cnf(c, plain, $false).", "tptp"}}
   end
 
   test "a TSTP reply without a derivation has no view for it" do
     {:ok, solution, []} = Tptp.Tstp.from_string("%----\n% File     : E---3.5.1\n%----\n")
     result = %{@result | details: %{tstp: solution}}
 
-    assert {:ok, %Outcome{views: []}} = Backend.outcome({:ok, result}, :e)
+    assert {:ok, %Outcome{views: [], output: nil}} = Backend.outcome({:ok, result}, :e)
   end
 
   test "an error passes through" do

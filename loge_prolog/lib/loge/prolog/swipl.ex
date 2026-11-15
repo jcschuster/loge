@@ -48,7 +48,7 @@ defmodule Loge.Prolog.Swipl do
       swipl = %__MODULE__{session: session, directory: directory}
       output = Path.join(directory, "output")
       :ok = SWI.load(session, Application.app_dir(:loge_prolog, "priv/loge.pl"))
-      capture = Path.join(directory, "capture.pl")
+      capture = Path.join(directory, "loge-capture.pl")
       File.write!(capture, ":- loge:capture(#{literal(output)}).\n")
       :ok = SWI.load(session, capture)
       result = fun.(swipl)
@@ -61,20 +61,33 @@ defmodule Loge.Prolog.Swipl do
   end
 
   @doc """
-  The syntax errors and singleton variables of `source`, read as consulting it would
-  read it, with `op/3` directives applied to the clauses after them.
+  Reads `source` as consulting it would, with `op/3` directives applied to the terms
+  after them: its syntax errors and singleton variables, and the goal of each query
+  `?- Goal.` as written, in order. A query's variables are what it asks for, so none
+  of them is a singleton.
   """
-  @spec lint(t(), binary()) :: [Diagnostic.t()]
-  def lint(%__MODULE__{} = swipl, source) when is_binary(source) do
+  @spec read(t(), binary()) :: {[Diagnostic.t()], [String.t()]}
+  def read(%__MODULE__{} = swipl, source) when is_binary(source) do
     file = write_program(swipl, source)
-    query = SWI.query(swipl.session, "loge:lint(#{literal(file)}, Findings)")
-    [%{"Findings" => findings}] = Enum.take(query, 1)
-    Enum.map(findings, &diagnostic(&1, source))
+    query = SWI.query(swipl.session, "loge:read_program(#{literal(file)}, Findings, Queries)")
+    [%{"Findings" => findings, "Queries" => queries}] = Enum.take(query, 1)
+    {Enum.map(findings, &diagnostic(&1, source)), Enum.map(queries, &goal(&1, source))}
   end
 
-  @doc "Consults `source` as the program the session's goals run against."
-  @spec consult(t(), binary(), pos_integer()) :: :ok | {:error, term()}
-  def consult(%__MODULE__{} = swipl, source, timeout) when is_binary(source) do
+  @doc """
+  Consults `source` as the program the session's goals run against, leaving out its
+  queries. Each of `includes` whose name is a word, of letters, digits and
+  underscores, is written beside it as `<name>.pl`, where `swipl` looks for the source
+  a directive names (`Loge.Prolog.Includes`); `swipl` resolves other names, such as
+  `library(lists)`, on its own.
+  """
+  @spec consult(t(), binary(), Loge.Language.includes(), pos_integer()) :: :ok | {:error, term()}
+  def consult(%__MODULE__{} = swipl, source, includes, timeout)
+      when is_binary(source) and is_map(includes) do
+    for {name, input} <- includes, name =~ ~r/\A\w+\z/u do
+      File.write!(Path.join(swipl.directory, name <> ".pl"), Loge.Input.to_iodata(input))
+    end
+
     SWI.load(swipl.session, write_program(swipl, source), timeout: timeout)
   end
 
@@ -130,6 +143,11 @@ defmodule Loge.Prolog.Swipl do
     Diagnostic.new(code, severity(severity), range, message)
   end
 
+  defp goal({:compound, "query", [from, to]}, source) do
+    start = byte_offset(source, from)
+    binary_part(source, start, byte_offset(source, to) - start)
+  end
+
   defp severity("error"), do: :error
   defp severity("warning"), do: :warning
 
@@ -142,7 +160,7 @@ defmodule Loge.Prolog.Swipl do
     do: byte_offset(rest, characters - 1, bytes + byte_size(<<char::utf8>>))
 
   defp write_program(%__MODULE__{directory: directory}, source) do
-    file = Path.join(directory, "program.pl")
+    file = Path.join(directory, "loge-program.pl")
     File.write!(file, source)
     file
   end

@@ -9,12 +9,14 @@ defmodule Loge.Asp.Language do
   syntax errors, unsafe variables and the grounder's warnings without searching for
   models; `Loge.Asp.Messages` reads them. Grounding that does not end is stopped after
   #{@time_limit} seconds, and the analysis then holds what clingo reported until then.
-  The analysis has no `native` and takes no options.
+  The sources of the `:includes` option, and those they carry, are grounded with it
+  (`Loge.Asp.Includes`); a finding in one is placed on the first line and names it.
+  The analysis has no `native`.
   """
 
   @behaviour Loge.Language
 
-  alias Loge.Asp.Messages
+  alias Loge.Asp.{Includes, Messages}
 
   @impl true
   def id, do: :asp
@@ -29,13 +31,16 @@ defmodule Loge.Asp.Language do
   def editor_language, do: "asp"
 
   @impl true
-  def include_names(source) when is_binary(source), do: []
+  def include_names(source) when is_binary(source), do: Includes.names(source)
 
   @impl true
-  def analyze(source, _options) when is_binary(source) do
+  def analyze(source, options) when is_binary(source) do
+    includes = Loge.Source.closure(source, Keyword.get(options, :includes, %{}))
+
     {:ok, %Loge.Executable.Exit{output: output, file: file}} =
       Loge.Executable.run(Clingo.CLI.executable(), ["--outf=3", "--solve-limit=0"], source,
         extension: ".lp",
+        files: Includes.files(includes),
         stderr: :merge,
         timeout: @time_limit * 1000
       )

@@ -4,12 +4,25 @@ defmodule Loge.Egglog.LanguageTest do
   alias Loge.{Analysis, Diagnostic, Range}
   alias Loge.Egglog.Language
 
+  doctest Loge.Egglog.Includes
+
   test "describes egglog" do
     assert Language.id() == :egglog
     assert Language.label() == "egglog"
     assert Language.extensions() == [".egg"]
     assert Language.editor_language() == "egglog"
-    assert Language.include_names("(include \"defs.egg\")") == []
+  end
+
+  test "a source names what it includes by the strings of its include commands" do
+    source = """
+    (include "defs")
+    ; (include "commented")
+    (let s "(include \\"quoted\\")")
+    ( include
+      "more.egg" )
+    """
+
+    assert Language.include_names(source) == ["defs", "more.egg"]
   end
 
   test "a program that parses has no diagnostics" do

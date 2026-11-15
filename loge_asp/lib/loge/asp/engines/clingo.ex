@@ -11,6 +11,9 @@ defmodule Loge.Asp.Engines.Clingo do
     * `:time_limit` - seconds of grounding and search, as clingo's `--time-limit`;
       without it there is no limit. Reaching it without a model is `:timeout`.
 
+  The sources of the `:includes` option and those the input carries
+  (`Loge.Source.closure/2`) are grounded with it, as `Loge.Asp.Includes` describes.
+
   The raw output is clingo's JSON; its warnings are disabled and its stderr is not
   read. The `{:models, models}` view lists each model's shown atoms as clingo prints
   them; for an optimisation these are the improving models, the last one optimal when
@@ -22,7 +25,7 @@ defmodule Loge.Asp.Engines.Clingo do
   @behaviour Loge.Engine
 
   alias Loge.{Control, Outcome}
-  alias Loge.Asp.Language
+  alias Loge.Asp.{Includes, Language}
   alias Loge.Executable.Exit
 
   # https://github.com/potassco/clasp/blob/master/clasp/cli/clasp_app.h (ExitCode)
@@ -65,12 +68,18 @@ defmodule Loge.Asp.Engines.Clingo do
 
     arguments = ["--outf=2", "--warn=none" | limits(options)]
 
-    case Loge.Executable.run(Clingo.CLI.executable(), arguments, program, extension: ".lp") do
+    includes = Loge.Source.closure(input, Keyword.get(options, :includes, %{}))
+    files = Includes.files(includes)
+
+    case Loge.Executable.run(Clingo.CLI.executable(), arguments, program,
+           extension: ".lp",
+           files: files
+         ) do
       {:ok, %Exit{status: status, output: output}} when status in @results ->
         outcome(output, status)
 
       {:ok, %Exit{status: @error}} ->
-        {:error, {:invalid_program, Language.analyze(program, []).diagnostics}}
+        {:error, {:invalid_program, Language.analyze(program, includes: includes).diagnostics}}
 
       {:ok, %Exit{status: status, output: output}} ->
         {:error, {:exit_status, status, output}}
