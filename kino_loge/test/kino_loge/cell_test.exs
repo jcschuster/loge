@@ -21,6 +21,7 @@ defmodule KinoLoge.CellTest do
     assert data.engines == [
              %{id: "fake_engine", label: "Fake engine", group: "Solve"},
              %{id: "second_engine", label: "Second engine", group: "Solve"},
+             %{id: "validator", label: "Validator", group: "Check"},
              %{id: "translator", label: "Translator → Other", group: "Translate"}
            ]
 
@@ -38,6 +39,7 @@ defmodule KinoLoge.CellTest do
 
     assert data.inputs == [%{id: "", label: "This cell's editor"}]
     assert data.input == nil
+    assert data.roles == []
     assert data.variable == ""
     assert data.diagnostics == []
   end
@@ -158,6 +160,46 @@ defmodule KinoLoge.CellTest do
              connect(kino)
 
     assert label =~ "not bound"
+  end
+
+  test "each role offers the bound inputs of its languages" do
+    {kino, _source} = start_smart_cell!(Cell, %{"engine" => "validator"})
+
+    assert [
+             %{key: "data", label: "Data", required: true, choices: [none], value: nil},
+             %{key: "schema", required: false}
+           ] = connect(kino).roles
+
+    assert none == %{id: "", label: "none"}
+
+    bound = [
+      graph: Loge.source(:other, "g"),
+      shapes: Loge.source(:fake, "s"),
+      log: %Loge.Outcome{status: :success, raw: "", engine: :e}
+    ]
+
+    Cell.scan_binding(kino.pid, bound, __ENV__)
+    assert_broadcast_event(kino, "setup", %{roles: [data, schema]})
+
+    assert data.choices == [none, %{id: "graph", label: "graph"}]
+    assert schema.choices == [none, %{id: "shapes", label: "shapes"}]
+  end
+
+  test "a chosen role is passed its variable, and one no longer bound says so" do
+    {kino, _source} = start_smart_cell!(Cell, %{"engine" => "validator"})
+    push_event(kino, "set_role", %{"key" => "data", "name" => "graph"})
+
+    assert_smart_cell_update(kino, %{"roles" => %{"data" => "graph"}}, source)
+    assert source == ~s|Loge.run!(KinoLoge.Fake.Validator, "", data: graph)|
+
+    assert %{roles: [%{value: "graph", choices: [_none, %{id: "graph", label: label}]}, _schema]} =
+             connect(kino)
+
+    assert label =~ "not bound"
+
+    push_event(kino, "set_role", %{"key" => "data", "name" => nil})
+    assert_smart_cell_update(kino, %{"roles" => %{"data" => nil}}, source)
+    assert source == ~s|Loge.run!(KinoLoge.Fake.Validator, "", [])|
   end
 
   test "an event it does not know changes nothing" do

@@ -8,6 +8,10 @@ defmodule Loge.TptpTest do
     assert Loge.Registry.engine("verify") == {:ok, Loge.Tptp.Engines.Verify}
   end
 
+  test "a problem names its other sources by includes, so no engine has a role" do
+    assert Enum.all?(Loge.Registry.engines_for(:tptp), &(&1.roles() == []))
+  end
+
   test "a generated run is valid Elixir naming the engine" do
     source =
       Loge.Engine.to_source(Loge.Tptp.Engines.SystemOnTptp, "fof(a, axiom, p).", system: "E")

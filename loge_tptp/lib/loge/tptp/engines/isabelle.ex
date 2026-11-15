@@ -69,6 +69,9 @@ defmodule Loge.Tptp.Engines.Isabelle do
   end
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [
       %Control{

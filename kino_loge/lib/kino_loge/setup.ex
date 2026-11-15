@@ -1,11 +1,12 @@
 defmodule KinoLoge.Setup do
   @moduledoc """
   What a Logic Engine cell is set to: its language, its engine and the engine's
-  control values, its input, the variable its outcome is bound to, and the source in
-  its editor.
+  control values, its input, the variable that holds each of the engine's roles, the
+  variable its outcome is bound to, and the source in its editor.
 
   The input is the source in the editor (`nil`) or the name of a variable that holds a
-  bound input, a source or an outcome with an output. The setup round-trips through the
+  bound input, a source or an outcome with an output. A role (`Loge.Role`) is unset
+  (`nil`) or the name of such a variable; an engine's roles start unset. The setup round-trips through the
   cell's attrs, which a notebook stores as JSON: ids, keys and choices are matched by
   their string form, so nothing read from a notebook becomes an atom, and names become
   variables only through `Loge.Variable.parse/1`.
@@ -13,18 +14,20 @@ defmodule KinoLoge.Setup do
 
   alias Loge.{Control, Registry}
 
-  @enforce_keys [:language, :engine, :options, :input, :variable, :source]
+  @enforce_keys [:language, :engine, :options, :input, :roles, :variable, :source]
   defstruct @enforce_keys
 
   @typedoc """
   A cell's language and engine modules, control values in control order, input
-  variable (`nil` for the editor), result variable (`""` for none) and source.
+  variable (`nil` for the editor), role variables in role order (`nil` for unset),
+  result variable (`""` for none) and source.
   """
   @type t :: %__MODULE__{
           language: module(),
           engine: module(),
           options: keyword(),
           input: String.t() | nil,
+          roles: [{atom(), String.t() | nil}],
           variable: String.t(),
           source: String.t()
         }
@@ -37,7 +40,7 @@ defmodule KinoLoge.Setup do
   The setup stored in `attrs`. A missing or unknown language is the first one
   `languages/0` offers, a missing or unknown engine the language's first, a missing or
   invalid control value the control's default, and a missing or invalid name the
-  editor as input and no result variable. Raises `ArgumentError` when no language has
+  editor as input, an unset role and no result variable. Raises `ArgumentError` when no language has
   an engine.
   """
   @spec from_attrs(map()) :: t()
@@ -50,6 +53,7 @@ defmodule KinoLoge.Setup do
       engine: engine,
       options: options(engine, Map.get(attrs, "options", %{})),
       input: name(attrs["input"], nil),
+      roles: roles(engine, Map.get(attrs, "roles", %{})),
       variable: name(attrs["variable"], ""),
       source: Map.get(attrs, "source", "")
     }
@@ -63,6 +67,7 @@ defmodule KinoLoge.Setup do
       "engine" => id(setup.engine),
       "options" => Map.new(setup.options, fn {key, value} -> {Atom.to_string(key), value} end),
       "input" => setup.input,
+      "roles" => Map.new(setup.roles, fn {key, name} -> {Atom.to_string(key), name} end),
       "variable" => setup.variable,
       "source" => setup.source
     }
@@ -71,14 +76,17 @@ defmodule KinoLoge.Setup do
   @doc """
   The Elixir the cell evaluates, `Loge.Engine.to_source/4`: the engine run on the
   editor's source with the includes it names, or on the bound input, which carries its
-  own includes; bound to the result variable when there is one.
+  own includes; each set role passed its variable; bound to the result variable when
+  there is one.
   """
   @spec to_source(t()) :: String.t()
   def to_source(%__MODULE__{} = setup) do
     options = Enum.reject(setup.options, fn {_key, value} -> is_nil(value) end)
+    roles = Enum.reject(setup.roles, fn {_key, name} -> is_nil(name) end)
     {input, includes} = input(setup)
+    references = [roles: roles, includes: includes] ++ bind(setup)
 
-    Loge.Engine.to_source(setup.engine, input, options, [includes: includes] ++ bind(setup))
+    Loge.Engine.to_source(setup.engine, input, options, references)
   end
 
   @doc """
@@ -93,7 +101,7 @@ defmodule KinoLoge.Setup do
     end
   end
 
-  @doc "The language's engine with id `id`, with its defaults."
+  @doc "The language's engine with id `id`, with its defaults and its roles unset."
   @spec put_engine(t(), String.t()) :: t()
   def put_engine(%__MODULE__{} = setup, id) do
     case engine(setup.language, id) do
@@ -128,6 +136,21 @@ defmodule KinoLoge.Setup do
     end
   end
 
+  @doc """
+  Sets the role whose key is `key` to the variable `name`, or unsets it for `nil`. A
+  key the engine has no role for, or a name that is no variable name, changes nothing.
+  """
+  @spec put_role(t(), String.t(), String.t() | nil) :: t()
+  def put_role(%__MODULE__{} = setup, key, name) do
+    with %Loge.Role{key: role} <-
+           Enum.find(setup.engine.roles(), &(Atom.to_string(&1.key) == key)),
+         {:ok, name} <- role_name(name) do
+      %{setup | roles: Keyword.replace!(setup.roles, role, name)}
+    else
+      _invalid -> setup
+    end
+  end
+
   @doc "Binds the outcome to `name`, a variable name, or to nothing for `\"\"`."
   @spec put_variable(t(), String.t()) :: t()
   def put_variable(%__MODULE__{} = setup, ""), do: %{setup | variable: ""}
@@ -155,7 +178,8 @@ defmodule KinoLoge.Setup do
   defp bind(%__MODULE__{variable: ""}), do: []
   defp bind(%__MODULE__{variable: variable}), do: [bind: variable]
 
-  defp with_engine(setup, engine), do: %{setup | engine: engine, options: options(engine, %{})}
+  defp with_engine(setup, engine),
+    do: %{setup | engine: engine, options: options(engine, %{}), roles: roles(engine, %{})}
 
   defp options(engine, stored) when is_map(stored) do
     for control <- engine.controls() do
@@ -167,6 +191,20 @@ defmodule KinoLoge.Setup do
   end
 
   defp options(engine, _stored), do: options(engine, %{})
+
+  defp roles(engine, stored) when is_map(stored),
+    do: for(role <- engine.roles(), do: {role.key, name(stored[Atom.to_string(role.key)], nil)})
+
+  defp roles(engine, _stored), do: roles(engine, %{})
+
+  defp role_name(nil), do: {:ok, nil}
+
+  defp role_name(name) do
+    case name(name, nil) do
+      nil -> :error
+      name -> {:ok, name}
+    end
+  end
 
   defp name(name, none) when is_binary(name) do
     case Loge.Variable.parse(name) do

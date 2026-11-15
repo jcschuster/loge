@@ -35,11 +35,16 @@ defmodule Loge.Engine do
   @type task :: :solve | :check | {:translate, to :: atom(), preserves :: Loge.Status.t()}
 
   @typedoc """
-  The names a generated `Loge.run!/3` call refers to: `:includes`, the include names of
-  the source, each passed as the variable of that name where it is one; `:bind`, the
-  variable the outcome is bound to.
+  The names a generated `Loge.run!/3` call refers to: `:roles`, the variable that holds
+  each role's value, by role key; `:includes`, the include names of the source, each
+  passed as the variable of that name where it is one; `:bind`, the variable the
+  outcome is bound to.
   """
-  @type references :: [includes: [String.t()], bind: String.t()]
+  @type references :: [
+          roles: [{atom(), String.t()}],
+          includes: [String.t()],
+          bind: String.t()
+        ]
 
   @doc "The engine's id, such as `:clingo`; unique among registered engines."
   @callback id() :: atom()
@@ -65,12 +70,18 @@ defmodule Loge.Engine do
   @doc "Checks with the given settings that the engine can be reached."
   @callback verify(keyword()) :: :ok | {:error, term()}
 
+  @doc """
+  The sources a run takes beside its input, which its language cannot name
+  (`Loge.Role`); `[]` for most engines. Role keys and control keys are disjoint.
+  """
+  @callback roles() :: [Loge.Role.t()]
+
   @doc "Options chosen per run."
   @callback controls() :: [Loge.Control.t()]
 
   @doc """
-  Runs the engine on an input with the control values and settings in the options.
-  The `:includes` option holds the `t:Loge.Language.includes/0` the input may include;
+  Runs the engine on an input with the role values, control values and settings in the
+  options. The `:includes` option holds the `t:Loge.Language.includes/0` the input may include;
   with those the input carries, they are `Loge.Source.closure/2`.
   """
   @callback run(Loge.Input.t(), keyword()) :: {:ok, Loge.Outcome.t()} | {:error, term()}
@@ -83,7 +94,7 @@ defmodule Loge.Engine do
   options, which needs nothing but `loge` and the engine's package.
 
   `input` is the source text, or an atom naming the variable that holds the input.
-  Raises `ArgumentError` when `:bind` is not a variable name.
+  Raises `ArgumentError` when `:bind` or a role's variable is not a variable name.
 
       iex> Loge.Engine.to_source(MyEngine, "p.", time_limit: 5)
       ~s|Loge.run!(MyEngine, "p.", time_limit: 5)|
@@ -94,14 +105,18 @@ defmodule Loge.Engine do
       iex> Loge.Engine.to_source(MyEngine, :result, models: 1)
       ~s|Loge.run!(MyEngine, result, models: 1)|
 
+      iex> Loge.Engine.to_source(MyEngine, "SELECT * {?s ?p ?o}", [], roles: [data: "graph"])
+      ~s|Loge.run!(MyEngine, "SELECT * {?s ?p ?o}", data: graph)|
+
       iex> Loge.Engine.to_source(MyEngine, "include('defs').", [], includes: ["defs", "Axioms/SET001+0.ax"])
       ~s|Loge.run!(MyEngine, "include('defs').", includes: %{"defs" => defs})|
   """
   @spec to_source(module(), binary() | atom(), keyword(), references()) :: binary()
   def to_source(engine, input, options, references \\ [])
       when (is_binary(input) or is_atom(input)) and is_list(options) do
-    references = Keyword.validate!(references, [:bind, includes: []])
-    options = options ++ Loge.Variable.includes(references[:includes])
+    references = Keyword.validate!(references, [:bind, roles: [], includes: []])
+    roles = for {key, name} <- references[:roles], do: {key, Loge.Variable.quoted!(name)}
+    options = roles ++ options ++ Loge.Variable.includes(references[:includes])
 
     quote(do: Loge.run!(unquote(engine), unquote(quoted(input)), unquote(options)))
     |> Loge.Variable.bind(references[:bind])

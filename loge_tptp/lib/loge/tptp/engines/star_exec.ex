@@ -34,6 +34,9 @@ defmodule Loge.Tptp.Engines.StarExec do
   def verify(options), do: StarExec.verify(options)
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :time_limit, type: :integer, label: "Time limit (CPU s)", default: 5}]
   end

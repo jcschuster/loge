@@ -7,6 +7,7 @@ defmodule Loge.Asp.Engines.ClingoTest do
   test "describes the engine" do
     assert Clingo.id() == :clingo
     assert Clingo.languages() == [:asp]
+    assert Clingo.roles() == []
     assert Clingo.config_schema() == []
     assert Clingo.configure([]) == :ok
     assert Clingo.verify([]) == :ok

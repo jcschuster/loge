@@ -1,7 +1,7 @@
 defmodule Loge.ConsumerTest do
   use ExUnit.Case, async: true
 
-  alias Loge.{Control, Registry}
+  alias Loge.{Control, Fake, Registry}
 
   test "a consumer discovers, configures, lints and runs by string ids alone" do
     {:ok, language} = Registry.language("fake")
@@ -28,6 +28,21 @@ defmodule Loge.ConsumerTest do
 
     assert %Loge.Outcome{status: :satisfiable, raw: "P | Q.", details: %{options: [limit: 3]}} =
              Loge.run!(solver, translated, options)
+  end
+
+  test "a consumer gives an engine's roles the inputs of their languages" do
+    {:ok, validator} = Registry.engine("fake_validator")
+    graph = Loge.run!(Fake.Translator, "p.", [])
+    bound = %{"graph" => graph, "problem" => Loge.source(:fake, "q.")}
+
+    roles =
+      for %Loge.Role{key: key, languages: languages, required?: true} <- validator.roles(),
+          {_name, input} <- bound,
+          Loge.Input.language(input) in languages,
+          do: {key, input}
+
+    assert roles == [data: graph]
+    assert %Loge.Outcome{status: :conformant} = Loge.run!(validator, "p.", roles)
   end
 
   test "loge depends on no consumer" do

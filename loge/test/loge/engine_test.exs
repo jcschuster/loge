@@ -65,10 +65,33 @@ defmodule Loge.EngineTest do
     end
   end
 
+  test "to_source/4 passes each role the variable that holds it" do
+    assert Loge.Engine.to_source(Fake.Validator, "p.", [strict: true], roles: [data: "graph"]) ==
+             ~s|Loge.run!(Loge.Fake.Validator, "p.", data: graph, strict: true)|
+  end
+
+  test "to_source/4 rejects a role that is not a variable name" do
+    assert_raise ArgumentError, ~r/not a variable name/, fn ->
+      Loge.Engine.to_source(Fake.Validator, "p.", [], roles: [data: "Not one"])
+    end
+  end
+
   test "to_source/4 rejects an unknown reference" do
     assert_raise ArgumentError, fn ->
       Loge.Engine.to_source(Fake.Translator, "p.", [], binding: "cnf")
     end
+  end
+
+  test "one run's bound outcome is the role of the next" do
+    translate = Loge.Engine.to_source(Fake.Translator, "p.", [], bind: "graph")
+    validate = Loge.Engine.to_source(Fake.Validator, "q.", [], roles: [data: "graph"])
+
+    {_outcome, binding} = Code.eval_string(translate)
+
+    assert {%Loge.Outcome{status: :conformant, details: %{roles: [data: graph]}}, _binding} =
+             Code.eval_string(validate, binding)
+
+    assert graph.output.text == "P."
   end
 
   test "one run's bound outcome is the input of the next" do

@@ -8,6 +8,7 @@ defmodule Loge.Dimacs.Engines.ClaspTest do
   test "describes the engine" do
     assert Clasp.id() == :clasp
     assert Clasp.languages() == [:dimacs]
+    assert Clasp.roles() == []
     assert Clasp.config_schema() == []
     assert Clasp.configure([]) == :ok
     assert Clasp.verify([]) == :ok

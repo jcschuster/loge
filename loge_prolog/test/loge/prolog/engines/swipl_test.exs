@@ -9,6 +9,7 @@ defmodule Loge.Prolog.Engines.SwiplTest do
   test "describes the engine" do
     assert Swipl.id() == :swipl
     assert Swipl.languages() == [:prolog]
+    assert Swipl.roles() == []
     assert Swipl.config_schema() == []
     assert Swipl.verify([]) == :ok
 

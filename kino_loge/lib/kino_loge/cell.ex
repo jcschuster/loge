@@ -6,8 +6,9 @@ defmodule KinoLoge.Cell do
   The input is the source in the cell's editor, linted as it is edited, or a source or
   an outcome another cell bound, shown read-only in place of the editor. The engine
   select groups the language's engines by their task, solve, check or translate; a
-  translation names the language it leads to. Includes resolve against the sources of
-  the cell's language bound in the notebook (`KinoLoge.Editor`).
+  translation names the language it leads to. An engine's roles (`Loge.Role`) are one
+  select each, over the bound inputs of the role's languages. Includes resolve against
+  the sources of the cell's language bound in the notebook (`KinoLoge.Editor`).
 
   The cell's state is a `KinoLoge.Setup`; its source is `KinoLoge.Setup.to_source/1`.
   The cell brings its own editor, which highlights the language named by
@@ -42,6 +43,9 @@ defmodule KinoLoge.Cell do
 
   def handle_event("set_input", %{"name" => name}, ctx),
     do: change(ctx, &Setup.put_input(&1, name))
+
+  def handle_event("set_role", %{"key" => key, "name" => name}, ctx),
+    do: change(ctx, &Setup.put_role(&1, key, name))
 
   def handle_event("set_variable", %{"name" => name}, ctx),
     do: change(ctx, &Setup.put_variable(&1, name))
@@ -85,6 +89,7 @@ defmodule KinoLoge.Cell do
       inputs: inputs(setup, editor.sources),
       input: setup.input,
       input_text: input_text(setup, editor.sources),
+      roles: roles(setup, editor.sources),
       variable: setup.variable
     }
   end
@@ -114,29 +119,50 @@ defmodule KinoLoge.Cell do
   end
 
   defp inputs(%Setup{} = setup, sources) do
-    bound = setup |> bound(sources) |> Map.keys() |> Enum.sort()
+    names = sources |> bound([setup.language.id()]) |> Map.keys()
+    [%{id: "", label: "This cell's editor"} | choices(names, setup.input)]
+  end
+
+  defp roles(%Setup{engine: engine, roles: chosen}, sources) do
+    for %Loge.Role{} = role <- engine.roles() do
+      name = chosen[role.key]
+      names = sources |> bound(role.languages) |> Map.keys()
+
+      %{
+        key: Atom.to_string(role.key),
+        label: role.label,
+        required: role.required?,
+        choices: [%{id: "", label: "none"} | choices(names, name)],
+        value: name
+      }
+    end
+  end
+
+  defp choices(names, chosen) do
+    names = Enum.sort(names)
 
     missing =
-      if setup.input && setup.input not in bound,
-        do: [%{id: setup.input, label: "#{setup.input} (not bound)"}],
+      if chosen && chosen not in names,
+        do: [%{id: chosen, label: "#{chosen} (not bound)"}],
         else: []
 
-    [%{id: "", label: "This cell's editor"}] ++
-      Enum.map(bound, &%{id: &1, label: &1}) ++ missing
+    Enum.map(names, &%{id: &1, label: &1}) ++ missing
   end
 
   defp input_text(%Setup{input: nil}, _sources), do: nil
 
   defp input_text(%Setup{input: name} = setup, sources) do
-    case bound(setup, sources) do
+    case bound(sources, [setup.language.id()]) do
       %{^name => %Loge.Source{text: text}} -> text
       _unbound -> nil
     end
   end
 
-  defp bound(%Setup{language: language}, sources) do
-    id = language.id()
-    for {name, %Loge.Source{language: ^id} = source} <- sources, into: %{}, do: {name, source}
+  defp bound(sources, languages) do
+    for {name, %Loge.Source{language: language} = source} <- sources,
+        language in languages,
+        into: %{},
+        do: {name, source}
   end
 
   defp controls(%Setup{engine: engine, options: options}) do

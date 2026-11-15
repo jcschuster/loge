@@ -300,11 +300,11 @@ endpoint, RDF syntaxes other than Turtle.
 
 ### Roles (`loge`, `kino_loge`)
 
-- [ ] `Loge.Role` and `c:Loge.Engine.roles/0`; every existing engine returns `[]`
-- [ ] `Loge.run!/3` takes role keys as options, and raises `ArgumentError` for a missing required role and for a value in a language the role does not list
-- [ ] `roles:` in `Loge.Engine.to_source/4`
-- [ ] `KinoLoge.Cell`: one select per role over the bound inputs of its languages, the widget of the input select; attr `"roles"`
-- [ ] A fake engine with a required and an optional role in both `test/support/fakes.ex`
+- [x] `Loge.Role` and `c:Loge.Engine.roles/0`; every existing engine returns `[]`
+- [x] `Loge.run!/3` takes role keys as options, and raises `ArgumentError` for a missing required role and for a value in a language the role does not list (a value without a language, a binary, passes, as an input does)
+- [x] `roles:` in `Loge.Engine.to_source/4`, rendered before the controls; names through `Loge.Variable.quoted!/1`, which `bind:` now uses too
+- [x] `KinoLoge.Cell`: one select per role over the bound inputs of its languages, the widget of the input select; attr `"roles"`. `cell.js` driven in jsdom with stand-ins for the editor modules; to be checked in Livebook
+- [x] A fake engine with a required and an optional role in both `test/support/fakes.ex`
 
 ### Probe (the agent determines; record the findings in OUTLINE §6)
 

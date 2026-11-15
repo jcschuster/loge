@@ -144,6 +144,7 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 @callback config_schema() :: [Loge.Config.Field.t()]   # cross-cutting settings (credentials, binaries)
 @callback configure(keyword()) :: :ok                  # makes settings the engine's for later runs
 @callback verify(keyword()) :: :ok | {:error, term()}  # reachability probe
+@callback roles() :: [Loge.Role.t()]          # sources beside the input (below); [] for most
 @callback controls() :: [Loge.Control.t()]    # per-run controls rendered by the cell
 @callback run(Loge.Input.t(), keyword()) :: {:ok, Loge.Outcome.t()} | {:error, term()}
 @callback format_error(term()) :: String.t()  # sentence for a reason run/verify returned
@@ -153,8 +154,9 @@ diagnostic `LOGE0001` on line 1 naming the analyzer (as `Tptp.Analyzer.run_all/3
 TPTP engines merge the settings into `:atp_client`'s application environment under the
 backend's `config_key/0`. `Loge.run!/3` calls `run/2` and returns the outcome or raises `Loge.Error`, whose message
 is the engine's `format_error/1`. Before that it raises `ArgumentError` for an option
-that is not a control key, a setting key or `:includes`, and for an input whose
-`Loge.Input.language/1` the engine does not read: a misspelt option or a mismatched
+that is not a role key, a control key, a setting key or `:includes`, for a required
+role that is missing, and for an input or a role's value whose `Loge.Input.language/1`
+the engine or the role does not read: a misspelt option or a mismatched
 pipeline fails with a sentence instead of running with defaults or failing in the tool's
 words.
 
@@ -177,13 +179,15 @@ One engine module performs one task; a tool that does several is several engines
 `Loge.Engine.to_source(engine, input, options, references)` renders the one call a cell
 evaluates; it is the same for every engine, so it is a core function, not a callback.
 `input` is the source text, or an atom naming the variable that holds the input.
-`references` are `includes: [name]`, the include names of the source, each passed as
-the variable of that name; `roles: [key: variable]` (phase 10); and `bind: variable`,
-the name the outcome is bound to, absent for none:
+`references` are `roles: [key: variable]`, the variable that holds each role's value,
+passed first; `includes: [name]`, the include names of the source, each passed as the
+variable of that name; and `bind: variable`, the name the outcome is bound to, absent
+for none:
 
     cnf = Loge.run!(Loge.Tptp.Engines.Clausify, "fof(a, axiom, p | q).", [])
     Loge.run!(Loge.Dimacs.Engines.Clasp, cnf, models: 1)
     Loge.run!(Engine, "include('defs').", time_limit: 10, includes: %{"defs" => defs})
+    Loge.run!(Loge.Sparql.Engines.Query, "SELECT * {?s ?p ?o}", data: graph)
 
 `Loge.Source.to_source/3` renders a Source cell's `Loge.source/3` call with the same
 `includes:` and `bind:`.
@@ -256,7 +260,7 @@ the language's comments, strings and quoted atoms, without starting the tool. Th
 lint grounds with the includes and names an included file in a finding on line 1;
 the Prolog and egglog lints read the program alone.
 
-### Roles (`Loge.Role`, phase 10)
+### Roles (`Loge.Role`)
 
 A role is a source an engine needs beside its input and that the input's language has no
 syntax to name: the data graph of a SPARQL query or of SHACL shapes, the schema and the
@@ -280,8 +284,9 @@ many queries. A SPARQL query on an endpoint has no role: the endpoint is an addr
 by a control.
 
 None of the languages of phases 1–4 has a role: TPTP, Prolog, ASP and egglog name other
-sources through includes, and SMT-LIB and DIMACS sources are self-contained. Roles are
-therefore built with their first engines, in phase 10, and not before.
+sources through includes, and SMT-LIB and DIMACS sources are self-contained; their
+engines return `[]`. Roles were built in phase 10, with fakes, before the engines of
+the semantic web that need them.
 
 ### `Loge.Diagnostic` (struct; fields of `Tptp.Diagnostic`, `range` for `span`)
 
@@ -447,8 +452,8 @@ Cells:
 - `KinoLoge.Cell` ("Logic Engine"): language select → engine select (`engines_for/1`,
   grouped by task) → input (this cell's editor, or a bound input the engine accepts,
   shown read-only in the editor; the select appears once there is a bound input to
-  choose) → roles (phase 10: one select per role, over the bound inputs of its
-  languages) → controls from `controls/0` → result name (optional) →
+  choose) → roles (one select per role, over the bound inputs of its languages, with
+  `none` first; attr `"roles"`, reset when the engine changes) → controls from `controls/0` → result name (optional) →
   bundled editor (grammar `Language.editor_language()`, §7) → diagnostics list. Its
   source is one `Loge.run!/3` call, bound to the result name when there is one. A cell
   always has an engine.

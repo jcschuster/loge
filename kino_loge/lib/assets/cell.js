@@ -22,6 +22,7 @@ export function init(ctx, data) {
   let shape = null;
   let shown = null;
   let inputs = {};
+  let roles = new Map();
   let controls = new Map();
 
   const suggestions = (c, el) => {
@@ -39,6 +40,12 @@ export function init(ctx, data) {
     return field(c.label, el, ...suggestions(c, el));
   };
 
+  const role = (r) => {
+    const el = select(r.choices, (name) => ctx.pushEvent("set_role", { key: r.key, name: name || null }));
+    roles.set(r.key, el);
+    return field(r.required ? r.label : `${r.label} (optional)`, el);
+  };
+
   const build = (setup) => {
     inputs = {
       language: select(setup.languages, (id) => ctx.pushEvent("set_language", { id })),
@@ -47,10 +54,12 @@ export function init(ctx, data) {
       variable: input("text", (name) => ctx.pushEvent("set_variable", { name })),
     };
     inputs.variable.placeholder = "none";
+    roles = new Map();
     header.replaceChildren(
       field("Language", inputs.language),
       field("Engine", inputs.engine),
       ...(setup.inputs.length > 1 ? [field("Input", inputs.input)] : []),
+      ...setup.roles.map(role),
       field("Bind to", inputs.variable)
     );
     controls = new Map();
@@ -80,6 +89,7 @@ export function init(ctx, data) {
       setup.languages,
       setup.engines,
       setup.inputs,
+      setup.roles.map(({ value, ...r }) => r),
       setup.engine,
       setup.controls.map(({ value, ...c }) => c),
     ]);
@@ -89,6 +99,7 @@ export function init(ctx, data) {
     assign(inputs.language, setup.language);
     assign(inputs.engine, setup.engine);
     assign(inputs.input, setup.input ?? "");
+    for (const r of setup.roles) assign(roles.get(r.key), r.value ?? "");
     assign(inputs.variable, setup.variable);
     for (const c of setup.controls) assign(controls.get(c.key), c.value);
     source.setLanguage(setup.editor_language);

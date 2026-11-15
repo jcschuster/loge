@@ -37,6 +37,9 @@ defmodule Loge.Dimacs.Engines.Clasp do
   def verify(_options), do: :ok
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :models, type: :integer, label: "Models (0 for all)", default: 1}]
   end

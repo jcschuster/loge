@@ -35,6 +35,9 @@ defmodule Loge.Tptp.Engines.LocalExec do
   def verify(options), do: LocalExec.verify(options)
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :time_limit, type: :integer, label: "Time limit (CPU s)", default: 5}]
   end

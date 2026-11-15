@@ -10,6 +10,12 @@ defmodule Loge.VariableTest do
     assert Variable.parse("groups2") == {:ok, :groups2}
   end
 
+  test "quoted!/1 rejects a name that is not a variable name" do
+    assert_raise ArgumentError, ~r/not a variable name: "Axioms"/, fn ->
+      Variable.quoted!("Axioms")
+    end
+  end
+
   test "anything else is not a variable" do
     for name <- [
           "",

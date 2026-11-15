@@ -48,6 +48,9 @@ defmodule Loge.Egglog.Engines.Egglog do
   def verify(_options), do: :ok
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :graph, type: :boolean, label: "Show the e-graph", default: false}]
   end

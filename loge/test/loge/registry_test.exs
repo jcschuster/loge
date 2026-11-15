@@ -32,7 +32,13 @@ defmodule Loge.RegistryTest do
   end
 
   test "engines_for/1 lists the engines accepting a language" do
-    assert Registry.engines_for(:fake) == [Fake.Engine, Fake.Translator, Fake.Checker]
+    assert Registry.engines_for(:fake) == [
+             Fake.Engine,
+             Fake.Translator,
+             Fake.Checker,
+             Fake.Validator
+           ]
+
     assert Registry.engines_for(:fake_target) == [Fake.Solver]
     assert Registry.engines_for(:other) == []
   end

@@ -25,6 +25,26 @@ defmodule LogeTest do
       end
     end
 
+    test "takes the engine's roles, each a source in a language the role lists" do
+      data = Loge.source(:fake_target, "d")
+
+      assert %Loge.Outcome{status: :conformant, details: %{roles: [data: ^data]}} =
+               Loge.run!(Fake.Validator, "p.", data: data)
+
+      assert %Loge.Outcome{details: %{roles: [data: "d", schema: "s"]}} =
+               Loge.run!(Fake.Validator, "p.", data: "d", schema: "s", strict: true)
+    end
+
+    test "rejects a run without a required role" do
+      assert_raise ArgumentError, ~r/role :data/, fn -> Loge.run!(Fake.Validator, "p.", []) end
+    end
+
+    test "rejects a role's value in a language the role does not list" do
+      assert_raise ArgumentError, ~r/:data.*:fake_target.*not :fake/, fn ->
+        Loge.run!(Fake.Validator, "p.", data: Loge.source(:fake, "d"))
+      end
+    end
+
     test "takes an outcome as the input of the next run" do
       cnf = Loge.run!(Fake.Translator, "p.", [])
 

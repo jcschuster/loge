@@ -10,6 +10,7 @@ defmodule Loge.Tptp.Engines.VerifyTest do
   test "describes the engine" do
     assert Verify.id() == :verify
     assert Verify.languages() == [:tptp]
+    assert Verify.roles() == []
     assert Verify.task() == :check
     assert Verify.config_schema() == Loge.Tptp.Engines.SystemOnTptp.config_schema()
     assert [%Control{key: :time_limit, type: :integer}] = Verify.controls()

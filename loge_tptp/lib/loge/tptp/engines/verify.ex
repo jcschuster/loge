@@ -46,6 +46,9 @@ defmodule Loge.Tptp.Engines.Verify do
   def verify(options), do: SystemOnTptp.verify(options)
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :time_limit, type: :integer, label: "Time limit (s)", default: 60}]
   end

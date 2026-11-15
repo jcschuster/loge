@@ -15,6 +15,7 @@ defmodule Loge.Egglog.Engines.EgglogTest do
   test "describes the engine" do
     assert Egglog.id() == :egglog
     assert Egglog.languages() == [:egglog]
+    assert Egglog.roles() == []
     assert Egglog.config_schema() == []
     assert Egglog.verify([]) == :ok
     assert [%Control{key: :graph, type: :boolean, default: false}] = Egglog.controls()

@@ -49,6 +49,9 @@ defmodule Loge.Smtlib.Engines.Z3 do
   def verify(options), do: Solver.verify(Solver.executable(__MODULE__, @default, options))
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [%Control{key: :time_limit, type: :integer, label: "Time limit (s)", default: 10}]
   end

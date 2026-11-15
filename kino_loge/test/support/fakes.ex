@@ -104,6 +104,9 @@ defmodule KinoLoge.Fake.Engine do
   end
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [
       %Control{
@@ -155,6 +158,9 @@ defmodule KinoLoge.Fake.SecondEngine do
   @impl true
   def verify(_options), do: :ok
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls, do: []
   @impl true
   def run(_input, _options), do: {:error, :never}
@@ -181,6 +187,9 @@ defmodule KinoLoge.Fake.Translator do
   @impl true
   def verify(_options), do: :ok
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls, do: []
 
   @impl true
@@ -194,6 +203,53 @@ defmodule KinoLoge.Fake.Translator do
        raw: text,
        engine: :translator,
        output: Loge.source(:other, String.upcase(text))
+     }}
+  end
+
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule KinoLoge.Fake.Validator do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  alias Loge.Role
+
+  @impl true
+  def id, do: :validator
+  @impl true
+  def label, do: "Validator"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: :check
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_options), do: :ok
+
+  @impl true
+  def roles do
+    [
+      %Role{key: :data, label: "Data", languages: [:other], required?: true},
+      %Role{key: :schema, label: "Schema", languages: [:fake], required?: false}
+    ]
+  end
+
+  @impl true
+  def controls, do: []
+
+  @impl true
+  def run(input, options) do
+    {:ok,
+     %Loge.Outcome{
+       status: :conformant,
+       raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
+       engine: :validator,
+       details: Map.new(options)
      }}
   end
 

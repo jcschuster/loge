@@ -56,6 +56,9 @@ defmodule Loge.Prolog.Engines.Swipl do
   def verify(_options), do: :ok
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [
       %Control{key: :answers, type: :integer, label: "Answers (0 for all)", default: 1},

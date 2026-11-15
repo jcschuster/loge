@@ -63,14 +63,17 @@ defmodule Loge do
   engine's description of the failure otherwise. This is the call
   `Loge.Engine.to_source/4` generates.
 
-  The options are the engine's controls (`c:Loge.Engine.controls/0`), its settings
-  (`c:Loge.Engine.config_schema/0`) and `:includes`. Raises `ArgumentError` for any
-  other key, and for an input in a language the engine does not read.
+  The options are the engine's roles (`c:Loge.Engine.roles/0`), its controls
+  (`c:Loge.Engine.controls/0`), its settings (`c:Loge.Engine.config_schema/0`) and
+  `:includes`. Raises `ArgumentError` for any other key, for a required role that is
+  missing, and for an input or a role's value in a language the engine or the role
+  does not read.
   """
   @spec run!(module(), Loge.Input.t(), keyword()) :: Loge.Outcome.t()
   def run!(engine, input, options) when is_list(options) do
-    check_language!(engine, Loge.Input.language(input))
+    check_language!(inspect(engine), engine.languages(), Loge.Input.language(input))
     check_options!(engine, Keyword.keys(options))
+    Enum.each(engine.roles(), &check_role!(engine, &1, options))
 
     case engine.run(input, options) do
       {:ok, %Loge.Outcome{} = outcome} -> outcome
@@ -78,18 +81,32 @@ defmodule Loge do
     end
   end
 
-  defp check_language!(_engine, nil), do: :ok
+  defp check_language!(_reader, _languages, nil), do: :ok
 
-  defp check_language!(engine, language) do
-    unless language in engine.languages() do
-      raise ArgumentError,
-            "#{inspect(engine)} reads #{inspect(engine.languages())}, not #{inspect(language)}"
+  defp check_language!(reader, languages, language) do
+    unless language in languages do
+      raise ArgumentError, "#{reader} reads #{inspect(languages)}, not #{inspect(language)}"
+    end
+  end
+
+  defp check_role!(engine, %Loge.Role{key: key} = role, options) do
+    case Keyword.fetch(options, key) do
+      {:ok, value} ->
+        reader = "the role #{inspect(key)} of #{inspect(engine)}"
+        check_language!(reader, role.languages, Loge.Input.language(value))
+
+      :error when role.required? ->
+        raise ArgumentError, "#{inspect(engine)} needs the role #{inspect(key)} (#{role.label})"
+
+      :error ->
+        :ok
     end
   end
 
   defp check_options!(engine, keys) do
     known =
-      Enum.map(engine.controls(), & &1.key) ++
+      Enum.map(engine.roles(), & &1.key) ++
+        Enum.map(engine.controls(), & &1.key) ++
         Enum.map(engine.config_schema(), & &1.key) ++ [:includes]
 
     case Enum.uniq(keys) -- known do

@@ -37,6 +37,9 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
   def verify(options), do: SystemOnTptp.verify(options)
 
   @impl true
+  def roles, do: []
+
+  @impl true
   def controls do
     [
       %Control{

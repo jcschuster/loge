@@ -21,6 +21,12 @@ defmodule Loge.StructsTest do
     refute %Field{key: :k, type: :string, required?: false, group: :defaults}.secret?
   end
 
+  test "a role names its key, label, languages and whether it is required" do
+    assert_raise ArgumentError, ~r/:required\?/, fn ->
+      struct!(Loge.Role, key: :data, label: "Data", languages: [:fake])
+    end
+  end
+
   test "a control has no choices by default" do
     assert %Control{key: :k, type: :text, label: "K"}.choices == []
   end

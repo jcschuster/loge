@@ -44,6 +44,20 @@ defmodule Loge.Variable do
   end
 
   @doc """
+  The quoted variable `name`. Raises `ArgumentError` when `name` is not a variable name.
+
+      iex> Loge.Variable.quoted!("graph") |> Macro.to_string()
+      "graph"
+  """
+  @spec quoted!(String.t()) :: Macro.t()
+  def quoted!(name) when is_binary(name) do
+    case parse(name) do
+      {:ok, variable} -> Macro.var(variable, nil)
+      :error -> raise ArgumentError, "not a variable name: #{inspect(name)}"
+    end
+  end
+
+  @doc """
   The quoted expression bound to the variable `name`, or the expression itself when
   `name` is `nil`. Raises `ArgumentError` when `name` is not a variable name.
 
@@ -53,10 +67,6 @@ defmodule Loge.Variable do
   @spec bind(Macro.t(), String.t() | nil) :: Macro.t()
   def bind(expression, nil), do: expression
 
-  def bind(expression, name) when is_binary(name) do
-    case parse(name) do
-      {:ok, variable} -> quote(do: unquote(Macro.var(variable, nil)) = unquote(expression))
-      :error -> raise ArgumentError, "not a variable name: #{inspect(name)}"
-    end
-  end
+  def bind(expression, name) when is_binary(name),
+    do: quote(do: unquote(quoted!(name)) = unquote(expression))
 end

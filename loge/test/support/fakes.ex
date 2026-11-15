@@ -140,6 +140,8 @@ defmodule Loge.Fake.Engine do
   end
 
   @impl true
+  def roles, do: []
+  @impl true
   def controls, do: [%Control{key: :mode, type: :select, label: "Mode", choices: [:a, :b]}]
 
   @impl true
@@ -184,6 +186,8 @@ defmodule Loge.Fake.FailingEngine do
   def config_schema, do: []
   @impl true
   def verify(_options), do: :ok
+  @impl true
+  def roles, do: []
   @impl true
   def controls, do: [%Loge.Control{key: :why, type: :text, label: "Why"}]
   @impl true
@@ -234,6 +238,8 @@ defmodule Loge.Fake.Translator do
   @impl true
   def verify(_settings), do: :ok
   @impl true
+  def roles, do: []
+  @impl true
   def controls, do: []
 
   @impl true
@@ -277,6 +283,8 @@ defmodule Loge.Fake.Solver do
   @impl true
   def verify(_settings), do: :ok
   @impl true
+  def roles, do: []
+  @impl true
   def controls, do: [%Control{key: :limit, type: :integer, label: "Limit", default: 1}]
 
   @impl true
@@ -314,6 +322,8 @@ defmodule Loge.Fake.Checker do
   @impl true
   def verify(_settings), do: :ok
   @impl true
+  def roles, do: []
+  @impl true
   def controls, do: []
 
   @impl true
@@ -324,6 +334,53 @@ defmodule Loge.Fake.Checker do
        problem: :verification,
        raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
        engine: :fake_checker
+     }}
+  end
+
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule Loge.Fake.Validator do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  alias Loge.Role
+
+  @impl true
+  def id, do: :fake_validator
+  @impl true
+  def label, do: "Fake validator"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: :check
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_settings), do: :ok
+
+  @impl true
+  def roles do
+    [
+      %Role{key: :data, label: "Data", languages: [:fake_target], required?: true},
+      %Role{key: :schema, label: "Schema", languages: [:fake], required?: false}
+    ]
+  end
+
+  @impl true
+  def controls, do: [%Loge.Control{key: :strict, type: :boolean, label: "Strict", default: false}]
+
+  @impl true
+  def run(input, options) do
+    {:ok,
+     %Loge.Outcome{
+       status: :conformant,
+       raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
+       engine: :fake_validator,
+       details: %{roles: Keyword.take(options, [:data, :schema])}
      }}
   end
 
@@ -349,6 +406,8 @@ defmodule Loge.Fake.Impostor do
   def configure(_settings), do: :ok
   @impl true
   def verify(_settings), do: :ok
+  @impl true
+  def roles, do: []
   @impl true
   def controls, do: []
   @impl true
