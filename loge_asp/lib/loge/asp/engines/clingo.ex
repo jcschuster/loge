@@ -40,6 +40,9 @@ defmodule Loge.Asp.Engines.Clingo do
   def languages, do: [:asp]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: []
 
   @impl true

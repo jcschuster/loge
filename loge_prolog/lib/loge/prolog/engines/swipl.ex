@@ -37,6 +37,9 @@ defmodule Loge.Prolog.Engines.Swipl do
   def languages, do: [:prolog]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: []
 
   @impl true

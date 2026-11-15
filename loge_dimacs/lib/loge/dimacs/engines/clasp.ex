@@ -25,6 +25,9 @@ defmodule Loge.Dimacs.Engines.Clasp do
   def languages, do: [:dimacs]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: []
 
   @impl true

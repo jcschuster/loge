@@ -61,6 +61,8 @@ defmodule KinoLoge.Fake.Engine do
   @impl true
   def languages, do: [:fake]
   @impl true
+  def task, do: :solve
+  @impl true
   def config_schema do
     [
       %Loge.Config.Field{
@@ -145,6 +147,8 @@ defmodule KinoLoge.Fake.SecondEngine do
   @impl true
   def languages, do: [:fake]
   @impl true
+  def task, do: :solve
+  @impl true
   def config_schema, do: []
   @impl true
   def configure(_settings), do: :ok
@@ -154,6 +158,45 @@ defmodule KinoLoge.Fake.SecondEngine do
   def controls, do: []
   @impl true
   def run(_input, _options), do: {:error, :never}
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule KinoLoge.Fake.Translator do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  @impl true
+  def id, do: :translator
+  @impl true
+  def label, do: "Translator"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: {:translate, :other, :equi_satisfiable}
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_options), do: :ok
+  @impl true
+  def controls, do: []
+
+  @impl true
+  def run(input, _options) do
+    text = IO.iodata_to_binary(Loge.Input.to_iodata(input))
+
+    {:ok,
+     %Loge.Outcome{
+       szs: :equi_satisfiable,
+       problem: :translation,
+       raw: text,
+       engine: :translator,
+       output: Loge.source(:other, String.upcase(text))
+     }}
+  end
+
   @impl true
   def format_error(reason), do: inspect(reason)
 end

@@ -26,4 +26,31 @@ defmodule Loge.Tptp.IncludesTest do
     assert {:error, {:unresolved_includes, [%Tptp.Diagnostic{code: "TPTP0601"}]}} =
              Includes.input("include('defs'). include('nope').", %{"defs" => defs}, @library)
   end
+
+  test "a source is sent with the includes it carries inlined" do
+    defs = Loge.source(:tptp, "fof(a, axiom, p).")
+
+    problem =
+      Loge.source(:tptp, "include('defs').\nfof(b, conjecture, p).", includes: %{"defs" => defs})
+
+    assert {:ok, %Tptp.Unit{} = unit} = Includes.input(problem, %{}, @library)
+
+    assert IO.iodata_to_binary(Loge.Input.to_iodata(unit)) ==
+             "fof(a, axiom, p).\nfof(b, conjecture, p).\n"
+  end
+
+  test "an include resolves through the includes of the source that names it" do
+    base = Loge.source(:tptp, "fof(a, axiom, p).")
+    defs = Loge.source(:tptp, "include('base').", includes: %{"base" => base})
+
+    assert {:ok, unit} =
+             Includes.input(
+               "include('defs').\nfof(b, conjecture, p).",
+               %{"defs" => defs},
+               @library
+             )
+
+    assert IO.iodata_to_binary(Loge.Input.to_iodata(unit)) ==
+             "fof(a, axiom, p).\nfof(b, conjecture, p).\n"
+  end
 end

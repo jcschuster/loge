@@ -36,7 +36,7 @@ defmodule Loge.Tptp.Language do
   def analyze(source, options) when is_binary(source) do
     {includes, options} = Keyword.pop(options, :includes, %{})
     {library, options} = Keyword.pop(options, :library, Tptp.Resolver.Http)
-    resolver = Includes.resolver(includes, library)
+    resolver = Includes.resolver(Loge.Source.closure(source, includes), library)
     {:ok, unit, _diagnostics} = Tptp.Unit.from_string(source, [resolver: resolver] ++ options)
     native = Tptp.analyze(unit, options)
 

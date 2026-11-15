@@ -33,14 +33,23 @@ installs all of them:
 Every problem below sits in a **Logic Engine** smart cell (`+ Smart` → *Logic Engine*).
 From top to bottom, a cell has:
 
-1. a **language** and an **engine** select;
-2. the engine's **controls**, such as a time limit;
-3. the **editor**, and under it the problems the linter finds as you type;
-4. once evaluated, the outcome: a **Result** tab with the verdict and the details the
+1. a **language** and an **engine** select, the engines grouped by what they do:
+   solve, check or translate;
+2. the **input**, which appears once a cell above has bound a source or result in
+   the cell's language: this cell's editor or that variable; and **Bind to**, a
+   variable for the outcome, so a later cell can take it as its input;
+3. the engine's **controls**, such as a time limit;
+4. the **editor**, and under it the problems the linter finds as you type;
+5. once evaluated, the outcome: a **Result** tab with the verdict and the details the
    engine reports, and an **Output** tab with what the engine printed.
 
+A source that several cells share sits in a **Logic Source** cell (`+ Smart` →
+*Logic Source*): a language, a variable name and an editor. It runs nothing; other
+cells include its source by that name, or take it as their input.
+
 Evaluating a cell runs ordinary Elixir. Open a cell's source (the `<>` toggle) to see
-it: one `Loge.run!/3` call, which works without the smart cell installed.
+it: one `Loge.run!/3` or `Loge.source/3` call, which works without the smart cells
+installed.
 
 ## Settings
 
@@ -61,11 +70,10 @@ z3 and cvc5 are found on `PATH`. If z3 lives elsewhere, set its executable here.
 
 ## Proving theorems: TPTP
 
-TPTP is the language of automated theorem provers. A cell with no engine and a
-variable name is a **definitions** cell: it holds axioms that later cells include by
-that name. This one defines groups:
+TPTP is the language of automated theorem provers. This **Logic Source** cell binds
+the axioms of groups to `groups`; later cells include them by that name:
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOm51bGwsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJzb3VyY2UiOiJmb2YoYXNzb2NpYXRpdml0eSwgYXhpb20sICFbWCwgWSwgWl06IG11bHQobXVsdChYLCBZKSwgWikgPSBtdWx0KFgsIG11bHQoWSwgWikpKS5cbmZvZihsZWZ0X2lkZW50aXR5LCBheGlvbSwgIVtYXTogbXVsdChlLCBYKSA9IFgpLlxuZm9mKGxlZnRfaW52ZXJzZSwgYXhpb20sICFbWF06IG11bHQoaW52KFgpLCBYKSA9IGUpLlxuIiwidmFyaWFibGUiOiJncm91cHMifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InRwdHAiLCJzb3VyY2UiOiJmb2YoYXNzb2NpYXRpdml0eSwgYXhpb20sICFbWCwgWSwgWl06IG11bHQobXVsdChYLCBZKSwgWikgPSBtdWx0KFgsIG11bHQoWSwgWikpKS5cbmZvZihsZWZ0X2lkZW50aXR5LCBheGlvbSwgIVtYXTogbXVsdChlLCBYKSA9IFgpLlxuZm9mKGxlZnRfaW52ZXJzZSwgYXhpb20sICFbWF06IG11bHQoaW52KFgpLCBYKSA9IGUpLlxuIiwidmFyaWFibGUiOiJncm91cHMifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
 
 ```elixir
 groups =
@@ -77,17 +85,17 @@ groups =
 
 A classic exercise: in a group where every element is its own inverse, multiplication
 commutes. The cell includes `groups` and asks the E prover on SystemOnTPTP.
-Expected: **Theorem**. If you edit the definitions above, this cell becomes stale, as
-any cell that reads a variable does.
+Expected: **Theorem**. If you edit the axioms above, this cell becomes stale, as any
+cell that reads a variable does.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2Yoc2VsZl9pbnZlcnNlLCBoeXBvdGhlc2lzLCAhW1hdOiBtdWx0KFgsIFgpID0gZSkuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7InN5c3RlbSI6IkUiLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2Yoc2VsZl9pbnZlcnNlLCBoeXBvdGhlc2lzLCAhW1hdOiBtdWx0KFgsIFgpID0gZSkuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('groups').\n\nfof(self_inverse, hypothesis, ![X]: mult(X, X) = e).\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).\n",
   system: "E",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"groups" => groups}
 )
 ```
@@ -97,14 +105,14 @@ expected is **CounterSatisfiable** (or **GaveUp** within the time limit). The SZ
 status is the standard vocabulary of these verdicts; the Result tab links to its
 definitions.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ2dyb3VwcycpLlxuXG5mb2YoY29tbXV0YXRpdmUsIGNvbmplY3R1cmUsICFbWCwgWV06IG11bHQoWCwgWSkgPSBtdWx0KFksIFgpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnZ3JvdXBzJykuXG5cbmZvZihjb21tdXRhdGl2ZSwgY29uamVjdHVyZSwgIVtYLCBZXTogbXVsdChYLCBZKSA9IG11bHQoWSwgWCkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('groups').\n\nfof(commutative, conjecture, ![X, Y]: mult(X, Y) = mult(Y, X)).",
   system: "Vampire",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"groups" => groups}
 )
 ```

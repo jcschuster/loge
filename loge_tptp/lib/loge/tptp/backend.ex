@@ -44,6 +44,21 @@ defmodule Loge.Tptp.Backend do
   end
 
   @doc """
+  The options with the run's `:time_limit`, in seconds, under `key`, the name the
+  backend reads it by. Every Loge engine names its time limit `:time_limit`.
+
+      iex> Loge.Tptp.Backend.time_limit([time_limit: 5, system: "E"], :cpu_timeout_s)
+      [cpu_timeout_s: 5, system: "E"]
+  """
+  @spec time_limit(keyword(), atom()) :: keyword()
+  def time_limit(options, key) do
+    case Keyword.pop(options, :time_limit) do
+      {nil, options} -> options
+      {seconds, options} -> Keyword.put(options, key, seconds)
+    end
+  end
+
+  @doc """
   The outcome of an `AtpClient` query run by `engine`: `views`, then what the system
   derived (a proof, a model) as text views in TPTP titled by dataform. That is the
   solution of a TSTP reply (`details.tstp`) and each SZS output block of the result. The

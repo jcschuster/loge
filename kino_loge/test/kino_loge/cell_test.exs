@@ -16,11 +16,12 @@ defmodule KinoLoge.CellTest do
     {kino, _source} = start_smart_cell!(Cell, %{"options" => %{"limit" => 9}})
     data = connect(kino)
 
-    assert data.languages == [%{id: "fake", label: "Fake"}, %{id: "other", label: "Other"}]
+    assert data.languages == [%{id: "fake", label: "Fake"}]
 
     assert data.engines == [
-             %{id: "fake_engine", label: "Fake engine"},
-             %{id: "second_engine", label: "Second engine"}
+             %{id: "fake_engine", label: "Fake engine", group: "Solve"},
+             %{id: "second_engine", label: "Second engine", group: "Solve"},
+             %{id: "translator", label: "Translator → Other", group: "Translate"}
            ]
 
     assert data.language == "fake"
@@ -35,6 +36,9 @@ defmodule KinoLoge.CellTest do
     assert %{key: "mode", choices: ["fast", "slow"], value: "fast"} =
              Enum.find(data.controls, &(&1.key == "mode"))
 
+    assert data.inputs == [%{id: "", label: "This cell's editor"}]
+    assert data.input == nil
+    assert data.variable == ""
     assert data.diagnostics == []
   end
 
@@ -75,11 +79,13 @@ defmodule KinoLoge.CellTest do
     refute_received {:runtime_smart_cell_update, _, _, _, _}
   end
 
-  test "another language changes the grammar" do
+  test "another engine changes the controls" do
     {kino, _source} = start_smart_cell!(Cell, %{})
-    push_event(kino, "set_language", %{"id" => "other"})
+    push_event(kino, "set_engine", %{"id" => "translator"})
 
-    assert_broadcast_event(kino, "setup", %{language: "other", editor_language: nil})
+    assert_smart_cell_update(kino, %{"engine" => "translator"}, source)
+    assert source =~ "Loge.run!(KinoLoge.Fake.Translator"
+    assert_broadcast_event(kino, "setup", %{engine: "translator", controls: []})
   end
 
   test "a control change updates the source and every client" do
@@ -91,16 +97,62 @@ defmodule KinoLoge.CellTest do
     assert_broadcast_event(kino, "setup", %{engine: "fake_engine"})
   end
 
-  test "no engine makes a definitions cell bound to a variable" do
-    {kino, _source} = start_smart_cell!(Cell, %{"source" => "fact"})
-    push_event(kino, "set_engine", %{"id" => nil})
-    push_event(kino, "set_variable", %{"name" => "defs"})
+  test "the outcome is bound to the result name" do
+    {kino, _source} = start_smart_cell!(Cell, %{"engine" => "translator", "source" => "p"})
+    push_event(kino, "set_variable", %{"name" => "cnf"})
 
     assert_smart_cell_update(
       kino,
-      %{"engine" => nil, "variable" => "defs"},
-      ~s|defs = Loge.source(:fake, "fact")|
+      %{"variable" => "cnf"},
+      ~s|cnf = Loge.run!(KinoLoge.Fake.Translator, "p", [])|
     )
+  end
+
+  test "the bound inputs of the cell's language are offered as its input" do
+    {kino, _source} = start_smart_cell!(Cell, %{})
+
+    Cell.scan_binding(
+      kino.pid,
+      [
+        problem: Loge.source(:fake, "p"),
+        cnf: %Loge.Outcome{raw: "", engine: :e, output: Loge.source(:fake, "c")},
+        log: %Loge.Outcome{raw: "", engine: :e},
+        other: Loge.source(:other, "x")
+      ],
+      __ENV__
+    )
+
+    assert_broadcast_event(kino, "setup", %{inputs: inputs})
+
+    assert Enum.sort(inputs) == [
+             %{id: "", label: "This cell's editor"},
+             %{id: "cnf", label: "cnf"},
+             %{id: "problem", label: "problem"}
+           ]
+  end
+
+  test "a bound input is run and shown in place of the editor's source" do
+    {kino, _source} = start_smart_cell!(Cell, %{"source" => "unused"})
+    Cell.scan_binding(kino.pid, [problem: Loge.source(:fake, "p")], __ENV__)
+    assert_broadcast_event(kino, "setup", %{inputs: [_, _]})
+    push_event(kino, "set_input", %{"name" => "problem"})
+
+    assert_smart_cell_update(kino, %{"input" => "problem"}, source)
+    assert source =~ "Loge.run!(KinoLoge.Fake.Engine, problem,"
+    assert %{input: "problem", input_text: "p"} = connect(kino)
+
+    push_event(kino, "set_input", %{"name" => nil})
+    assert_smart_cell_update(kino, %{"input" => nil}, source)
+    assert source =~ ~s|"unused"|
+  end
+
+  test "an input no longer bound stays chosen and says so" do
+    {kino, _source} = start_smart_cell!(Cell, %{"input" => "gone"})
+
+    assert %{input: "gone", input_text: nil, inputs: [_editor, %{id: "gone", label: label}]} =
+             connect(kino)
+
+    assert label =~ "not bound"
   end
 
   test "an event it does not know changes nothing" do

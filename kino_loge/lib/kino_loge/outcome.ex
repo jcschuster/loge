@@ -1,13 +1,14 @@
 defmodule KinoLoge.Outcome do
   @moduledoc """
   A `Loge.Outcome` as kinos: a Result tab with the verdict, when the outcome has an
-  SZS status, and the outcome's views, and an Output tab with the engine's raw output.
-  Raw output and text views without a language are shown as a terminal shows them, in
-  a monospace font; a text view in a language is highlighted by `KinoLoge.Code`; a
-  graph view is drawn by `Kino.Mermaid`.
+  SZS status, the outcome's views and its output, and an Output tab with the engine's
+  raw output. Raw output and text without a language are shown as a terminal shows
+  them, in a monospace font; text in a language is highlighted by `KinoLoge.Code`; a
+  graph view is drawn by `Kino.Mermaid`. The output is titled with its language's
+  label, and is plain text when its language has no grammar or is not installed.
 
   The verdict is the status's name and mnemonic in its tone's colour, its
-  description if it has one, and a link to the SZS ontology. `Kino.Render` is implemented for
+  description and legend if it has them, and a link to the SZS ontology. `Kino.Render` is implemented for
   `Loge.Outcome` through `kino/1`.
   """
 
@@ -17,7 +18,8 @@ defmodule KinoLoge.Outcome do
   @spec kino(Outcome.t()) :: Kino.Layout.t()
   def kino(%Outcome{} = outcome) do
     Kino.Layout.tabs(
-      Result: Kino.Layout.grid(verdict(outcome) ++ Enum.map(outcome.views, &view/1)),
+      Result:
+        Kino.Layout.grid(verdict(outcome) ++ Enum.map(outcome.views, &view/1) ++ output(outcome)),
       Output: Kino.Text.new(outcome.raw, terminal: true)
     )
   end
@@ -36,13 +38,26 @@ defmodule KinoLoge.Outcome do
   defp verdict_kino(%Verdict{} = verdict) do
     Kino.Layout.grid(
       [label("#{verdict.name} (#{verdict.mnemonic})", verdict.tone)] ++
-        description(verdict.description) ++
+        text(verdict.description) ++
+        text(verdict.legend) ++
         [Kino.Markdown.new("[SZS ontology](#{verdict.source})")]
     )
   end
 
-  defp description(nil), do: []
-  defp description(text), do: [Kino.Text.new(text)]
+  defp text(nil), do: []
+  defp text(text), do: [Kino.Text.new(text)]
+
+  defp output(%Outcome{output: nil}), do: []
+
+  defp output(%Outcome{output: %Loge.Source{language: id, text: text}}) do
+    case Loge.Registry.language(id) do
+      {:ok, language} ->
+        [view({:titled, language.label(), {:text, text, language.editor_language()}})]
+
+      :error ->
+        [view({:titled, Atom.to_string(id), {:text, text, nil}})]
+    end
+  end
 
   defp view({:text, text, nil}), do: Kino.Text.new(text, terminal: true)
   defp view({:text, text, language}), do: KinoLoge.Code.new(text, language)

@@ -21,11 +21,11 @@ Nothing to set for SystemOnTPTP. To try another engine, fill in its fields and p
 :ok
 ```
 
-## Definitions
+## Sources
 
-A Logic Engine cell with no engine, bound to `set_theory`. Later cells include it by name.
+A Logic Source cell bound to `set_theory`. Later cells include it by name.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOm51bGwsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJzb3VyY2UiOiJmb2Yoc3Vic2V0LCBheGlvbSwgIVtBLCBCXTogKHN1YnNldChBLCBCKSA8PT4gIVtYXTogKG1lbWJlcihYLCBBKSA9PiBtZW1iZXIoWCwgQikpKSkuXG5mb2YoZXF1YWxfc2V0LCBheGlvbSwgIVtBLCBCXTogKGVxdWFsX3NldChBLCBCKSA8PT4gKHN1YnNldChBLCBCKSAmIHN1YnNldChCLCBBKSkpKS5cbmZvZihpbnRlcnNlY3Rpb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIGludGVyc2VjdGlvbihBLCBCKSkgPD0+IChtZW1iZXIoWCwgQSkgJiBtZW1iZXIoWCwgQikpKSkuXG5mb2YodW5pb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIHVuaW9uKEEsIEIpKSA8PT4gKG1lbWJlcihYLCBBKSB8IG1lbWJlcihYLCBCKSkpKS4iLCJ2YXJpYWJsZSI6InNldF90aGVvcnkifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InRwdHAiLCJzb3VyY2UiOiJmb2Yoc3Vic2V0LCBheGlvbSwgIVtBLCBCXTogKHN1YnNldChBLCBCKSA8PT4gIVtYXTogKG1lbWJlcihYLCBBKSA9PiBtZW1iZXIoWCwgQikpKSkuXG5mb2YoZXF1YWxfc2V0LCBheGlvbSwgIVtBLCBCXTogKGVxdWFsX3NldChBLCBCKSA8PT4gKHN1YnNldChBLCBCKSAmIHN1YnNldChCLCBBKSkpKS5cbmZvZihpbnRlcnNlY3Rpb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIGludGVyc2VjdGlvbihBLCBCKSkgPD0+IChtZW1iZXIoWCwgQSkgJiBtZW1iZXIoWCwgQikpKSkuXG5mb2YodW5pb24sIGF4aW9tLCAhW1gsIEEsIEJdOiAobWVtYmVyKFgsIHVuaW9uKEEsIEIpKSA8PT4gKG1lbWJlcihYLCBBKSB8IG1lbWJlcihYLCBCKSkpKS4iLCJ2YXJpYWJsZSI6InNldF90aGVvcnkifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
 
 ```elixir
 set_theory =
@@ -37,30 +37,30 @@ set_theory =
 
 ## Including a cell
 
-Expected: **Theorem**. Edit the definitions above and this cell turns stale.
+Expected: **Theorem**. Edit the source above and this cell turns stale.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cblxuZm9mKGludGVyc2VjdGlvbl9jb21tdXRlcywgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiBlcXVhbF9zZXQoaW50ZXJzZWN0aW9uKEEsIEIpLCBpbnRlcnNlY3Rpb24oQiwgQSkpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnc2V0X3RoZW9yeScpLlxuXG5mb2YoaW50ZXJzZWN0aW9uX2NvbW11dGVzLCBjb25qZWN0dXJlLFxuICAgICFbQSwgQl06IGVxdWFsX3NldChpbnRlcnNlY3Rpb24oQSwgQiksIGludGVyc2VjdGlvbihCLCBBKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('set_theory').\n\nfof(intersection_commutes, conjecture,\n    ![A, B]: equal_set(intersection(A, B), intersection(B, A))).",
   system: "E",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"set_theory" => set_theory}
 )
 ```
 
 A selection includes only the named formulae. Expected: **Theorem**.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknLCBbc3Vic2V0LCB1bmlvbl0pLlxuXG5mb2YodW5pb25fdXBwZXJfYm91bmQsIGNvbmplY3R1cmUsICFbQSwgQl06IHN1YnNldChBLCB1bmlvbihBLCBCKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnc2V0X3RoZW9yeScsIFtzdWJzZXQsIHVuaW9uXSkuXG5cbmZvZih1bmlvbl91cHBlcl9ib3VuZCwgY29uamVjdHVyZSwgIVtBLCBCXTogc3Vic2V0KEEsIHVuaW9uKEEsIEIpKSkuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('set_theory', [subset, union]).\n\nfof(union_upper_bound, conjecture, ![A, B]: subset(A, union(A, B))).",
   system: "E",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"set_theory" => set_theory}
 )
 ```
@@ -70,14 +70,14 @@ Loge.run!(
 A name that is not a cell is fetched from tptp.org (cached under `~/.cache/tptp`).
 Expected: **Theorem**.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ0F4aW9tcy9TRVQwMDYrMC5heCcpLlxuXG5mb2YocG93ZXJfc2V0X29mX3N1YnNldCwgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiAoc3Vic2V0KEEsIEIpID0+IHN1YnNldChwb3dlcl9zZXQoQSksIHBvd2VyX3NldChCKSkpKS4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnQXhpb21zL1NFVDAwNiswLmF4JykuXG5cbmZvZihwb3dlcl9zZXRfb2Zfc3Vic2V0LCBjb25qZWN0dXJlLFxuICAgICFbQSwgQl06IChzdWJzZXQoQSwgQikgPT4gc3Vic2V0KHBvd2VyX3NldChBKSwgcG93ZXJfc2V0KEIpKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('Axioms/SET006+0.ax').\n\nfof(power_set_of_subset, conjecture,\n    ![A, B]: (subset(A, B) => subset(power_set(A), power_set(B)))).",
   system: "E",
-  time_limit_sec: 10
+  time_limit: 10
 )
 ```
 
@@ -85,14 +85,14 @@ Loge.run!(
 
 Expected: **CounterSatisfiable** (or **GaveUp**/**Timeout**, depending on the system).
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cblxuZm9mKHVuaW9uX2lzX2ludGVyc2VjdGlvbiwgY29uamVjdHVyZSxcbiAgICAhW0EsIEJdOiBlcXVhbF9zZXQodW5pb24oQSwgQiksIGludGVyc2VjdGlvbihBLCBCKSkpLiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiVmFtcGlyZSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnc2V0X3RoZW9yeScpLlxuXG5mb2YodW5pb25faXNfaW50ZXJzZWN0aW9uLCBjb25qZWN0dXJlLFxuICAgICFbQSwgQl06IGVxdWFsX3NldCh1bmlvbihBLCBCKSwgaW50ZXJzZWN0aW9uKEEsIEIpKSkuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('set_theory').\n\nfof(union_is_intersection, conjecture,\n    ![A, B]: equal_set(union(A, B), intersection(A, B))).",
   system: "Vampire",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"set_theory" => set_theory}
 )
 ```
@@ -105,14 +105,14 @@ unfinished last statement (line 5), and, on the include of `set_theory`, that it
 conjecture. Evaluating fails with `undefined variable "no_such_cell"`: an include that
 names a variable is a reference to it.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXRfc2VjIjoxMH0sInNvdXJjZSI6ImluY2x1ZGUoJ3NldF90aGVvcnknKS5cbmluY2x1ZGUoJ25vX3N1Y2hfY2VsbCcpLlxuXG5mb2Yoc3Vic2V0LCBheGlvbSwgJHRydWUpLlxuZm9mKHVuZmluaXNoZWQsIGNvbmplY3R1cmUsICFbQV06IHN1YnNldChBLCBBKSIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzeXN0ZW1fb25fdHB0cCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsic3lzdGVtIjoiRSIsInRpbWVfbGltaXQiOjEwfSwic291cmNlIjoiaW5jbHVkZSgnc2V0X3RoZW9yeScpLlxuaW5jbHVkZSgnbm9fc3VjaF9jZWxsJykuXG5cbmZvZihzdWJzZXQsIGF4aW9tLCAkdHJ1ZSkuXG5mb2YodW5maW5pc2hlZCwgY29uamVjdHVyZSwgIVtBXTogc3Vic2V0KEEsIEEpIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(
   Loge.Tptp.Engines.SystemOnTptp,
   "include('set_theory').\ninclude('no_such_cell').\n\nfof(subset, axiom, $true).\nfof(unfinished, conjecture, ![A]: subset(A, A)",
   system: "E",
-  time_limit_sec: 10,
+  time_limit: 10,
   includes: %{"set_theory" => set_theory, "no_such_cell" => no_such_cell}
 )
 ```

@@ -26,8 +26,14 @@ defmodule Loge.RegistryTest do
     assert {:error, {:not_loaded, Loge.Missing}} = Loge.register(Loge.Missing)
   end
 
+  test "register/1 rejects a second module with an id already taken" do
+    assert {:error, {:duplicate_id, :fake_engine, Fake.Engine}} = Loge.register(Fake.Impostor)
+    refute Fake.Impostor in Registry.engines()
+  end
+
   test "engines_for/1 lists the engines accepting a language" do
-    assert Registry.engines_for(:fake) == [Fake.Engine]
+    assert Registry.engines_for(:fake) == [Fake.Engine, Fake.Translator, Fake.Checker]
+    assert Registry.engines_for(:fake_target) == [Fake.Solver]
     assert Registry.engines_for(:other) == []
   end
 
@@ -45,5 +51,31 @@ defmodule Loge.RegistryTest do
   test "language_for_extension/1 finds the language claiming an extension" do
     assert Registry.language_for_extension(".fk") == {:ok, Fake.Language}
     assert Registry.language_for_extension(".zz") == :error
+  end
+
+  test "language/1 and engine/1 find a module by its id or the id's string form" do
+    assert Registry.language(:fake_target) == {:ok, Fake.Target}
+    assert Registry.language("fake_target") == {:ok, Fake.Target}
+    assert Registry.engine(:fake_solver) == {:ok, Fake.Solver}
+    assert Registry.engine("fake_solver") == {:ok, Fake.Solver}
+  end
+
+  test "language/1 and engine/1 make no atom from an unknown id" do
+    id = "no_such_id_#{System.unique_integer([:positive])}"
+
+    assert Registry.language(id) == :error
+    assert Registry.engine(id) == :error
+    assert_raise ArgumentError, fn -> String.to_existing_atom(id) end
+  end
+
+  test "translations/0 gives an edge per translate engine and language it reads" do
+    assert Registry.translations() == [
+             %{
+               engine: Fake.Translator,
+               from: :fake,
+               to: :fake_target,
+               preserves: :equi_satisfiable
+             }
+           ]
   end
 end

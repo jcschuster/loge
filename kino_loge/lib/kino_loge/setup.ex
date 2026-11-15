@@ -1,50 +1,56 @@
 defmodule KinoLoge.Setup do
   @moduledoc """
   What a Logic Engine cell is set to: its language, its engine and the engine's
-  control values, the variable a definitions cell binds, and the source.
+  control values, its input, the variable its outcome is bound to, and the source in
+  its editor.
 
-  An engine of `nil` makes a definitions cell, whose source another cell includes
-  through `variable`. The setup round-trips through the cell's attrs, which a
-  notebook stores as JSON: ids, keys and choices are matched by their string form, so
-  nothing read from a notebook becomes an atom.
+  The input is the source in the editor (`nil`) or the name of a variable that holds a
+  bound input, a source or an outcome with an output. The setup round-trips through the
+  cell's attrs, which a notebook stores as JSON: ids, keys and choices are matched by
+  their string form, so nothing read from a notebook becomes an atom, and names become
+  variables only through `Loge.Variable.parse/1`.
   """
 
   alias Loge.{Control, Registry}
 
-  @enforce_keys [:language, :engine, :options, :variable, :source]
+  @enforce_keys [:language, :engine, :options, :input, :variable, :source]
   defstruct @enforce_keys
 
-  @typedoc "A cell's language and engine modules, control values in control order, variable and source."
+  @typedoc """
+  A cell's language and engine modules, control values in control order, input
+  variable (`nil` for the editor), result variable (`""` for none) and source.
+  """
   @type t :: %__MODULE__{
           language: module(),
-          engine: module() | nil,
+          engine: module(),
           options: keyword(),
+          input: String.t() | nil,
           variable: String.t(),
           source: String.t()
         }
 
+  @doc "The languages a Logic Engine cell offers: those with a registered engine."
+  @spec languages() :: [module()]
+  def languages, do: Enum.filter(Registry.languages(), &(engines(&1) != []))
+
   @doc """
-  The setup stored in `attrs`. A missing or unknown language is the first registered
-  one, a missing or unknown engine the language's first, and a missing or invalid
-  control value the control's default. An `"engine"` of `nil` is a definitions cell.
-  Raises `ArgumentError` when no language is registered.
+  The setup stored in `attrs`. A missing or unknown language is the first one
+  `languages/0` offers, a missing or unknown engine the language's first, a missing or
+  invalid control value the control's default, and a missing or invalid name the
+  editor as input and no result variable. Raises `ArgumentError` when no language has
+  an engine.
   """
   @spec from_attrs(map()) :: t()
   def from_attrs(attrs) when is_map(attrs) do
-    language = find(Registry.languages(), attrs["language"]) || first_language()
-
-    engine =
-      case Map.fetch(attrs, "engine") do
-        {:ok, nil} -> nil
-        {:ok, id} -> find(engines(language), id) || first_engine(language)
-        :error -> first_engine(language)
-      end
+    language = language(attrs["language"]) || first_language()
+    engine = engine(language, attrs["engine"]) || first_engine(language)
 
     %__MODULE__{
       language: language,
       engine: engine,
       options: options(engine, Map.get(attrs, "options", %{})),
-      variable: variable(attrs["variable"]),
+      input: name(attrs["input"], nil),
+      variable: name(attrs["variable"], ""),
       source: Map.get(attrs, "source", "")
     }
   end
@@ -54,96 +60,106 @@ defmodule KinoLoge.Setup do
   def to_attrs(%__MODULE__{} = setup) do
     %{
       "language" => id(setup.language),
-      "engine" => setup.engine && id(setup.engine),
+      "engine" => id(setup.engine),
       "options" => Map.new(setup.options, fn {key, value} -> {Atom.to_string(key), value} end),
+      "input" => setup.input,
       "variable" => setup.variable,
       "source" => setup.source
     }
   end
 
   @doc """
-  The Elixir the cell evaluates: `Loge.Engine.to_source/4` for an engine cell,
-  `Loge.Source.to_source/3` for a definitions cell.
+  The Elixir the cell evaluates, `Loge.Engine.to_source/4`: the engine run on the
+  editor's source with the includes it names, or on the bound input, which carries its
+  own includes; bound to the result variable when there is one.
   """
   @spec to_source(t()) :: String.t()
-  def to_source(%__MODULE__{engine: nil} = setup) do
-    Loge.Source.to_source(setup.language.id(), setup.source, setup.variable)
-  end
-
   def to_source(%__MODULE__{} = setup) do
     options = Enum.reject(setup.options, fn {_key, value} -> is_nil(value) end)
+    {input, includes} = input(setup)
 
-    Loge.Engine.to_source(
-      setup.engine,
-      setup.source,
-      options,
-      setup.language.include_names(setup.source)
-    )
+    Loge.Engine.to_source(setup.engine, input, options, [includes: includes] ++ bind(setup))
   end
 
-  @doc "The registered language with id `id`, with its first engine and that engine's defaults."
+  @doc """
+  The language with id `id` among `languages/0`, with its first engine, that engine's
+  defaults and the editor as input.
+  """
   @spec put_language(t(), String.t()) :: t()
   def put_language(%__MODULE__{} = setup, id) do
-    case find(Registry.languages(), id) do
+    case language(id) do
       nil -> setup
-      language -> with_engine(%{setup | language: language}, first_engine(language))
+      language -> with_engine(%{setup | language: language, input: nil}, first_engine(language))
     end
   end
 
-  @doc "The language's engine with id `id`, with its defaults; `nil` makes a definitions cell."
-  @spec put_engine(t(), String.t() | nil) :: t()
-  def put_engine(%__MODULE__{} = setup, nil), do: with_engine(setup, nil)
-
+  @doc "The language's engine with id `id`, with its defaults."
+  @spec put_engine(t(), String.t()) :: t()
   def put_engine(%__MODULE__{} = setup, id) do
-    case find(engines(setup.language), id) do
+    case engine(setup.language, id) do
       nil -> setup
       engine -> with_engine(setup, engine)
     end
   end
 
   @doc """
-  Sets the control whose key is `key` to `value`, if the value suits the control. An
-  empty integer field unsets a control without a default.
+  Sets the control whose key is `key` to `value`, if `Loge.Control.cast/2` reads it as
+  the control's value.
   """
   @spec put_option(t(), String.t(), term()) :: t()
-  def put_option(%__MODULE__{engine: nil} = setup, _key, _value), do: setup
-
   def put_option(%__MODULE__{} = setup, key, value) do
     with %Control{} = control <-
            Enum.find(setup.engine.controls(), &(Atom.to_string(&1.key) == key)),
-         {:ok, value} <- cast(control, value) do
+         {:ok, value} <- Control.cast(control, value) do
       %{setup | options: Keyword.replace!(setup.options, control.key, value)}
     else
       _invalid -> setup
     end
   end
 
-  @doc "Binds a definitions cell to `name`, a variable name or `\"\"`."
-  @spec put_variable(t(), String.t()) :: t()
-  def put_variable(%__MODULE__{} = setup, name) do
-    case variable(name) do
-      ^name -> %{setup | variable: name}
-      _invalid -> setup
+  @doc "Takes the input from the editor (`nil`) or from the variable `name`."
+  @spec put_input(t(), String.t() | nil) :: t()
+  def put_input(%__MODULE__{} = setup, nil), do: %{setup | input: nil}
+
+  def put_input(%__MODULE__{} = setup, name) do
+    case name(name, nil) do
+      nil -> setup
+      name -> %{setup | input: name}
     end
   end
 
-  @doc "Replaces the source."
+  @doc "Binds the outcome to `name`, a variable name, or to nothing for `\"\"`."
+  @spec put_variable(t(), String.t()) :: t()
+  def put_variable(%__MODULE__{} = setup, ""), do: %{setup | variable: ""}
+
+  def put_variable(%__MODULE__{} = setup, name) do
+    case name(name, nil) do
+      nil -> setup
+      name -> %{setup | variable: name}
+    end
+  end
+
+  @doc "Replaces the source in the editor."
   @spec put_source(t(), String.t()) :: t()
   def put_source(%__MODULE__{} = setup, source) when is_binary(source),
     do: %{setup | source: source}
 
-  @doc "The choices of a control, with dynamic ones resolved."
-  @spec choices(Control.t()) :: [term()]
-  def choices(%Control{choices: {:dynamic, choices}}), do: choices.()
-  def choices(%Control{choices: choices}), do: choices
+  defp input(%__MODULE__{input: nil} = setup),
+    do: {setup.source, setup.language.include_names(setup.source)}
+
+  defp input(%__MODULE__{input: name}) do
+    {:ok, variable} = Loge.Variable.parse(name)
+    {variable, []}
+  end
+
+  defp bind(%__MODULE__{variable: ""}), do: []
+  defp bind(%__MODULE__{variable: variable}), do: [bind: variable]
 
   defp with_engine(setup, engine), do: %{setup | engine: engine, options: options(engine, %{})}
 
-  defp options(nil, _stored), do: []
-
   defp options(engine, stored) when is_map(stored) do
     for control <- engine.controls() do
-      case cast(control, Map.get(stored, Atom.to_string(control.key))) do
+      case Control.cast(control, Map.get(stored, Atom.to_string(control.key))) do
         {:ok, value} -> {control.key, value}
         :error -> {control.key, control.default}
       end
@@ -152,50 +168,36 @@ defmodule KinoLoge.Setup do
 
   defp options(engine, _stored), do: options(engine, %{})
 
-  defp cast(%Control{type: :integer}, value) when is_integer(value), do: {:ok, value}
-  defp cast(%Control{type: :integer, default: nil}, ""), do: {:ok, nil}
-
-  defp cast(%Control{type: :integer}, value) when is_binary(value) do
-    case Integer.parse(value) do
-      {integer, ""} -> {:ok, integer}
-      _other -> :error
-    end
-  end
-
-  defp cast(%Control{type: :boolean}, value) when is_boolean(value), do: {:ok, value}
-  defp cast(%Control{type: :text}, value) when is_binary(value), do: {:ok, value}
-
-  defp cast(%Control{type: :select} = control, value) when not is_nil(value) do
-    case Enum.find(choices(control), &(&1 == value or to_string(&1) == value)) do
-      nil -> :error
-      choice -> {:ok, choice}
-    end
-  end
-
-  defp cast(%Control{}, _value), do: :error
-
-  defp variable(name) when is_binary(name) do
+  defp name(name, none) when is_binary(name) do
     case Loge.Variable.parse(name) do
       {:ok, _variable} -> name
-      :error -> ""
+      :error -> none
     end
   end
 
-  defp variable(_name), do: ""
+  defp name(_name, none), do: none
 
   defp engines(language), do: Registry.engines_for(language.id())
 
-  defp first_engine(language), do: List.first(engines(language))
+  defp first_engine(language), do: hd(engines(language))
 
   defp first_language do
-    case Registry.languages() do
+    case languages() do
       [language | _] -> language
-      [] -> raise ArgumentError, "no Loge language is registered"
+      [] -> raise ArgumentError, "no Loge engine is registered"
     end
   end
 
-  defp find(modules, id) when is_binary(id), do: Enum.find(modules, &(id(&1) == id))
-  defp find(_modules, _id), do: nil
+  defp language(id) when is_binary(id), do: among(languages(), Registry.language(id))
+  defp language(_id), do: nil
+
+  defp engine(language, id) when is_binary(id),
+    do: among(engines(language), Registry.engine(id))
+
+  defp engine(_language, _id), do: nil
+
+  defp among(modules, {:ok, module}), do: if(module in modules, do: module)
+  defp among(_modules, :error), do: nil
 
   defp id(module), do: Atom.to_string(module.id())
 end

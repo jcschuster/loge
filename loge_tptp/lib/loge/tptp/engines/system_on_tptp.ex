@@ -4,7 +4,8 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
 
   The `:system` control is a system name such as `"Vampire"`, resolved to the version
   SystemOnTPTP currently advertises; without it the configured default system runs.
-  Every other option is one of `AtpClient.SystemOnTptp.query_system/3`. A cancelled
+  `:time_limit` is the wall-clock limit in seconds. Every other option is one of
+  `AtpClient.SystemOnTptp.query_system/3`. A cancelled
   run releases the connection, but the remote prover runs to its time limit.
   """
 
@@ -22,6 +23,9 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
 
   @impl true
   def languages, do: [:tptp]
+
+  @impl true
+  def task, do: :solve
 
   @impl true
   def config_schema, do: Backend.config_schema(SystemOnTptp)
@@ -42,7 +46,7 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
         choices: {:dynamic, &provers/0},
         default: "E"
       },
-      %Control{key: :time_limit_sec, type: :integer, label: "Time limit (s)", default: 5}
+      %Control{key: :time_limit, type: :integer, label: "Time limit (s)", default: 5}
     ]
   end
 
@@ -51,7 +55,9 @@ defmodule Loge.Tptp.Engines.SystemOnTptp do
     {system, options} = Keyword.pop(options, :system)
 
     with {:ok, input, options} <- Backend.prepare(input, options) do
-      input |> query(system, options) |> Backend.outcome(id())
+      input
+      |> query(system, Backend.time_limit(options, :time_limit_sec))
+      |> Backend.outcome(id())
     end
   end
 

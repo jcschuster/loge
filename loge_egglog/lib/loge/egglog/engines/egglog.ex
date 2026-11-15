@@ -30,6 +30,9 @@ defmodule Loge.Egglog.Engines.Egglog do
   def languages, do: [:egglog]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: []
 
   @impl true

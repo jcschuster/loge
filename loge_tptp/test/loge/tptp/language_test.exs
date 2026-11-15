@@ -73,6 +73,16 @@ defmodule Loge.Tptp.LanguageTest do
       assert message =~ ~r/^in 'outer': /
     end
 
+    test "an include resolves through the includes of the source that names it" do
+      defs = Loge.source(:tptp, "fof(a, axiom, p).\nfof(a, axiom, q).")
+      outer = Loge.source(:tptp, "include('defs').", includes: %{"defs" => defs})
+
+      assert [%Diagnostic{code: "TPTP0503", message: message}] =
+               analyze("include('outer').\nfof(b, conjecture, p).", %{"outer" => outer})
+
+      assert message =~ ~r/^in 'outer': /
+    end
+
     test "any Loge.Input can be included" do
       {:ok, file, []} = Tptp.from_string("fof(a, axiom, p).")
       assert analyze("include('defs'). fof(b, conjecture, p).", %{"defs" => file}) == []

@@ -1,53 +1,35 @@
 defmodule KinoLoge.Cell do
   @moduledoc """
-  The Logic Engine smart cell: a source in a registered language, linted as it is
-  edited, and run by one of the language's engines when the cell is evaluated.
+  The Logic Engine smart cell: one engine of a language run on an input, when the cell
+  is evaluated, and its outcome optionally bound to a variable.
 
-  With no engine the cell defines a source instead, bound to a variable, for later
-  cells of the same language to include. Includes resolve against the sources of the
-  cell's language bound in the notebook, which the cell reads from its binding.
+  The input is the source in the cell's editor, linted as it is edited, or a source or
+  an outcome another cell bound, shown read-only in place of the editor. The engine
+  select groups the language's engines by their task, solve, check or translate; a
+  translation names the language it leads to. Includes resolve against the sources of
+  the cell's language bound in the notebook (`KinoLoge.Editor`).
 
   The cell's state is a `KinoLoge.Setup`; its source is `KinoLoge.Setup.to_source/1`.
-
   The cell brings its own editor, which highlights the language named by
-  `c:Loge.Language.editor_language/0`. Every client edits the same source: a client
-  pushes its changes against the version it has seen, the cell applies those made
-  against the current version (`KinoLoge.ChangeSet`) and broadcasts them, and a client
-  whose changes were made against an older version rebases them on the broadcast and
-  pushes again. Diagnostics use the position format of Kino's smart-cell editor
-  diagnostics; they are drawn in the editor and listed under it.
+  `c:Loge.Language.editor_language/0`.
   """
 
   use Kino.JS, assets_path: "lib/assets", entrypoint: "cell.js"
   use Kino.JS.Live
   use Kino.SmartCell, name: "Logic Engine"
 
-  alias KinoLoge.{ChangeSet, Setup}
-  alias Loge.{Control, Diagnostic, Range}
+  alias KinoLoge.{Editor, Setup}
+  alias Loge.{Control, Registry}
 
-  @lint_delay 300
+  @groups [solve: "Solve", check: "Check", translate: "Translate"]
 
   @impl true
   def init(attrs, ctx) do
-    setup = Setup.from_attrs(attrs)
-
-    ctx =
-      ctx
-      |> assign(setup: setup, version: 0, sources: %{}, diagnostics: [], lint: nil, timer: nil)
-      |> schedule_lint()
-
-    {:ok, ctx}
+    {:ok, ctx |> assign(setup: Setup.from_attrs(attrs)) |> Editor.init()}
   end
 
   @impl true
-  def handle_connect(ctx) do
-    %{setup: setup, version: version, diagnostics: diagnostics} = ctx.assigns
-
-    {:ok,
-     setup
-     |> payload()
-     |> Map.merge(%{source: setup.source, version: version, diagnostics: diagnostics}), ctx}
-  end
+  def handle_connect(ctx), do: {:ok, ctx |> payload() |> Map.merge(Editor.connect(ctx)), ctx}
 
   @impl true
   def handle_event("set_language", %{"id" => id}, ctx),
@@ -55,78 +37,30 @@ defmodule KinoLoge.Cell do
 
   def handle_event("set_engine", %{"id" => id}, ctx), do: change(ctx, &Setup.put_engine(&1, id))
 
-  def handle_event("set_variable", %{"name" => name}, ctx),
-    do: change(ctx, &Setup.put_variable(&1, name))
-
   def handle_event("set_option", %{"key" => key, "value" => value}, ctx),
     do: change(ctx, &Setup.put_option(&1, key, value))
 
-  def handle_event(
-        "push",
-        %{"version" => version, "updates" => updates},
-        %{assigns: %{version: version}} = ctx
-      )
-      when is_list(updates) do
-    case edit(ctx.assigns.setup.source, updates) do
-      {:ok, source} ->
-        broadcast_event(ctx, "updates", updates)
+  def handle_event("set_input", %{"name" => name}, ctx),
+    do: change(ctx, &Setup.put_input(&1, name))
 
-        {:noreply,
-         ctx
-         |> update(:setup, &Setup.put_source(&1, source))
-         |> assign(version: version + length(updates))
-         |> schedule_lint()}
+  def handle_event("set_variable", %{"name" => name}, ctx),
+    do: change(ctx, &Setup.put_variable(&1, name))
 
-      :error ->
-        {:noreply, ctx}
-    end
-  end
+  def handle_event("push", payload, ctx), do: {:noreply, Editor.push(ctx, payload)}
 
   def handle_event(_event, _payload, ctx), do: {:noreply, ctx}
 
   @impl true
-  def handle_info(:lint, ctx), do: {:noreply, lint(ctx)}
-
-  def handle_info({:binding, sources}, ctx) do
-    {:noreply, ctx |> assign(sources: sources) |> schedule_lint()}
+  def handle_info({:binding, _sources} = message, ctx) do
+    ctx = Editor.handle_info(message, ctx)
+    broadcast_event(ctx, "setup", payload(ctx))
+    {:noreply, ctx}
   end
 
-  def handle_info({ref, diagnostics}, %{assigns: %{lint: %Task{ref: ref}}} = ctx) do
-    Process.demonitor(ref, [:flush])
-    {:noreply, show(ctx, diagnostics)}
-  end
-
-  def handle_info(
-        {:DOWN, ref, :process, _pid, reason},
-        %{assigns: %{lint: %Task{ref: ref}}} = ctx
-      ) do
-    failure =
-      Diagnostic.new(
-        "LOGE0002",
-        :error,
-        Range.new(1),
-        "linting failed: " <> Exception.format_exit(reason)
-      )
-
-    {:noreply, show(ctx, [failure])}
-  end
-
-  def handle_info(_stale, ctx), do: {:noreply, ctx}
+  def handle_info(message, ctx), do: {:noreply, Editor.handle_info(message, ctx)}
 
   @impl true
-  def scan_binding(pid, binding, _env) do
-    sources =
-      for {name, value} <- binding,
-          is_atom(name),
-          Loge.Input.impl_for(value),
-          language = Loge.Input.language(value),
-          into: %{},
-          do:
-            {Atom.to_string(name),
-             Loge.source(language, IO.iodata_to_binary(Loge.Input.to_iodata(value)))}
-
-    send(pid, {:binding, sources})
-  end
+  def scan_binding(pid, binding, _env), do: Editor.scan_binding(pid, binding)
 
   @impl true
   def to_attrs(ctx), do: Setup.to_attrs(ctx.assigns.setup)
@@ -134,77 +68,76 @@ defmodule KinoLoge.Cell do
   @impl true
   def to_source(attrs), do: attrs |> Setup.from_attrs() |> Setup.to_source()
 
-  defp edit(source, updates) do
-    Enum.reduce_while(updates, {:ok, source}, fn update, {:ok, source} ->
-      with %{"changes" => changes} <- update,
-           {:ok, source} <- ChangeSet.apply(source, changes) do
-        {:cont, {:ok, source}}
-      else
-        _invalid -> {:halt, :error}
-      end
-    end)
-  end
-
   defp change(ctx, fun) do
     ctx = update(ctx, :setup, fun)
-    broadcast_event(ctx, "setup", payload(ctx.assigns.setup))
-    {:noreply, schedule_lint(ctx)}
+    broadcast_event(ctx, "setup", payload(ctx))
+    {:noreply, Editor.schedule_lint(ctx)}
   end
 
-  defp schedule_lint(ctx) do
-    if ctx.assigns.timer, do: Process.cancel_timer(ctx.assigns.timer)
-    assign(ctx, timer: Process.send_after(self(), :lint, @lint_delay))
-  end
-
-  defp lint(ctx) do
-    if ctx.assigns.lint, do: Task.shutdown(ctx.assigns.lint, :brutal_kill)
-    %Setup{language: language, source: source} = ctx.assigns.setup
-
-    includes =
-      for {name, %Loge.Source{language: id} = source} <- ctx.assigns.sources,
-          id == language.id(),
-          into: %{},
-          do: {name, source}
-
-    task = Loge.Run.async(fn -> Loge.lint(language, source, includes: includes) end)
-    assign(ctx, lint: task, timer: nil)
-  end
-
-  defp show(ctx, diagnostics) do
-    diagnostics = Enum.map(diagnostics, &marker/1)
-    broadcast_event(ctx, "diagnostics", diagnostics)
-    assign(ctx, lint: nil, diagnostics: diagnostics)
-  end
-
-  defp marker(%Diagnostic{range: %Range{} = range} = diagnostic) do
-    range
-    |> Map.from_struct()
-    |> Map.reject(fn {_key, value} -> is_nil(value) end)
-    |> Map.merge(%{
-      severity: diagnostic.severity,
-      description: description(diagnostic),
-      code: diagnostic.code
-    })
-  end
-
-  defp description(%Diagnostic{message: message, hint: nil}), do: message
-  defp description(%Diagnostic{message: message, hint: hint}), do: message <> "\n" <> hint
-
-  defp payload(%Setup{} = setup) do
+  defp payload(%{assigns: %{setup: %Setup{} = setup, editor: editor}}) do
     %{
-      languages: Enum.map(Loge.Registry.languages(), &choice/1),
-      engines: Enum.map(Loge.Registry.engines_for(setup.language.id()), &choice/1),
-      language: Atom.to_string(setup.language.id()),
+      languages: Enum.map(Setup.languages(), &choice/1),
+      engines: engines(setup.language),
+      language: id(setup.language),
       editor_language: setup.language.editor_language(),
-      engine: setup.engine && Atom.to_string(setup.engine.id()),
+      engine: id(setup.engine),
       controls: controls(setup),
+      inputs: inputs(setup, editor.sources),
+      input: setup.input,
+      input_text: input_text(setup, editor.sources),
       variable: setup.variable
     }
   end
 
-  defp choice(module), do: %{id: Atom.to_string(module.id()), label: module.label()}
+  defp choice(module), do: %{id: id(module), label: module.label()}
 
-  defp controls(%Setup{engine: nil}), do: []
+  defp engines(language) do
+    engines = Registry.engines_for(language.id())
+
+    for {task, group} <- @groups,
+        engine <- engines,
+        kind(engine.task()) == task,
+        do: %{id: id(engine), label: label(engine.label(), engine.task()), group: group}
+  end
+
+  defp kind({:translate, _to, _preserves}), do: :translate
+  defp kind(task), do: task
+
+  defp label(label, {:translate, to, _preserves}), do: "#{label} → #{target(to)}"
+  defp label(label, _task), do: label
+
+  defp target(language) do
+    case Registry.language(language) do
+      {:ok, module} -> module.label()
+      :error -> Atom.to_string(language)
+    end
+  end
+
+  defp inputs(%Setup{} = setup, sources) do
+    bound = setup |> bound(sources) |> Map.keys() |> Enum.sort()
+
+    missing =
+      if setup.input && setup.input not in bound,
+        do: [%{id: setup.input, label: "#{setup.input} (not bound)"}],
+        else: []
+
+    [%{id: "", label: "This cell's editor"}] ++
+      Enum.map(bound, &%{id: &1, label: &1}) ++ missing
+  end
+
+  defp input_text(%Setup{input: nil}, _sources), do: nil
+
+  defp input_text(%Setup{input: name} = setup, sources) do
+    case bound(setup, sources) do
+      %{^name => %Loge.Source{text: text}} -> text
+      _unbound -> nil
+    end
+  end
+
+  defp bound(%Setup{language: language}, sources) do
+    id = language.id()
+    for {name, %Loge.Source{language: ^id} = source} <- sources, into: %{}, do: {name, source}
+  end
 
   defp controls(%Setup{engine: engine, options: options}) do
     for %Control{} = control <- engine.controls() do
@@ -212,7 +145,7 @@ defmodule KinoLoge.Cell do
         key: Atom.to_string(control.key),
         type: Atom.to_string(control.type),
         label: control.label,
-        choices: Enum.map(Setup.choices(control), &to_string/1),
+        choices: Enum.map(Control.choices(control), &to_string/1),
         value: json(options[control.key])
       }
     end
@@ -222,4 +155,6 @@ defmodule KinoLoge.Cell do
     do: Atom.to_string(value)
 
   defp json(value), do: value
+
+  defp id(module), do: Atom.to_string(module.id())
 end

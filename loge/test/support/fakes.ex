@@ -128,6 +128,8 @@ defmodule Loge.Fake.Engine do
   def label, do: "Fake engine"
   @impl true
   def languages, do: [:fake]
+  @impl true
+  def task, do: :solve
 
   @impl true
   def config_schema, do: [%Field{key: :token, type: :string, required?: true, group: :connection}]
@@ -172,17 +174,182 @@ defmodule Loge.Fake.FailingEngine do
   @impl true
   def languages, do: [:fake]
   @impl true
+  def task, do: :solve
+  @impl true
   def config_schema, do: []
   @impl true
   def verify(_options), do: :ok
   @impl true
-  def controls, do: []
+  def controls, do: [%Loge.Control{key: :why, type: :text, label: "Why"}]
   @impl true
   def run(_input, options), do: {:error, {:refused, Keyword.fetch!(options, :why)}}
   @impl true
   def configure(_settings), do: :ok
   @impl true
   def format_error({:refused, why}), do: "refused: " <> why
+end
+
+defmodule Loge.Fake.Target do
+  @moduledoc false
+  @behaviour Loge.Language
+
+  @impl true
+  def id, do: :fake_target
+  @impl true
+  def label, do: "Fake target"
+  @impl true
+  def extensions, do: [".ft"]
+  @impl true
+  def editor_language, do: nil
+  @impl true
+  def include_names(_source), do: []
+  @impl true
+  def analyze(source, _options),
+    do: %Loge.Analysis{language: :fake_target, source: source, diagnostics: []}
+end
+
+defmodule Loge.Fake.Translator do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  alias Loge.Outcome
+
+  @impl true
+  def id, do: :fake_translator
+  @impl true
+  def label, do: "Fake translator"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: {:translate, :fake_target, :equi_satisfiable}
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_settings), do: :ok
+  @impl true
+  def controls, do: []
+
+  @impl true
+  def run(input, options) do
+    text = IO.iodata_to_binary(Loge.Input.to_iodata(input))
+    includes = Loge.Source.closure(input, Keyword.get(options, :includes, %{}))
+
+    {:ok,
+     %Outcome{
+       szs: :equi_satisfiable,
+       problem: :translation,
+       raw: text,
+       engine: :fake_translator,
+       output: Loge.source(:fake_target, String.upcase(text)),
+       details: %{includes: includes}
+     }}
+  end
+
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule Loge.Fake.Solver do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  alias Loge.{Config.Field, Control, Outcome}
+
+  @impl true
+  def id, do: :fake_solver
+  @impl true
+  def label, do: "Fake solver"
+  @impl true
+  def languages, do: [:fake_target]
+  @impl true
+  def task, do: :solve
+  @impl true
+  def config_schema, do: [%Field{key: :path, type: :string, required?: false, group: :defaults}]
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_settings), do: :ok
+  @impl true
+  def controls, do: [%Control{key: :limit, type: :integer, label: "Limit", default: 1}]
+
+  @impl true
+  def run(input, options) do
+    {:ok,
+     %Outcome{
+       szs: :satisfiable,
+       problem: :satisfiability,
+       raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
+       engine: :fake_solver,
+       details: %{options: options}
+     }}
+  end
+
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule Loge.Fake.Checker do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  @impl true
+  def id, do: :fake_checker
+  @impl true
+  def label, do: "Fake checker"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: :check
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_settings), do: :ok
+  @impl true
+  def controls, do: []
+
+  @impl true
+  def run(input, _options) do
+    {:ok,
+     %Loge.Outcome{
+       szs: :verified_good,
+       problem: :verification,
+       raw: IO.iodata_to_binary(Loge.Input.to_iodata(input)),
+       engine: :fake_checker
+     }}
+  end
+
+  @impl true
+  def format_error(reason), do: inspect(reason)
+end
+
+defmodule Loge.Fake.Impostor do
+  @moduledoc false
+  @behaviour Loge.Engine
+
+  @impl true
+  def id, do: :fake_engine
+  @impl true
+  def label, do: "Impostor"
+  @impl true
+  def languages, do: [:fake]
+  @impl true
+  def task, do: :solve
+  @impl true
+  def config_schema, do: []
+  @impl true
+  def configure(_settings), do: :ok
+  @impl true
+  def verify(_settings), do: :ok
+  @impl true
+  def controls, do: []
+  @impl true
+  def run(_input, _options), do: {:error, :impostor}
+  @impl true
+  def format_error(reason), do: inspect(reason)
 end
 
 defmodule Loge.PeerTest.Report do

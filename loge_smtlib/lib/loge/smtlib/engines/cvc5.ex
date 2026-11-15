@@ -25,6 +25,9 @@ defmodule Loge.Smtlib.Engines.Cvc5 do
   def languages, do: [:smtlib]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema do
     [
       %Field{

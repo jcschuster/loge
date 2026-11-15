@@ -1,29 +1,32 @@
 # Loge — Execution Plan
 
-Design reference: `OUTLINE.md`. Phases are ordered by how much new parsing each needs;
-phases 2 and 4 can run beside 3. Each phase has one gate that must pass before the next
-starts. Phase 0 is issue-only and nothing waits on its answers.
+Design reference: `OUTLINE.md`. Phases 1 to 4 are ordered by how much new parsing each
+needs; phases 2 and 4 can run beside 3. Phases 5 to 9 follow the scope of OUTLINE §0, in
+order: core contracts, cells, the existing languages, translations, new formalisms. Each
+phase has one gate that must pass before the next starts. Phase 0 is issue-only and
+nothing waits on its answers.
 
 ## Phase 0 — Upstream issues and PRs
 
 Open these first; every item has a fallback inside Loge.
 
-| Repo                       | Change                                                                                                                                                                                                                                                                                                                                                                                              | Size                                               | Fallback if declined                                         | Status |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ | ------ |
-| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS                          | diagnostics listed under the editor (phase 1 default anyway) | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column. Loge no longer waits on it (bundled editor) |
-| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs                                    | —                                                            | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open; as above |
-| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile                               | plain-text editor for TPTP                                   | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), merged; the cell uses its own bundle |
-| livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                                              | —                                                            | [ ]    |
-| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                                              | not needed: `loge_asp` lints through the executable            | [ ]    |
-| davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so | report | `loge_asp` runs the executable | [ ] |
-| davfuenmayor/egglog_elixir | Return spans structurally from the NIF | — | — | [x] parse errors carry `location` since 45e8e55; type errors still text only |
-| davfuenmayor/egglog_elixir | Structured locations for type and unbound-name errors, so a lint could report them; and a type-check-only entry point (today types are checked only while running) | small Rust | parse errors only | [ ] |
-| davfuenmayor/egglog_elixir | An interruptible run (a flag checked between rule iterations), so an engine can cancel without a peer node | small Rust | `Loge.Peer` (130 ms per run) | [ ] |
-| davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog                                       | not needed (lint via `SWI.query`)                            | [ ]    |
-| davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests | small | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard` | [ ] |
-| davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only) | release | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI | [ ] |
-| bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies | small C | no Picosat engine; clasp covers DIMACS | [ ] |
-| jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild | small generator change | TPTP brackets uncoloured | [x] 0.1.3 |
+| Repo                       | Change                                                                                                                                                                                                                                                                                                                                                                                              | Size                      | Fallback if declined                                                                       | Status                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| livebook-dev/livebook      | Issue → PR: `diagnostics` option for the smart-cell editor. `reconfigure_smart_cell(ctx, editor: [diagnostics: [%{from, to, severity, message}]])` → `session.ex` editor-update handler (`handle_info({:runtime_smart_cell_editor_update, …})`, currently applies `:source`, `:intellisense_node`, `:visible`) → client event → `setDiagnostics`. Ask whether offsets or line/column are preferred. | ~60 lines Elixir + ~30 JS | diagnostics listed under the editor (phase 1 default anyway)                               | [x] [#3235](https://github.com/livebook-dev/livebook/pull/3235), open; maintainers chose line/column. Loge no longer waits on it (bundled editor) |
+| livebook-dev/kino          | Companion PR: add `:diagnostics` to the `Keyword.validate!` allow-list in `Kino.SmartCell.Server.reconfigure_smart_cell/2` and document it. Must land with the Livebook PR.                                                                                                                                                                                                                         | one line + docs           | —                                                                                          | [x] [#522](https://github.com/livebook-dev/kino/pull/522), open; as above                                                                         |
+| livebook-dev/livebook      | PR: TPTP highlighting. `assets/package.json` + `codemirror-lang-tptp ^0.1.1`; regenerate `assets/bun.lock`; `languages.js`: import, `tptpDesc`, add to `markdownDesc.codeLanguages` and `languages`; `theme.js`: style `t.modifier`, `t.labelName`, `t.typeName`, `t.standard(t.variableName)`, `t.logicOperator`. Precedent: commit cbcd6386 (Shell), PR #2772 (Python).                           | ~20 lines + lockfile      | plain-text editor for TPTP                                                                 | [x] [#3234](https://github.com/livebook-dev/livebook/pull/3234), merged; the cell uses its own bundle                                             |
+| livebook-dev/livebook      | Later PR: aliases `egglog`, `smt2` on the Scheme legacy mode; `asp`, `prolog`, `dimacs` once modes exist                                                                                                                                                                                                                                                                                            | small                     | —                                                                                          | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Accept `logger:` in `Clingo.Ast.parse!/2` (passes `nil` today); optional `Clingo.parse/2` collecting logger messages                                                                                                                                                                                                                                                                                | small                     | not needed: `loge_asp` lints through the executable                                        | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Issue: closing a session whose owner died during grounding segfaults the VM (`p(0). p(X+1) :- p(X).`, kill the owner of `Clingo.with_control/2` mid-`ground!`, then halt); grounding itself cannot be interrupted in libclingo, so the session should outlive the grounder or the docs should say so                                                                                                | report                    | `loge_asp` runs the executable                                                             | [ ]                                                                                                                                               |
+| davfuenmayor/egglog_elixir | Return spans structurally from the NIF                                                                                                                                                                                                                                                                                                                                                              | —                         | —                                                                                          | [x] parse errors carry `location` since 45e8e55; type errors still text only                                                                      |
+| davfuenmayor/egglog_elixir | Structured locations for type and unbound-name errors, so a lint could report them; and a type-check-only entry point (today types are checked only while running)                                                                                                                                                                                                                                  | small Rust                | parse errors only                                                                          | [ ]                                                                                                                                               |
+| davfuenmayor/egglog_elixir | An interruptible run (a flag checked between rule iterations), so an engine can cancel without a peer node                                                                                                                                                                                                                                                                                          | small Rust                | `Loge.Peer` (130 ms per run)                                                               | [ ]                                                                                                                                               |
+| davfuenmayor/swi_elixir    | Optional: collect all load-time errors and warnings in `priv/bridge.pl`                                                                                                                                                                                                                                                                                                                             | small Prolog              | not needed (lint via `SWI.query`)                                                          | [ ]                                                                                                                                               |
+| davfuenmayor/swi_elixir    | A non-raising pull (`{:ok, bindings} \| :done \| {:error, reason}`) beside the raising `Enumerable`; `SWI.Session` reacts to its owner only between requests                                                                                                                                                                                                                                        | small                     | `Loge.Prolog.Swipl` rescues `SWI.Error` per pull and kills the session from a `Loge.Guard` | [ ]                                                                                                                                               |
+| davfuenmayor/clingo_elixir | Publish to Hex (a Hex package cannot depend on a git dependency, so `loge_dimacs` and `loge_asp` cannot be published before); ship the macOS bundles (`native/` has linux x86_64/aarch64 and windows only)                                                                                                                                                                                          | release                   | none: blocks publishing `loge_dimacs`, `loge_asp` and macOS CI                             | [ ]                                                                                                                                               |
+| bitwalker/picosat_elixir   | Run `solve` on a dirty CPU scheduler and make it interruptible (picosat's `picosat_set_interrupt`), so a run can be cancelled; 0.2.3 (2022) blocks a normal scheduler until the solve returns, even after the caller dies                                                                                                                                                                           | small C                   | no Picosat engine; clasp covers DIMACS                                                     | [ ]                                                                                                                                               |
+| jcschuster/lang-tptp       | `closedBy`/`openedBy` on the `(` `)` `[` `]` `{` `}` tokens (`@detectDelim` finds none, OUTLINE §7); then raise `codemirror-lang-tptp` in `kino_loge/assets` and rebuild                                                                                                                                                                                                                            | small generator change    | TPTP brackets uncoloured                                                                   | [x] 0.1.3                                                                                                                                         |
+| davfuenmayor/rudof_elixir  | Publish to Hex with the native bundles hosted as release assets (its README names their size as the obstacle); bundles beyond linux x86_64; locations in `Rudof.Error` (today `kind` and `message`)                                                                                                                                                                                                 | release + small Rust      | none for publishing `loge_rdf`; linting by readers of our own                              | [ ]                                                                                                                                               |
 
 Not PR targets: `codemirror/legacy-modes` (ports CM5 modes only), `SirBogman/codemirror-lang-prolog`
 (fork after evaluation), potassco/clingo, egraphs-good/egglog.
@@ -72,7 +75,7 @@ in `kino_loge`.
 
 ### Gate
 
-- [ ] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd` (smoke-test notebook exists; to be checked in Livebook)
+- [x] All KinoAtpClient features reproduced in a notebook under `notebooks/tptp.livemd` (smoke-test notebook exists; to be checked in Livebook)
 - [x] `rg -i tptp kino_loge/lib -g '*.ex'` returns nothing
 
 ### Editor (spike done, OUTLINE §7)
@@ -159,16 +162,132 @@ in `kino_loge`.
 
 - [x] First Port-only engine; reusable as the template for kissat/cadical/Vampire: `Loge.Executable` in core (also replaces `loge_asp`'s runner; kills the tool when the node halts)
 
-## Phase 5 — MCP and agents
+## Phase 5 — Tasks and outputs (`loge`)
 
-### `loge_mcp`
+Goal: the contracts of OUTLINE §0 and §3 in core, tested with fakes, before any package
+uses them. The former phase 5, an MCP server, is deferred: OUTLINE §10 says what the
+libraries hold ready for it, and the cross-cutting list below keeps that tested.
 
-- [ ] Tools `list_engines`, `lint(language, source)`, `solve(engine, source, options)`; JSON schema generated from `config_schema/0` + `controls/0`
-- [ ] Reuse AtpMcp's transport
+### `loge`
+
+- [x] `t:Loge.Engine.task/0` and `c:Loge.Engine.task/0`; fakes for a solve, a check and a translate engine in `test/support/fakes.ex`
+- [x] `Loge.Outcome.output` (`Loge.Source.t() | nil`); `problem` gains `:translation` and `:verification`; `Loge.Verdict.of/2` describes both (a description for every problem kind but `:satisfiability`), with a legend for a translation; `VerifiedBad` in the negative tone
+- [x] `Loge.Input` for `Loge.Outcome`: its output, else its raw text with no language
+- [x] `Loge.Engine.to_source/4`: `input` as text or as a variable (an atom); `references` with `includes:` and `bind:`; doctests for a bound run, a run on a variable, and includes
+- [x] `Loge.Registry.language/1` and `engine/1` (id as an atom or its string form; no atom is made), `translations/0`; `register/1` rejects a second module with an id its kind holds
+- [x] `Loge.Control.cast/2`, moved from the private `cast/2` of `KinoLoge.Setup`, with its tests
+- [x] Moduledocs of `Loge` and `Loge.Engine` state the three tasks
+- [x] Sources carry their includes: `Loge.source/3` with `includes:`, `Loge.Source.to_source/3` with `includes:` and `bind:`, `Loge.Source.closure/2`
+- [x] `Loge.run!/3` raises `ArgumentError` for an option that is not a control, a setting or `:includes`, and for an input in a language the engine does not read
+
+### Language packages
+
+- [x] Every engine of phases 1–4 declares `task/0` as `:solve`
+- [x] Every time limit is `time_limit`, in seconds: SystemOnTPTP, StarExec and LocalExec renamed, mapped by `Loge.Tptp.Backend.time_limit/2`; the notebooks follow. `:library` stays an option of the TPTP engines' `run/2` and of `analyze/2`, a seam for tests; `Loge.run!/3` does not take it
 
 ### Gate
 
-- [ ] `loge_mcp` has no Kino dependency; the agent framework calls `Loge.Engine.run/2` directly
+- [x] In `loge`'s tests the outcome of the fake translator is the input of the fake solver through `Loge.run!/3`, and the registry finds both by string id (`test/loge/consumer_test.exs`)
+- [x] Cancellation tests unchanged; `mix dialyzer` clean in every package
+
+## Phase 6 — Source cell and Engine cell (`kino_loge`)
+
+Goal: two cells by what they produce (OUTLINE §4), linked by variable names.
+
+- [x] `KinoLoge.Editor`: the collaborative source and the lint loop, taken out of `KinoLoge.Cell`; both cells use it
+- [x] `KinoLoge.SourceCell` ("Logic Source"): language, variable name (default from `Kino.SmartCell.prefixed_var_name/2`), editor, diagnostics; source `name = Loge.source(:lang, "…", includes: %{…})`; a setup struct of its own (`KinoLoge.SourceSetup`)
+- [x] `KinoLoge.Cell` always has an engine: the `engine: nil` clauses and the definitions mode leave `KinoLoge.Setup` and `cell.js`; only languages with an engine are offered
+- [x] Engine select grouped by task; a translation's option names its target language
+- [x] Input: this cell's editor, or a bound input of a language the engine accepts (a source, or an outcome with an output), shown read-only; attr `"input"`; a chosen input no longer bound stays listed as not bound; the select is hidden while the editor is the only choice
+- [x] Result name, optional; attr `"variable"`; source `name = Loge.run!(…)`
+- [x] `KinoLoge.Setup` reads ids and control values through `Loge.Registry.language/1`, `engine/1` and `Loge.Control.cast/2`
+- [x] `KinoLoge.Outcome`: the output as text in its language, after the views; a translation's verdict with the legend "Ax: the input, C: the output"
+- [x] JS for both cells (`cell.js`, `source_cell.js`, shared `editing.js`), driven in jsdom against a stand-in for the cell; the bundle is unchanged (its read-only `viewer()` shows a bound input), so not rebuilt
+- [x] `loge_tptp` resolves includes against `Loge.Source.closure/2`, so a source run or included from any cell brings its own includes
+- [x] Notebooks: definitions cells become Source cells. No migration code; the notebooks in `notebooks/` are regenerated (the stored source of every TPTP cell equals the one its attrs generate)
+
+### Gate
+
+- [x] `rg -i tptp kino_loge/lib -g '*.ex'` returns nothing
+- [ ] In Livebook: a Source cell and an Engine cell that includes it; an Engine cell whose input is another's result; editing the first marks the second stale (to be checked in Livebook)
+
+## Phase 7 — Existing languages on the new contracts
+
+Goal: no part of a problem outside a source, and results that flow on, with the six
+languages that exist.
+
+### `loge_tptp`
+
+- [ ] Prover outcomes carry `output`: the derivation of a solved problem, else its interpretation, as TPTP source (`AtpClient.Result.derivation/1`, `interpretation/1`)
+- [ ] `Loge.Tptp.Engines.Verify`, task `:check`, over `AtpClient.verify/2`: GDV for a derivation, AGMV for an interpretation; `:verified_good` or `:verified_bad`, `problem: :verification`; tests against a local HTTP stub
+- [ ] Before that: read in `deps/atp_client` how `AtpClient.verify/2` is given a derivation or an interpretation that arrives as text
+
+### `loge_prolog`
+
+- [ ] Queries are the `?- Goal.` terms of the source, answered in order; the `goal` control goes; one `{:titled, "?- Goal", {:table, …}}` view per query; a source without a query is consulted only
+- [ ] `priv/loge.pl` reports the position of each query term, so the engine consults the rest and asks each query; read in `deps/swi_elixir` what the bridge offers for this before choosing the mechanism
+- [ ] Includes from Source cells (the open item of phase 3)
+
+### `loge_asp`, `loge_egglog`
+
+- [ ] Includes from Source cells (the open items of phases 2 and 3)
+
+### Gate
+
+- [ ] `notebooks/demo.livemd`: prove a TPTP problem, bind the result, verify it in a second cell; a Prolog program in a Source cell and two cells that include it and ask one query each
+- [ ] No control holds part of a problem (the Prolog `goal` was the one)
+
+## Phase 8 — Translations, verified
+
+Goal: the first translations (OUTLINE §8) in Elixir, each with its verification
+(OUTLINE §9). A translation is not done before its record exists.
+
+### Before the first translation
+
+- [ ] Send GDV a hand-written clausification derivation in E's annotation style through `AtpClient.verify/2`, and note which rule names and `status` values it accepts for Skolemisation and definition steps
+
+### `loge_tptp`
+
+- [ ] `Loge.Tptp.Formula`: terms, atoms, connectives, quantifiers; read from `Tptp.Node`, printed through `Tptp.Printer`; round-trip property
+- [ ] `Loge.Tptp.Engines.Clausify`: FOF → CNF. Negated conjecture, simplification, negation normal form, variable renaming, Skolemisation, naming of subformulas (a control), distribution; `details.derivation`
+- [ ] `Loge.Tptp.Engines.Ground`: clauses with no function symbol of arity above 0 → their ground instances over the constants
+- [ ] `Loge.Tptp.Engines.Dimacs`: ground clauses without equality → DIMACS, with the atom table
+- [ ] `:inappropriate` with diagnostics for input outside each fragment
+- [ ] Properties with StreamData (a test-only dependency), in `mix test`
+- [ ] Verification suite tagged `:verification`, excluded in `test_helper.exs`: derivation (GDV), status (TPTP headers), differential (ECNF, VCNF, EGround)
+- [ ] `loge_tptp/VERIFICATION.md` for the version to be published
+
+### Gate
+
+- [ ] `notebooks/demo.livemd`: one FOF problem whose Skolemisation introduces constants only, through Clausify, Ground, Dimacs and clasp in four cells; the SAT verdict agrees with a prover's on the original
+- [ ] The record shows no disagreement
+
+## Phase 9 — Course formalisms
+
+Goal: the remaining topics of OUTLINE §0. Each is added without a change to `loge` or
+`kino_loge`, except the one named below.
+
+### Modal logic (`loge_tptp`)
+
+- [ ] Find which SystemOnTPTP systems take non-classical TPTP and offer them for it
+- [ ] `Loge.Tptp.Engines.Embed`: non-classical TPTP → THF by shallow embedding, in Elixir; reference ATFLET; verified as in phase 8, on the non-classical problems of the TPTP library
+- [ ] The standard translation of propositional modal logic into FOF, if the course uses it
+
+### Description logics
+
+- [ ] Decide the concrete syntax and the reasoner (open question below)
+- [ ] Translations between description logic, modal logic and first-order logic as the course states them
+
+### Semantic web (`loge_rdf`)
+
+- [ ] `Loge.Role` and `c:Loge.Engine.roles/0` in `loge`; role selects in `KinoLoge.Cell`; `roles:` in `Loge.Engine.to_source/4`. The one planned core change of this phase
+- [ ] Languages Turtle, SPARQL, ShExC; their Lezer grammars in the editor bundle
+- [ ] Engines: SPARQL query (`:solve`; role `data`, or an endpoint control), SHACL and ShEx validation (`:check`; role `data`), each in a `Loge.Peer` (rudof's NIF cannot be interrupted)
+- [ ] Blocked on rudof_elixir on Hex (phase 0)
+
+### Gate
+
+- [ ] Each formalism has a section in `notebooks/demo.livemd` and a smoke-test notebook
 
 ## Cross-cutting (from day one)
 
@@ -178,6 +297,8 @@ in `kino_loge`.
 - [ ] Clean-machine smoke test before each course
 - [x] Shared kill-with-caller in `loge`: `Loge.Executable` for command-line tools, `Loge.Guard` for processes holding a Port (`loge_prolog`, `Loge.Peer`)
 - [ ] Run DIMACS through the `clingo` executable or a `Loge.Peer`, so grounding is cancellable too
+- [ ] Before publishing a package that has a translation: `mix test --only verification`, and its `VERIFICATION.md` for that version with no disagreement (OUTLINE §9)
+- [x] The consumer contract of OUTLINE §10 holds: a test in `loge` discovers, configures, lints and runs fake modules through the registry by string ids, and `loge` has no Kino dependency (`loge/test/loge/consumer_test.exs`)
 
 ## Open questions
 
@@ -188,3 +309,13 @@ in `kino_loge`.
 - [x] Livebook maintainers' stance on smart-cell-only languages: not asked; niche languages are highlighted by the bundled editor instead
 - [x] Exact clingo message text at runtime: observed, OUTLINE §6
 - [x] setup-beam pair for CI: Elixir 1.20, OTP 29 (`clingo_elixir`'s bundled NIF is built against OTP 29 headers, NIF 2.18)
+- [x] Cell types per task (query, solve, validate): no. Two cells by what they produce; the task is the engine's (OUTLINE §4)
+- [x] A behaviour of its own for translations: no. A translation is an engine whose outcome carries a source (OUTLINE §3, §8)
+- [x] DPLL as an algorithm to show, and a Datalog language: out of scope (OUTLINE §0)
+- [x] Where the formula type for translations lives: in `loge_tptp`, as `Loge.Tptp.Formula` (OUTLINE §8)
+- [x] How SZS statuses are read is Loge's own decision: Ax of a TPTP problem is its axioms with the negated conjecture; across logics each side has its models in its own logic (OUTLINE §8)
+- [ ] Loge's own statuses, for results and relations no SZS value states (a data graph conforming to SHACL shapes, for one): badges as today, or a status type of Loge's that includes the ontology's values. `Loge.Outcome.szs` and the `preserves` of a task are `Tptp.Szs.Ontology.t()` today. Needed before `loge_rdf`
+- [ ] Rules for carrying a verdict back along a translation: not written, not scheduled
+- [ ] Equality in `Ground` and `Dimacs`: reject it, or add the ground instances of the equality axioms
+- [ ] Description logics: concrete syntax (OWL functional syntax, Manchester syntax, a TPTP encoding) and reasoner
+- [ ] ShEx shape map: a role with a language of its own, or part of the schema source

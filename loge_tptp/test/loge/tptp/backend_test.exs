@@ -5,6 +5,8 @@ defmodule Loge.Tptp.BackendTest do
   alias Loge.Outcome
   alias Loge.Tptp.Backend
 
+  doctest Backend
+
   @result %Result{status: :theorem, evidence: :szs, output: "out", backend: AtpClient.LocalExec}
 
   test "an AtpClient result becomes an outcome keeping the result" do
@@ -69,5 +71,9 @@ defmodule Loge.Tptp.BackendTest do
     for field <- Backend.config_schema(AtpClient.StarExec) do
       assert %Loge.Config.Field{} = field
     end
+  end
+
+  test "time_limit/2 leaves options without a time limit as they are" do
+    assert Backend.time_limit([system: "E"], :time_limit_sec) == [system: "E"]
   end
 end

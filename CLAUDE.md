@@ -1,8 +1,14 @@
 # CLAUDE.md
 
-Loge: Livebook smart cells and Elixir libraries for logic languages. Read `OUTLINE.md`
-(design, contracts, verified backend facts) and `PLAN.md` (phases, checklists) before
-changing anything. They are the source of truth; update them when a decision changes.
+Loge: Elixir libraries that give logic engines one interface (sources in, an outcome out;
+an engine solves, checks or translates), and the Livebook smart cells that use it. Read
+`OUTLINE.md` (scope, design, contracts, verified backend facts) and `PLAN.md` (phases,
+checklists) before changing anything. They are the source of truth; update them when a
+decision changes.
+
+Scope and non-goals are OUTLINE §0. Do not add what it excludes: algorithm
+visualisations, a Datalog language, format converters, interactive provers. `loge_mcp` is
+not being built; OUTLINE §10 lists what the libraries must keep true for it.
 
 ## Objective
 
@@ -13,14 +19,28 @@ contract or an upstream library, say so instead of routing around it.
 ## Repository rules
 
 - Monorepo, one mix project per directory, no umbrella. Language packages depend only on
-  `loge`; consumers (`kino_loge`, `loge_mcp`) depend only on `loge`. Never cross-link
-  language packages.
+  `loge`; consumers (`kino_loge`, later `loge_mcp`) depend only on `loge`. Never cross-link
+  language packages. Nothing in `loge` or a language package depends on Kino or on a
+  transport.
 - `kino_loge` contains no language-specific Elixir: `rg -i tptp kino_loge/lib -g '*.ex'` must stay
   empty. The grammar table in `kino_loge/assets/editor.js` is the one place that names languages;
   after changing it run `npm run build` there (Node is in `.devcontainer`) and keep the built
   `lib/assets/editor.js`.
 - Generated cell source (`Loge.Engine.to_source/4`) must run without `kino_loge` installed: one
-  `Loge.run!/3` call with named options, no helper modules.
+  `Loge.run!/3` call with named options, bound to a variable when the cell names its
+  result, no helper modules. Cells are linked by variable names only.
+- An engine module performs one task: `:solve`, `:check` or `{:translate, to, preserves}`.
+  There is no cell and no behaviour per task.
+- No control carries part of a problem. A question the language has syntax for is part of
+  the source; a reference the language can express is an include; a source the language
+  cannot name is a role (OUTLINE §3).
+- A translation is written in Elixir, lives in the package of its source language, emits
+  the target's text itself and declares the SZS relation it preserves. It calls no
+  external tool and no remote service at run time. Input outside its fragment is an
+  outcome with `:inappropriate`, never a best effort (OUTLINE §8).
+- A consumer makes no atom from external input: ids through `Loge.Registry.language/1`
+  and `engine/1`, control values through `Loge.Control.cast/2`, names through
+  `Loge.Variable.parse/1`.
 - Package name = module namespace (`loge_tptp` → `Loge.Tptp`).
 - Minimum Elixir 1.20.
 
@@ -31,6 +51,14 @@ contract or an upstream library, say so instead of routing around it.
   implementation in `test/support`.
 - Before finishing a task run, from the package directory: `mix format`,
   `mix compile --warnings-as-errors`, `mix test`. Run `mix dialyzer` when touching typespecs.
+- Translations: property tests (StreamData) run in `mix test`. Tests tagged
+  `:verification` call remote TPTP tools and read the TPTP library; they are excluded by
+  default and from CI. Run them with `mix test --only verification` before a release and
+  record the figures in the package's `VERIFICATION.md` (OUTLINE §9). Never weaken, skip
+  or delete a failing verification; report the disagreement.
+- From phase 5 on, follow PLAN's phase order; a phase is done when its gate passes. Tick
+  a checkbox only for what was run, and write "to be checked in Livebook" where it was
+  not.
 - Never commit or push. When a change is complete, suggest a commit message and stop.
 - Report what changed, not full file contents.
 - Flag ambiguities instead of resolving them silently. Verify claims about libraries

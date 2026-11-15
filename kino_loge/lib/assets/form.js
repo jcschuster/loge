@@ -29,14 +29,21 @@ export function field(label, ...children) {
 }
 
 export function select(options, push) {
-  const el = element(
-    "select",
-    { className: "input" },
-    ...options.map(({ id, label }) => new Option(label, id))
-  );
+  const el = element("select", { className: "input" }, ...choices(options));
   el.addEventListener("change", () => push(el.value));
   return el;
 }
+
+// Options that name a group are gathered under it, in the order they come.
+const choices = (options) =>
+  options.reduce((children, { id, label, group }) => {
+    const option = new Option(label, id);
+    if (group === undefined) return [...children, option];
+    const last = children.at(-1);
+    if (last instanceof HTMLOptGroupElement && last.label === group) last.append(option);
+    else children.push(element("optgroup", { label: group }, option));
+    return children;
+  }, []);
 
 export function input(type, push) {
   if (type === "boolean") {

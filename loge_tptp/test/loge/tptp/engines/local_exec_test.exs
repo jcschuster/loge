@@ -8,7 +8,7 @@ defmodule Loge.Tptp.Engines.LocalExecTest do
 
   test "runs the prover binary" do
     assert {:ok, %Outcome{szs: :theorem, engine: :local_exec, raw: raw}} =
-             LocalExec.run("fof(a, conjecture, $true).", binary: @prover, cpu_timeout_s: 1)
+             LocalExec.run("fof(a, conjecture, $true).", binary: @prover, time_limit: 1)
 
     assert raw =~ "SZS status Theorem"
   end

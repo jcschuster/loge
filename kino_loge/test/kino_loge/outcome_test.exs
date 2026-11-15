@@ -85,6 +85,36 @@ defmodule KinoLoge.OutcomeTest do
     assert diagnostics =~ "careful"
   end
 
+  test "the output follows the views, in its language" do
+    outcome = %{@outcome | views: [{:badge, "done", :neutral}], output: Loge.source(:fake, "p.")}
+
+    %Kino.Layout{items: [%Kino.Layout{items: [_verdict, _badge, output]}, _raw]} =
+      KinoLoge.Outcome.kino(outcome)
+
+    assert %Kino.Layout{items: [%Kino.Text{text: "Fake"}, %Kino.JS{module: KinoLoge.Code}]} =
+             output
+  end
+
+  test "an output without a grammar, or in a language not installed, is plain text" do
+    for {language, title} <- [other: "Other", nope: "nope"] do
+      outcome = %{@outcome | output: Loge.source(language, "p.")}
+
+      %Kino.Layout{items: [%Kino.Layout{items: [_verdict, output]}, _raw]} =
+        KinoLoge.Outcome.kino(outcome)
+
+      assert %Kino.Layout{items: [%Kino.Text{text: ^title}, %Kino.Text{terminal: true}]} = output
+    end
+  end
+
+  test "a translation's verdict says what Ax and C stand for" do
+    outcome = %Outcome{szs: :equi_satisfiable, problem: :translation, raw: "", engine: :e}
+
+    %Kino.Layout{items: [%Kino.Layout{items: [verdict]}, _raw]} = KinoLoge.Outcome.kino(outcome)
+
+    assert %Kino.Layout{items: [_name, _description, %Kino.Text{text: legend}, _link]} = verdict
+    assert legend == "Ax: the input, C: the output"
+  end
+
   test "an outcome renders in Livebook" do
     assert %{type: :tabs, labels: ["Result", "Output"]} = Kino.Render.to_livebook(@outcome)
   end

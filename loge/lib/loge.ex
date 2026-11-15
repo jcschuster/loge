@@ -1,10 +1,12 @@
 defmodule Loge do
   @moduledoc """
-  Contracts for editing, linting and solving problems in logic languages.
+  One interface to logic engines: sources in, an outcome out. An engine solves a
+  source, checks one, or translates it into another language under a stated semantic
+  relation (`Loge.Engine`); a run's outcome can be the input of the next.
 
   A language package implements `Loge.Language`, `Loge.Analyzer` and `Loge.Engine`
-  and registers its modules; a consumer such as a smart cell discovers them through
-  `Loge.Registry` and runs them under `Loge.Run`.
+  and registers its modules; a consumer such as a smart cell or an agent discovers
+  them through `Loge.Registry` and runs them under `Loge.Run`.
 
   A package registers its modules when it starts:
 
@@ -20,14 +22,19 @@ defmodule Loge do
   """
 
   @doc """
-  Source text in a language, for another cell to include. See `Loge.Source`.
+  Source text in a language, for another cell to include or run. See `Loge.Source`.
+
+  The `:includes` option holds the sources the text includes, by the names it uses
+  (`t:Loge.Language.includes/0`).
 
       iex> Loge.source(:tptp, "fof(a, axiom, p).")
       %Loge.Source{language: :tptp, text: "fof(a, axiom, p)."}
   """
-  @spec source(atom(), binary()) :: Loge.Source.t()
-  def source(language, text) when is_atom(language) and is_binary(text),
-    do: %Loge.Source{language: language, text: text}
+  @spec source(atom(), binary(), includes: Loge.Language.includes()) :: Loge.Source.t()
+  def source(language, text, options \\ []) when is_atom(language) and is_binary(text) do
+    [includes: includes] = Keyword.validate!(options, includes: %{})
+    %Loge.Source{language: language, text: text, includes: includes}
+  end
 
   @doc """
   Every diagnostic about `source`: those of `c:Loge.Language.analyze/2`, then those
@@ -54,13 +61,44 @@ defmodule Loge do
   @doc """
   Runs `engine` on `input` and returns the outcome, raising `Loge.Error` with the
   engine's description of the failure otherwise. This is the call
-  `Loge.Engine.to_source/3` generates.
+  `Loge.Engine.to_source/4` generates.
+
+  The options are the engine's controls (`c:Loge.Engine.controls/0`), its settings
+  (`c:Loge.Engine.config_schema/0`) and `:includes`. Raises `ArgumentError` for any
+  other key, and for an input in a language the engine does not read.
   """
   @spec run!(module(), Loge.Input.t(), keyword()) :: Loge.Outcome.t()
-  def run!(engine, input, options) do
+  def run!(engine, input, options) when is_list(options) do
+    check_language!(engine, Loge.Input.language(input))
+    check_options!(engine, Keyword.keys(options))
+
     case engine.run(input, options) do
       {:ok, %Loge.Outcome{} = outcome} -> outcome
       {:error, reason} -> raise Loge.Error, engine: engine, reason: reason
+    end
+  end
+
+  defp check_language!(_engine, nil), do: :ok
+
+  defp check_language!(engine, language) do
+    unless language in engine.languages() do
+      raise ArgumentError,
+            "#{inspect(engine)} reads #{inspect(engine.languages())}, not #{inspect(language)}"
+    end
+  end
+
+  defp check_options!(engine, keys) do
+    known =
+      Enum.map(engine.controls(), & &1.key) ++
+        Enum.map(engine.config_schema(), & &1.key) ++ [:includes]
+
+    case Enum.uniq(keys) -- known do
+      [] ->
+        :ok
+
+      unknown ->
+        raise ArgumentError,
+              "#{inspect(engine)} has no options #{inspect(unknown)}; it takes #{inspect(known)}"
     end
   end
 

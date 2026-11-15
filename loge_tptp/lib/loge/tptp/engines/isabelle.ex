@@ -53,6 +53,9 @@ defmodule Loge.Tptp.Engines.Isabelle do
   def languages, do: [:tptp]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema do
     for field <- Backend.config_schema(Isabelle), do: %{field | required?: false}
   end

@@ -5,7 +5,7 @@ defmodule Loge.Tptp.Engines.SystemOnTptpTest do
   alias Loge.Tptp.{Engines.SystemOnTptp, HttpStub}
 
   test "offers the provers SystemOnTPTP lists" do
-    [%Control{key: :system, choices: {:dynamic, provers}}, %Control{key: :time_limit_sec}] =
+    [%Control{key: :system, choices: {:dynamic, provers}}, %Control{key: :time_limit}] =
       SystemOnTptp.controls()
 
     assert "E" in provers.()
@@ -17,7 +17,7 @@ defmodule Loge.Tptp.Engines.SystemOnTptpTest do
     assert {:ok, %Outcome{szs: :theorem, engine: :system_on_tptp, details: %{result: result}}} =
              SystemOnTptp.run("fof(a, conjecture, $true).",
                system: "E",
-               time_limit_sec: 1,
+               time_limit: 1,
                url: url,
                x2tptp: false
              )

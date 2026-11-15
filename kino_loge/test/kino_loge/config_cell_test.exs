@@ -15,7 +15,8 @@ defmodule KinoLoge.ConfigCellTest do
 
     assert [
              %{id: "fake_engine", label: "Fake engine", fields: fields},
-             %{id: "second_engine", fields: []}
+             %{id: "second_engine", fields: []},
+             %{id: "translator", fields: []}
            ] = data.engines
 
     assert %{

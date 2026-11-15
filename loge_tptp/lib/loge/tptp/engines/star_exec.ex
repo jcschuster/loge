@@ -2,8 +2,8 @@ defmodule Loge.Tptp.Engines.StarExec do
   @moduledoc """
   A prover on a StarExec cluster, over `AtpClient.StarExec`.
 
-  Options are those `AtpClient.StarExec` documents for a query. A cancelled run deletes its
-  remote job.
+  `:time_limit` is the CPU limit in seconds. Other options are those `AtpClient.StarExec`
+  documents for a query. A cancelled run deletes its remote job.
   """
 
   @behaviour Loge.Engine
@@ -22,6 +22,9 @@ defmodule Loge.Tptp.Engines.StarExec do
   def languages, do: [:tptp]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: Backend.config_schema(StarExec)
 
   @impl true
@@ -32,13 +35,15 @@ defmodule Loge.Tptp.Engines.StarExec do
 
   @impl true
   def controls do
-    [%Control{key: :cpu_timeout_s, type: :integer, label: "Time limit (s)", default: 5}]
+    [%Control{key: :time_limit, type: :integer, label: "Time limit (CPU s)", default: 5}]
   end
 
   @impl true
   def run(input, options) do
     with {:ok, input, options} <- Backend.prepare(input, options) do
-      input |> StarExec.query(options) |> Backend.outcome(id())
+      input
+      |> StarExec.query(Backend.time_limit(options, :cpu_timeout_s))
+      |> Backend.outcome(id())
     end
   end
 

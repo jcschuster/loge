@@ -5,10 +5,29 @@ defmodule LogeTest do
 
   describe "run!/3" do
     test "returns the outcome" do
-      send(self(), :finish)
+      assert %Loge.Outcome{szs: :satisfiable, raw: "p."} = Loge.run!(Fake.Solver, "p.", limit: 1)
+    end
 
-      assert %Loge.Outcome{szs: :theorem, raw: "p."} =
-               Loge.run!(Fake.Engine, "p.", notify: self())
+    test "takes the engine's controls, its settings and includes" do
+      options = [limit: 1, path: "/bin/x", includes: %{}]
+
+      assert %Loge.Outcome{details: %{options: ^options}} = Loge.run!(Fake.Solver, "p.", options)
+    end
+
+    test "rejects an option the engine does not take" do
+      assert_raise ArgumentError, ~r/:limt/, fn -> Loge.run!(Fake.Solver, "p.", limt: 1) end
+    end
+
+    test "rejects an input in a language the engine does not read" do
+      assert_raise ArgumentError, ~r/:fake/, fn ->
+        Loge.run!(Fake.Solver, Loge.source(:fake, "p."), [])
+      end
+    end
+
+    test "takes an outcome as the input of the next run" do
+      cnf = Loge.run!(Fake.Translator, "p.", [])
+
+      assert %Loge.Outcome{raw: "P."} = Loge.run!(Fake.Solver, cnf, [])
     end
 
     test "raises with the engine's message" do

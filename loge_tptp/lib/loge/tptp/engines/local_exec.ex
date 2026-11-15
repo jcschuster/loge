@@ -2,8 +2,9 @@ defmodule Loge.Tptp.Engines.LocalExec do
   @moduledoc """
   A prover binary on this machine, over `AtpClient.LocalExec`.
 
-  Options are those of `AtpClient.LocalExec.query/2`; `:binary` names the prover.
-  A cancelled run kills the prover process.
+  `:time_limit` is the CPU limit in seconds. Other options are those of
+  `AtpClient.LocalExec.query/2`; `:binary` names the prover. A cancelled run kills the
+  prover process.
   """
 
   @behaviour Loge.Engine
@@ -22,6 +23,9 @@ defmodule Loge.Tptp.Engines.LocalExec do
   def languages, do: [:tptp]
 
   @impl true
+  def task, do: :solve
+
+  @impl true
   def config_schema, do: Backend.config_schema(LocalExec)
 
   @impl true
@@ -32,13 +36,15 @@ defmodule Loge.Tptp.Engines.LocalExec do
 
   @impl true
   def controls do
-    [%Control{key: :cpu_timeout_s, type: :integer, label: "Time limit (s)", default: 5}]
+    [%Control{key: :time_limit, type: :integer, label: "Time limit (CPU s)", default: 5}]
   end
 
   @impl true
   def run(input, options) do
     with {:ok, input, options} <- Backend.prepare(input, options) do
-      input |> LocalExec.query(options) |> Backend.outcome(id())
+      input
+      |> LocalExec.query(Backend.time_limit(options, :cpu_timeout_s))
+      |> Backend.outcome(id())
     end
   end
 
