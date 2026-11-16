@@ -27,7 +27,7 @@ defmodule Loge.Smtlib.EnginesTest do
   end
 
   test "configure sets the executable for later runs" do
-    on_exit(fn -> Application.delete_env(:loge_smtlib, Cvc5) end)
+    on_exit(fn -> Loge.configure!(Cvc5, executable: "cvc5") end)
     assert Loge.configure!(Cvc5, executable: "loge-configured-cvc5") == :ok
 
     assert Cvc5.run("(check-sat)", []) ==
@@ -38,22 +38,20 @@ defmodule Loge.Smtlib.EnginesTest do
   test "z3 solves a script and gives its model" do
     assert Z3.verify([]) == :ok
 
-    assert {:ok,
-            %Outcome{status: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
+    assert {:ok, %Outcome{status: :satisfiable, views: [{:text, model, "smtlib"}]}} =
              Z3.run(@script, [])
 
-    assert Enum.map(rows, &Enum.take(&1, 2)) |> Enum.sort() == [["x", "Int"], ["y", "Int"]]
+    assert model =~ "(define-fun x () Int" and model =~ "(define-fun y () Int"
   end
 
   @tag :cvc5
   test "cvc5 solves a script and gives its model" do
     assert Cvc5.verify([]) == :ok
 
-    assert {:ok,
-            %Outcome{status: :satisfiable, views: [{:table, ["Name", "Sort", "Value"], rows}]}} =
+    assert {:ok, %Outcome{status: :satisfiable, views: [{:text, model, "smtlib"}]}} =
              Cvc5.run(@script, [])
 
-    assert length(rows) == 2
+    assert model =~ "(define-fun x () Int" and model =~ "(define-fun y () Int"
 
     assert {:ok, %Outcome{status: :unsatisfiable}} =
              Cvc5.run("(assert false)\n(check-sat)\n(push 1)\n(pop 1)", [])

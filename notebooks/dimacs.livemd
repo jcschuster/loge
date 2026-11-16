@@ -14,28 +14,95 @@ Mix.install([
 
 Expected: **Satisfiable**, one model, `1 -2 3`.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJjIHgxLCBub3QgeDIsIHgyIG9yIHgzXG5wIGNuZiAzIDNcbjEgMFxuLTIgMFxuMiAzIDBcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiYyB4MSwgbm90IHgyLCB4MiBvciB4M1xucCBjbmYgMyAzXG4xIDBcbi0yIDBcbjIgMyAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
 Loge.run!(Loge.Dimacs.Engines.Clasp, "c x1, not x2, x2 or x3\np cnf 3 3\n1 0\n-2 0\n2 3 0\n",
-  models: 1
+  models: 1,
+  time_limit: 10
 )
 ```
 
 Models `0` enumerates all of them. Expected: **Satisfiable**, three models.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjB9LCJzb3VyY2UiOiJwIGNuZiAyIDFcbjEgMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjowLCJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoicCBjbmYgMiAxXG4xIDIgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 1\n1 2 0\n", models: 0)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 1\n1 2 0\n", models: 0, time_limit: 10)
 ```
 
 Expected: **Unsatisfiable**, no models.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJwIGNuZiAxIDJcbjEgMFxuLTEgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoicCBjbmYgMSAyXG4xIDBcbi0xIDBcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 1 2\n1 0\n-1 0\n", models: 1)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 1 2\n1 0\n-1 0\n", models: 1, time_limit: 10)
+```
+
+## Other SAT solvers
+
+CaDiCaL and Kissat run as executables found on `PATH` (nixpkgs: `cadical`, `kissat`), or
+named in the Logic Engine Settings cell. Expected: **Satisfiable**, one model, `1 -2 3`;
+without the executable, an error naming it.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjYWRpY2FsIiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiYyB4MSwgbm90IHgyLCB4MiBvciB4M1xucCBjbmYgMyAzXG4xIDBcbi0yIDBcbjIgMyAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Cadical, "c x1, not x2, x2 or x3\np cnf 3 3\n1 0\n-2 0\n2 3 0\n",
+  time_limit: 10
+)
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJraXNzYXQiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjEwfSwicm9sZXMiOnt9LCJzb3VyY2UiOiJjIHgxLCBub3QgeDIsIHgyIG9yIHgzXG5wIGNuZiAzIDNcbjEgMFxuLTIgMFxuMiAzIDBcbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Kissat, "c x1, not x2, x2 or x3\np cnf 3 3\n1 0\n-2 0\n2 3 0\n",
+  time_limit: 10
+)
+```
+
+## MaxSAT
+
+A WCNF source, here in the format without a problem line, and clasp, which searches
+until the model is optimal. Expected: **Satisfiable**, `optimum found`, `cost 2`, the
+last model `1 -2`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcF9tYXhzYXQiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJ3Y25mIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiYyBleGFjdGx5IG9uZSBvZiB4MSBhbmQgeDI7IHgxIGlzIHdvcnRoIDMsIHgyIGlzIHdvcnRoIDJcbmggMSAyIDBcbmggLTEgLTIgMFxuMyAxIDBcbjIgMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Dimacs.Engines.ClaspMaxsat,
+  "c exactly one of x1 and x2; x1 is worth 3, x2 is worth 2\nh 1 2 0\nh -1 -2 0\n3 1 0\n2 2 0\n",
+  time_limit: 10
+)
+```
+
+## QBF
+
+A QDIMACS source and DepQBF, found on `PATH` or named in the settings (not in nixpkgs).
+Expected: **Satisfiable** (the formula is true), the partial certificate `1`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkZXBxYmYiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJxZGltYWNzIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiYyBleGlzdHMgeDEsIGZvciBhbGwgeDIsIGV4aXN0cyB4MzogeDEsIHgyIG9yIHgzLCBub3QgYm90aCB4MiBhbmQgeDNcbnAgY25mIDMgM1xuZSAxIDBcbmEgMiAwXG5lIDMgMFxuMSAwXG4yIDMgMFxuLTIgLTMgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Dimacs.Engines.Depqbf,
+  "c exists x1, for all x2, exists x3: x1, x2 or x3, not both x2 and x3\np cnf 3 3\ne 1 0\na 2 0\ne 3 0\n1 0\n2 3 0\n-2 -3 0\n",
+  time_limit: 10
+)
+```
+
+Expected: **Unsatisfiable** (false), the partial certificate `-1`: the value of the
+universal x1 for which no x2 works.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkZXBxYmYiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJxZGltYWNzIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiYyBmb3IgYWxsIHgxLCBleGlzdHMgeDI6IHgyIDwtPiB4MSwgYW5kIHgxIG9yIHgyXG5wIGNuZiAyIDNcbmEgMSAwXG5lIDIgMFxuLTEgMiAwXG4xIC0yIDBcbjEgMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Dimacs.Engines.Depqbf,
+  "c for all x1, exists x2: x2 <-> x1, and x1 or x2\np cnf 2 3\na 1 0\ne 2 0\n-1 2 0\n1 -2 0\n1 2 0\n",
+  time_limit: 10
+)
 ```
 
 ## Linting
@@ -43,8 +110,17 @@ Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 1 2\n1 0\n-1 0\n", models: 1)
 Expected: under the editor, variable 4 exceeds the header and the clause count
 differs from it; evaluating raises `Loge.Error` with both findings.
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJwIGNuZiAzIDNcbjEgLTQgMFxuMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoicCBjbmYgMyAzXG4xIC00IDBcbjIgMFxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 3 3\n1 -4 0\n2 0\n", models: 1)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 3 3\n1 -4 0\n2 0\n", models: 1, time_limit: 10)
+```
+
+Expected: under the editor, the innermost quantifier set is universal, which QDIMACS
+does not allow.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkZXBxYmYiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJxZGltYWNzIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoicCBjbmYgMiAxXG5lIDEgMFxuYSAyIDBcbjEgMiAwXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Depqbf, "p cnf 2 1\ne 1 0\na 2 0\n1 2 0\n", time_limit: 10)
 ```

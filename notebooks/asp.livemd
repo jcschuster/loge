@@ -12,8 +12,8 @@ Mix.install([
 
 ## Solving
 
-Expected: **Satisfiable**, one model, `colour(1,red) colour(2,green) colour(3,blue)` or another
-proper colouring.
+Expected: **Satisfiable**, one model, `colour(1,red). colour(2,green). colour(3,blue).` or another
+proper colouring, as ASP facts.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImFzcCIsIm9wdGlvbnMiOnsibW9kZWxzIjpudWxsLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6Im5vZGUoMS4uMykuIGVkZ2UoMSwyKS4gZWRnZSgyLDMpLiBlZGdlKDEsMykuXG5jb2wocmVkOyBncmVlbjsgYmx1ZSkuXG4xIHsgY29sb3VyKE4sIEMpIDogY29sKEMpIH0gMSA6LSBub2RlKE4pLlxuOi0gZWRnZShYLCBZKSwgY29sb3VyKFgsIEMpLCBjb2xvdXIoWSwgQykuXG4jc2hvdyBjb2xvdXIvMi5cbiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
@@ -39,7 +39,7 @@ Loge.run!(
 ```
 
 An optimisation runs to its optimum when no model count is set. Expected: **Satisfiable**,
-the last model `in(b)` and the raw output's result `OPTIMUM FOUND`.
+the last model `in(b).` and the raw output's result `OPTIMUM FOUND`.
 
 <!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJsYW5ndWFnZSI6ImFzcCIsIm9wdGlvbnMiOnsibW9kZWxzIjpudWxsLCJ0aW1lX2xpbWl0IjoxMH0sInNvdXJjZSI6Iml0ZW0oYSwgMykuIGl0ZW0oYiwgMSkuIGl0ZW0oYywgMikuXG57IGluKEkpIDogaXRlbShJLCBfKSB9LlxuOi0gbm90IGluKF8pLlxuI21pbmltaXplIHsgVywgSSA6IGluKEkpLCBpdGVtKEksIFcpIH0uXG4jc2hvdyBpbi8xLlxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 

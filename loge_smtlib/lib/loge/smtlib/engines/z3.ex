@@ -10,7 +10,7 @@ defmodule Loge.Smtlib.Engines.Z3 do
 
   @behaviour Loge.Engine
 
-  alias Loge.{Config.Field, Control}
+  alias Loge.Control
   alias Loge.Smtlib.Solver
 
   @default "z3"
@@ -28,25 +28,14 @@ defmodule Loge.Smtlib.Engines.Z3 do
   def task, do: :solve
 
   @impl true
-  def config_schema do
-    [
-      %Field{
-        key: :executable,
-        type: :string,
-        required?: false,
-        group: :connection,
-        default: @default,
-        label: "Executable",
-        doc: "A path, or a name looked up on PATH."
-      }
-    ]
-  end
+  def config_schema, do: [Loge.Executable.setting(@default)]
 
   @impl true
-  def configure(settings), do: Solver.configure(__MODULE__, settings)
+  def configure(settings), do: Loge.Executable.configure(__MODULE__, settings)
 
   @impl true
-  def verify(options), do: Solver.verify(Solver.executable(__MODULE__, @default, options))
+  def verify(options),
+    do: Loge.Executable.verify(Loge.Executable.configured(__MODULE__, @default, options))
 
   @impl true
   def roles, do: []
@@ -58,7 +47,7 @@ defmodule Loge.Smtlib.Engines.Z3 do
 
   @impl true
   def run(input, options) do
-    executable = Solver.executable(__MODULE__, @default, options)
+    executable = Loge.Executable.configured(__MODULE__, @default, options)
     Solver.run(id(), executable, ["-smt2"], input, options)
   end
 

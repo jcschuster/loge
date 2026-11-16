@@ -1,19 +1,25 @@
 defmodule Loge.Dimacs.Engines.Clasp do
   @moduledoc """
-  The clasp solver bundled with `clingo_elixir`, over `Clingo.Dimacs.solve!/2`.
+  clasp, the solver in the `clingo` executable bundled with `clingo_elixir`, run as an
+  OS process (`clingo --mode=clasp`, `Loge.Executable`) on DIMACS CNF.
 
-  The formula is checked by `Loge.Dimacs.Cnf` first and sent as rendered there. The
-  `:models` option is the number of models to find, `0` for all, as clasp's `-n`.
-  The outcome's raw output is in the SAT competition format, one `v` line per model,
-  and its `{:models, models}` view lists each model as a literal for every variable.
-  A cancelled run aborts the search; grounding the translated formula, which is linear
-  in its size, runs to its end first.
+  The formula is checked by `Loge.Dimacs.Cnf` first and sent as it renders there.
+
+  Options:
+
+    * `:models` - the number of models to find, `0` for all, as clasp's `--models`.
+      Defaults to `1`.
+    * `:time_limit` - seconds of search, as clasp's `--time-limit`. Defaults to `10`;
+      reaching it without a model is `:timeout`.
+
+  `Loge.Dimacs.Solver` describes the outcome; clasp prints a literal per variable in
+  each model. A cancelled run kills clasp.
   """
 
   @behaviour Loge.Engine
 
-  alias Loge.{Control, Outcome}
-  alias Loge.Dimacs.Cnf
+  alias Loge.Control
+  alias Loge.Dimacs.{Cnf, Solver}
 
   @impl true
   def id, do: :clasp
@@ -41,64 +47,21 @@ defmodule Loge.Dimacs.Engines.Clasp do
 
   @impl true
   def controls do
-    [%Control{key: :models, type: :integer, label: "Models (0 for all)", default: 1}]
+    [
+      %Control{key: :models, type: :integer, label: "Models (0 for all)", default: 1},
+      %Control{key: :time_limit, type: :integer, label: "Time limit (s)", default: 10}
+    ]
   end
 
   @impl true
   def run(input, options) do
-    with {:ok, cnf} <- Cnf.from_input(input) do
-      result =
-        cnf
-        |> Loge.Input.to_iodata()
-        |> IO.iodata_to_binary()
-        |> Clingo.Dimacs.solve!(models: model_limit(options), symbols: true)
+    models = Keyword.get(options, :models, 1)
 
-      {:ok, outcome(result, cnf.variables)}
-    end
+    with {:ok, cnf} <- Cnf.from_input(input),
+         {:ok, output, ended} <- Solver.clasp(cnf, ["--models=#{models}"], options),
+         do: {:ok, Solver.satisfiability(id(), output, ended)}
   end
 
   @impl true
-  def format_error({:invalid_cnf, diagnostics}) do
-    "Invalid DIMACS CNF:" <>
-      Enum.map_join(diagnostics, &"\nline #{&1.range.line}: #{&1.message}")
-  end
-
-  def format_error(reason), do: inspect(reason, pretty: true, width: 80)
-
-  defp model_limit(options) do
-    case Keyword.get(options, :models, 1) do
-      0 -> :all
-      models -> models
-    end
-  end
-
-  defp outcome(%Clingo.Result{status: status, models: models} = result, variables) do
-    models = Enum.map(models, &literals(&1, variables))
-
-    %Outcome{
-      status: status,
-      problem: :satisfiability,
-      raw:
-        IO.iodata_to_binary(["s ", status_line(status), ?\n | Enum.map(models, &value_line/1)]),
-      engine: id(),
-      views: if(models == [], do: [], else: [{:models, models}]),
-      details: %{result: result}
-    }
-  end
-
-  defp literals(%Clingo.Model{symbols: symbols}, variables) do
-    true_variables =
-      MapSet.new(symbols, fn %Clingo.Symbol{name: "v", arguments: [%Clingo.Symbol{value: n}]} ->
-        n
-      end)
-
-    for variable <- 1..variables//1,
-        do: if(variable in true_variables, do: variable, else: -variable)
-  end
-
-  defp status_line(:satisfiable), do: "SATISFIABLE"
-  defp status_line(:unsatisfiable), do: "UNSATISFIABLE"
-  defp status_line(:unknown), do: "UNKNOWN"
-
-  defp value_line(literals), do: ["v ", Enum.map(literals, &[Integer.to_string(&1), ?\s]), "0\n"]
+  def format_error(reason), do: Solver.format_error(reason)
 end

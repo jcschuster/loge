@@ -79,6 +79,12 @@ defmodule Loge.Dimacs.CnfTest do
              [{"DIMACS007", Range.new(3, column: 1, end_line: 4, end_column: 3)}]
   end
 
+  test "a quantifier set, which belongs to QDIMACS" do
+    assert codes("p cnf 1 1\ne 1 0\n1 0") == [
+             {"DIMACS008", Range.new(2, column: 1, end_line: 2, end_column: 2)}
+           ]
+  end
+
   test "reports every finding in source order" do
     assert "p cnf 1 3\nq 2 0\np cnf 1 1\n1" |> codes() |> Enum.map(&elem(&1, 0)) ==
              ["DIMACS006", "DIMACS004", "DIMACS005", "DIMACS003", "DIMACS007"]

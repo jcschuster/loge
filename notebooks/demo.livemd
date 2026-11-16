@@ -24,17 +24,17 @@ Loge ("logic engines") lets a notebook write problems in several logic languages
 hand them to provers and solvers. Each language is its own package; this notebook
 installs all of them:
 
-| Package       | Language               | Engines                                          |
-| ------------- | ---------------------- | ------------------------------------------------ |
-| `loge_tptp`   | TPTP                   | SystemOnTPTP, StarExec, a local prover, Isabelle |
-| `loge_dimacs` | DIMACS CNF             | clasp                                            |
-| `loge_asp`    | Answer Set Programming | clingo                                           |
-| `loge_prolog` | Prolog                 | SWI-Prolog                                       |
-| `loge_egglog` | egglog                 | egglog                                           |
-| `loge_smtlib` | SMT-LIB 2.6            | z3, cvc5                                         |
-| `loge_turtle` | RDF in Turtle          | SHACL                                            |
-| `loge_sparql` | SPARQL                 | queries on a graph or an endpoint                |
-| `loge_shex`   | ShExC and shape maps   | ShEx                                             |
+| Package       | Language                  | Engines                                          |
+| ------------- | ------------------------- | ------------------------------------------------ |
+| `loge_tptp`   | TPTP                      | SystemOnTPTP, StarExec, a local prover, Isabelle |
+| `loge_dimacs` | DIMACS CNF, WCNF, QDIMACS | clasp, CaDiCaL, Kissat, DepQBF                   |
+| `loge_asp`    | Answer Set Programming    | clingo                                           |
+| `loge_prolog` | Prolog                    | SWI-Prolog                                       |
+| `loge_egglog` | egglog                    | egglog                                           |
+| `loge_smtlib` | SMT-LIB 2.6               | z3, cvc5                                         |
+| `loge_turtle` | RDF in Turtle             | SHACL                                            |
+| `loge_sparql` | SPARQL                    | queries on a graph or an endpoint                |
+| `loge_shex`   | ShExC and shape maps      | ShEx                                             |
 
 Every problem below sits in a **Logic Engine** smart cell (`+ Smart` → *Logic Engine*).
 From top to bottom, a cell has:
@@ -171,7 +171,7 @@ Loge.run!(
 ```
 
 In **SMT-LIB**, each region is an integer from 1 to 3, and neighbours are `distinct`.
-z3 answers `sat` and the model table gives each region's number. Expected:
+z3 answers `sat` and the model, in SMT-LIB, gives each region's number. Expected:
 **Satisfiable**. This cell needs `z3` on `PATH` or set in the Settings cell; choose
 *cvc5* in the engine select to use cvc5 instead.
 
@@ -259,10 +259,13 @@ Loge.run!(
 )
 ```
 
-<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjF9LCJzb3VyY2UiOiJwIGNuZiAyIDVcbjEgMiAwXG4yIC0yIDBcbi0xIDEgMFxuMSAwXG4yIDAiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnsibW9kZWxzIjoxLCJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoicCBjbmYgMiA1XG4xIDIgMFxuMiAtMiAwXG4tMSAxIDBcbjEgMFxuMiAwIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
 
 ```elixir
-Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 5\n1 2 0\n2 -2 0\n-1 1 0\n1 0\n2 0", models: 1)
+Loge.run!(Loge.Dimacs.Engines.Clasp, "p cnf 2 5\n1 2 0\n2 -2 0\n-1 1 0\n1 0\n2 0",
+  models: 1,
+  time_limit: 10
+)
 ```
 
 ## The semantic web: Turtle, SPARQL, SHACL

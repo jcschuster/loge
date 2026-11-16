@@ -18,13 +18,15 @@ import { tags as t } from "@lezer/highlight";
 import { asp } from "codemirror-lang-asp";
 import { dimacs } from "codemirror-lang-dimacs";
 import { egglog } from "codemirror-lang-egglog";
+import { shapemap } from "codemirror-lang-shapemap";
+import { shex } from "codemirror-lang-shex";
 import { smtlib } from "codemirror-lang-smtlib";
 import { sparql } from "codemirror-lang-sparql";
 import { prolog } from "codemirror-lang-swipl";
 import { tptp } from "codemirror-lang-tptp";
 import { turtle } from "codemirror-lang-turtle";
 
-const languages = { asp, dimacs, egglog, prolog, smtlib, sparql, tptp, turtle };
+const languages = { asp, dimacs, egglog, prolog, shapemap, shex, smtlib, sparql, tptp, turtle };
 
 // https://github.com/livebook-dev/livebook/blob/main/assets/js/hooks/cell_editor/live_editor/codemirror/theme.js
 const colors = {
@@ -108,7 +110,7 @@ const highlighting = HighlightStyle.define([
   { tag: [t.number, t.bool, t.atom, t.escape, t.standard(t.variableName)], color: colors.blue },
   { tag: t.function(t.variableName), color: colors.blue },
   { tag: t.string, color: colors.green },
-  { tag: t.special(t.string), color: colors.yellow },
+  { tag: [t.special(t.string), t.className], color: colors.yellow },
   { tag: t.variableName, color: colors.text },
   { tag: [t.special(t.variableName), t.labelName, t.propertyName], color: colors.lightRed },
   { tag: [t.typeName, t.namespace], color: colors.teal },

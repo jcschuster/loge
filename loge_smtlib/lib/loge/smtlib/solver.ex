@@ -14,8 +14,8 @@ defmodule Loge.Smtlib.Solver do
       error, `:stopped` otherwise. A script with no `check-sat` asks nothing and one
       with several asks more than a status states, so both are `:success`; with
       several, a `{:table, ["check-sat", "Result"], rows}` view lists the answers.
-    * A model, the response to `(get-model)`, is a `{:table, columns, rows}` view of
-      its definitions, written as the solver wrote them.
+    * A model, the response to `(get-model)`, is a `{:text, text, "smtlib"}` view of
+      it as the solver wrote it.
     * `(error "…")` responses are a `{:diagnostics, diagnostics}` view, positioned on
       the script where the message gives a position (z3's `line L column C`, cvc5's
       `<file>:L.C`). They do not fail the run: a solver may answer the commands
@@ -29,41 +29,6 @@ defmodule Loge.Smtlib.Solver do
   alias Loge.Smtlib.{Commands, Language, Sexp}
 
   @answers ["sat", "unsat", "unknown"]
-
-  @doc """
-  The executable `engine` runs: the `:executable` option, else the one configured with
-  `Loge.configure!/2`, else `default`, a name looked up on `PATH`.
-  """
-  @spec executable(module(), String.t(), keyword()) :: String.t()
-  def executable(engine, default, options) do
-    options[:executable] ||
-      Keyword.get(Application.get_env(:loge_smtlib, engine, []), :executable, default)
-  end
-
-  @doc "Makes `settings` the engine's for later runs."
-  @spec configure(module(), keyword()) :: :ok
-  def configure(engine, settings) do
-    Application.put_env(
-      :loge_smtlib,
-      engine,
-      Keyword.merge(Application.get_env(:loge_smtlib, engine, []), settings)
-    )
-  end
-
-  @doc "Checks that `executable` runs, with `--version`."
-  @spec verify(String.t()) :: :ok | {:error, term()}
-  def verify(executable) do
-    case System.find_executable(executable) do
-      nil ->
-        {:error, {:executable_not_found, executable}}
-
-      path ->
-        case System.cmd(path, ["--version"], stderr_to_stdout: true) do
-          {_output, 0} -> :ok
-          {output, status} -> {:error, {:exit_status, status, output}}
-        end
-    end
-  end
 
   @doc """
   Runs `executable` with `arguments` on the script `input` within the `:time_limit`
@@ -96,20 +61,18 @@ defmodule Loge.Smtlib.Solver do
     end
   end
 
-  @doc "A sentence describing an error `run/5` or `verify/1` returned."
+  @doc "A sentence describing an error `run/5` or `Loge.Executable.verify/1` returned."
   @spec format_error(term()) :: String.t()
   def format_error({:invalid_script, diagnostics}) do
     "Invalid SMT-LIB script:" <>
       Enum.map_join(diagnostics, &"\nline #{&1.range.line}: #{&1.message}")
   end
 
-  def format_error({:executable_not_found, executable}) do
-    "#{executable} was not found on PATH. Install it, or set the engine's executable " <>
-      "in the Logic Engine Settings cell."
-  end
+  def format_error({:executable_not_found, _executable} = reason),
+    do: Loge.Executable.format_error(reason)
 
-  def format_error({:exit_status, status, output}),
-    do: "The solver exited with status #{status}:\n" <> output
+  def format_error({:exit_status, _status, _output} = reason),
+    do: Loge.Executable.format_error(reason)
 
   def format_error(reason), do: inspect(reason, pretty: true, width: 80)
 
@@ -128,9 +91,9 @@ defmodule Loge.Smtlib.Solver do
           do: error(message, script)
 
     models =
-      for {:list, [_ | _] = definitions, _span} <- responses,
+      for {:list, [_ | _] = definitions, span} <- responses,
           Enum.all?(definitions, &definition?/1),
-          do: model(definitions, output)
+          do: model(span, output)
 
     %Outcome{
       status: szs(answers, errors),
@@ -179,28 +142,8 @@ defmodule Loge.Smtlib.Solver do
 
   defp definition?(_term), do: false
 
-  defp model(definitions, output) do
-    rows =
-      for {:list, [_keyword, {_kind, name, _}, arguments, sort, value], _span} <- definitions,
-          do: {name, arguments, text(sort, output), text(value, output)}
-
-    if Enum.any?(rows, fn {_name, arguments, _sort, _value} ->
-         not match?({:list, [], _}, arguments)
-       end) do
-      {:table, ["Name", "Arguments", "Sort", "Value"],
-       Enum.map(rows, fn {name, arguments, sort, value} ->
-         [name, text(arguments, output), sort, value]
-       end)}
-    else
-      {:table, ["Name", "Sort", "Value"],
-       Enum.map(rows, fn {name, _arguments, sort, value} -> [name, sort, value] end)}
-    end
-  end
-
-  defp text(term, output) do
-    {offset, length} = elem(term, 2)
-    Regex.replace(~r/\s*\n\s*/, binary_part(output, offset, length), " ")
-  end
+  defp model({offset, length}, output),
+    do: {:text, binary_part(output, offset, length), Language.editor_language()}
 
   defp error(message, script) do
     case position(message) do

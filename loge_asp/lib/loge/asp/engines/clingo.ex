@@ -15,9 +15,11 @@ defmodule Loge.Asp.Engines.Clingo do
   (`Loge.Source.closure/2`) are grounded with it, as `Loge.Asp.Includes` describes.
 
   The raw output is clingo's JSON; its warnings are disabled and its stderr is not
-  read. The `{:models, models}` view lists each model's shown atoms as clingo prints
-  them; for an optimisation these are the improving models, the last one optimal when
-  the result is `OPTIMUM FOUND`. A program clingo rejects is
+  read. The models are a `{:text, text, "asp"}` view: each model's shown atoms, as
+  clingo prints them, written as facts under an `% Answer: n` comment, as clingo's
+  text output numbers them, with an `% Optimization:` comment of its costs. For an
+  optimisation these are the improving models, the last one optimal when the result
+  is `OPTIMUM FOUND`. A program clingo rejects is
   `{:error, {:invalid_program, diagnostics}}`, with the diagnostics of
   `Loge.Asp.Language`. A cancelled run kills clingo.
   """
@@ -112,10 +114,8 @@ defmodule Loge.Asp.Engines.Clingo do
   defp outcome(output, status) do
     case JSON.decode(output) do
       {:ok, %{"Result" => result} = json} ->
-        models =
-          for %{"Witnesses" => witnesses} <- json["Call"],
-              %{"Value" => atoms} <- witnesses,
-              do: atoms
+        witnesses =
+          for %{"Witnesses" => witnesses} <- json["Call"], witness <- witnesses, do: witness
 
         {:ok,
          %Outcome{
@@ -123,13 +123,33 @@ defmodule Loge.Asp.Engines.Clingo do
            problem: :satisfiability,
            raw: output,
            engine: id(),
-           views: optimum(result) ++ if(models == [], do: [], else: [{:models, models}]),
+           views: optimum(result) ++ models(witnesses),
            details: %{json: json}
          }}
 
       _ ->
         {:error, {:unrecognized_output, output}}
     end
+  end
+
+  defp models([]), do: []
+
+  defp models(witnesses) do
+    text =
+      witnesses
+      |> Enum.with_index(1)
+      |> Enum.map(fn {witness, n} -> answer(witness, n) end)
+
+    [{:text, IO.iodata_to_binary(text), Language.editor_language()}]
+  end
+
+  defp answer(%{"Value" => atoms} = witness, n) do
+    [
+      "% Answer: #{n}\n",
+      Enum.map_intersperse(atoms, ?\s, &[&1, ?.]),
+      ?\n
+      | for(costs <- [witness["Costs"]], costs, do: "% Optimization: #{Enum.join(costs, " ")}\n")
+    ]
   end
 
   defp optimum("OPTIMUM FOUND"), do: [{:badge, "optimum found", :positive}]

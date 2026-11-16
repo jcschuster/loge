@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a SAT solver that finds a model.
+printf "c fake\ns SATISFIABLE\nv 1 -2 0\n"
+exit 10

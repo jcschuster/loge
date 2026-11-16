@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for a solver that never ends.
+exec sleep 1000

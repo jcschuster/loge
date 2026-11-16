@@ -18,22 +18,27 @@ defmodule Loge.Dimacs.Engines.ClaspCancellationTest do
     %Cnf{variables: pigeons * holes, clauses: placed ++ shared}
   end
 
-  defp cpu_milliseconds(during) do
-    :erlang.statistics(:runtime)
-    Process.sleep(during)
-    {_total, since} = :erlang.statistics(:runtime)
-    since
+  defp clasp_processes do
+    for "/proc/" <> pid = directory <- Path.wildcard("/proc/[0-9]*"),
+        {:ok, command} <- [File.read(Path.join(directory, "cmdline"))],
+        [program, "--mode=clasp" | _] <- [String.split(command, <<0>>)],
+        Path.basename(program) == "clingo",
+        {:ok, status} <- [File.read(Path.join(directory, "status"))],
+        not (status =~ ~r/^State:\s+Z/m),
+        do: pid
   end
 
-  test "the caller's death stops the solver" do
-    formula = pigeonhole(10)
-
+  test "the caller's death kills clasp" do
     caller =
-      spawn(fn -> Loge.Run.async(fn -> Clasp.run(formula, []) end) |> Task.await(:infinity) end)
+      spawn(fn ->
+        Loge.Run.async(fn -> Clasp.run(pigeonhole(12), time_limit: 60) end)
+        |> Task.await(:infinity)
+      end)
 
-    assert cpu_milliseconds(500) > 300
+    Process.sleep(300)
+    assert [_clasp] = clasp_processes()
     Process.exit(caller, :kill)
-    Process.sleep(100)
-    assert cpu_milliseconds(500) < 100
+    Process.sleep(300)
+    assert clasp_processes() == []
   end
 end

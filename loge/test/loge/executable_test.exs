@@ -92,6 +92,56 @@ defmodule Loge.ExecutableTest do
     refute File.exists?("/proc/#{os_pid}")
   end
 
+  describe "the executable of an engine" do
+    setup do
+      on_exit(fn -> Application.delete_env(:loge, __MODULE__) end)
+    end
+
+    test "is a setting with a default" do
+      assert Executable.setting("kissat") == %Loge.Config.Field{
+               key: :executable,
+               type: :string,
+               required?: false,
+               group: :connection,
+               default: "kissat",
+               label: "Executable",
+               doc: "A path, or a name looked up on PATH."
+             }
+    end
+
+    test "is the run's option, else the configured one, else the default" do
+      assert Executable.configured(__MODULE__, "kissat", []) == "kissat"
+
+      assert Executable.configure(__MODULE__, executable: "/opt/kissat") == :ok
+      assert Executable.configured(__MODULE__, "kissat", []) == "/opt/kissat"
+      assert Executable.configured(__MODULE__, "kissat", executable: "./kissat") == "./kissat"
+    end
+
+    test "configuring keeps the engine's other settings" do
+      Executable.configure(__MODULE__, executable: "a", other: 1)
+      Executable.configure(__MODULE__, executable: "b")
+      assert Application.get_env(:loge, __MODULE__) == [other: 1, executable: "b"]
+    end
+
+    test "is verified by running it with --version" do
+      assert Executable.verify("true") == :ok
+
+      assert Executable.verify("loge-no-such-tool") ==
+               {:error, {:executable_not_found, "loge-no-such-tool"}}
+
+      assert {:error, {:exit_status, 1, _output}} = Executable.verify("false")
+    end
+  end
+
+  test "its errors read as sentences" do
+    assert Executable.format_error({:executable_not_found, "kissat"}) ==
+             "kissat was not found on PATH. Install it, or set the engine's executable " <>
+               "in the Logic Engine Settings cell."
+
+    assert Executable.format_error({:exit_status, 1, "bad\n"}) ==
+             "The executable exited with status 1:\nbad\n"
+  end
+
   defp wait_for_pid(attempts \\ 100) do
     pids =
       for file <- Path.wildcard(Path.join([System.tmp_dir!(), "loge_*", "*.pid"])),

@@ -22,7 +22,16 @@ defmodule Loge.Executable do
     * `:timeout` - milliseconds after which the tool is killed, or `:infinity`, the
       default.
     * `:env` - environment variables as `{name, value}` binaries.
+
+  An engine over a tool names it by its `:executable` setting: `setting/1` is the
+  field of `c:Loge.Engine.config_schema/0`, `configure/2` keeps it for the engine's
+  later runs, `configured/3` is what a run executes, and `verify/1` probes it.
   """
+
+  alias Loge.Config.Field
+
+  @typedoc "Why a tool could not be run, or why its probe failed."
+  @type error :: {:executable_not_found, String.t()} | {:exit_status, non_neg_integer(), binary()}
 
   defmodule Exit do
     @moduledoc """
@@ -80,6 +89,63 @@ defmodule Loge.Executable do
       path -> {:ok, run_found(path, arguments, input, options)}
     end
   end
+
+  @doc "The `:executable` setting of an engine whose tool is `default` unless configured."
+  @spec setting(String.t()) :: Field.t()
+  def setting(default) do
+    %Field{
+      key: :executable,
+      type: :string,
+      required?: false,
+      group: :connection,
+      default: default,
+      label: "Executable",
+      doc: "A path, or a name looked up on PATH."
+    }
+  end
+
+  @doc """
+  Makes `settings` the engine's for its later runs, merged into those it has, in the
+  `:loge` application environment under the engine's module.
+  """
+  @spec configure(module(), keyword()) :: :ok
+  def configure(engine, settings) when is_atom(engine) and is_list(settings),
+    do: Application.put_env(:loge, engine, Keyword.merge(settings(engine), settings))
+
+  @doc """
+  The executable a run of `engine` executes: the run's `:executable` option, else the
+  one configured with `configure/2`, else `default`.
+  """
+  @spec configured(module(), String.t(), keyword()) :: String.t()
+  def configured(engine, default, options) when is_atom(engine) and is_list(options),
+    do: options[:executable] || Keyword.get(settings(engine), :executable, default)
+
+  @doc "Checks that `executable`, a path or a name looked up on `PATH`, runs with `--version`."
+  @spec verify(String.t()) :: :ok | {:error, error()}
+  def verify(executable) do
+    case System.find_executable(executable) do
+      nil ->
+        {:error, {:executable_not_found, executable}}
+
+      path ->
+        case System.cmd(path, ["--version"], stderr_to_stdout: true) do
+          {_output, 0} -> :ok
+          {output, status} -> {:error, {:exit_status, status, output}}
+        end
+    end
+  end
+
+  @doc "A sentence describing an error of `run/4` or `verify/1`, or a run's unexpected exit."
+  @spec format_error(error()) :: String.t()
+  def format_error({:executable_not_found, executable}) do
+    "#{executable} was not found on PATH. Install it, or set the engine's executable " <>
+      "in the Logic Engine Settings cell."
+  end
+
+  def format_error({:exit_status, status, output}),
+    do: "The executable exited with status #{status}:\n" <> output
+
+  defp settings(engine), do: Application.get_env(:loge, engine, [])
 
   defp check_name!(name, input_name) do
     if name in ["", ".", "..", input_name] or Path.basename(name) != name do

@@ -17,7 +17,7 @@ defmodule Loge.Smtlib.SolverTest do
     end
   end
 
-  test "a model is a table of its definitions, as the solver wrote them" do
+  test "a model is SMT-LIB text, as the solver wrote it" do
     script = """
     (declare-const x Int)
     (declare-const s String)
@@ -34,21 +34,9 @@ defmodule Loge.Smtlib.SolverTest do
     assert {:ok, %Outcome{status: :satisfiable, views: [model]}} = run(script)
 
     assert model ==
-             {:table, ["Name", "Sort", "Value"],
-              [["x", "Int", "(- 3)"], ["s", "String", ~S|"a b"|]]}
-  end
-
-  test "functions in a model show their arguments" do
-    script = """
-    (check-sat)
-    ;> sat
-    ;> ((define-fun f ((x!0 Int)) Bool true))
-    """
-
-    assert {:ok, %Outcome{views: [{:table, ["Name", "Arguments", "Sort", "Value"], [row]}]}} =
-             run(script)
-
-    assert row == ["f", "((x!0 Int))", "Bool", "true"]
+             {:text,
+              "(\n  (define-fun x () Int\n    (- 3))\n  (define-fun s () String \"a b\")\n)",
+              "smtlib"}
   end
 
   test "several check-sats are a table of results, and the run a success" do

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a solver that rejects its input.
+echo "fake: error: parse error"
+exit 1

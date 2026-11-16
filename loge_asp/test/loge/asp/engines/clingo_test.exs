@@ -24,7 +24,7 @@ defmodule Loge.Asp.Engines.ClingoTest do
               status: :satisfiable,
               problem: :satisfiability,
               engine: :clingo,
-              views: [{:models, [["a", "b"]]}]
+              views: [{:text, "% Answer: 1\na. b.\n", "asp"}]
             } =
               outcome} =
              Clingo.run("a. b :- a.", [])
@@ -33,17 +33,25 @@ defmodule Loge.Asp.Engines.ClingoTest do
   end
 
   test "models: 0 enumerates every stable model" do
-    assert {:ok, %Outcome{views: [{:models, models}]}} = Clingo.run("{a; b}. :- a, b.", models: 0)
-    assert Enum.sort(models) == [[], ["a"], ["b"]]
+    assert {:ok, %Outcome{views: [{:text, text, "asp"}]}} =
+             Clingo.run("{a; b}. :- a, b.", models: 0)
+
+    assert length(Regex.scan(~r/^% Answer: \d$/m, text)) == 3
+
+    assert text |> String.split("\n", trim: true) |> Enum.reject(&(&1 =~ "%")) |> Enum.sort() == [
+             "a.",
+             "b."
+           ]
   end
 
   test "the includes of the run and those the source carries are grounded with it" do
     defs = Loge.source(:asp, "b.")
     program = Loge.source(:asp, "#include \"defs\".\na :- b.", includes: %{"defs" => defs})
 
-    assert {:ok, %Outcome{views: [{:models, [["b", "a"]]}]}} = Clingo.run(program, [])
+    assert {:ok, %Outcome{views: [{:text, "% Answer: 1\nb. a.\n", "asp"}]}} =
+             Clingo.run(program, [])
 
-    assert {:ok, %Outcome{views: [{:models, [["b", "a"]]}]}} =
+    assert {:ok, %Outcome{views: [{:text, "% Answer: 1\nb. a.\n", "asp"}]}} =
              Clingo.run("#include \"defs\".\na :- b.", includes: %{"defs" => defs})
   end
 
@@ -54,8 +62,9 @@ defmodule Loge.Asp.Engines.ClingoTest do
     assert message =~ "could not be opened"
   end
 
-  test "atoms keep their text, spaces included" do
-    assert {:ok, %Outcome{views: [{:models, [[~s|p("a b")|]]}]}} = Clingo.run(~s|p("a b").|, [])
+  test "atoms keep their text, spaces included, as facts" do
+    assert {:ok, %Outcome{views: [{:text, ~s|% Answer: 1\np("a b").\n|, "asp"}]}} =
+             Clingo.run(~s|p("a b").|, [])
   end
 
   test "without a model limit, an optimisation runs to the optimum and says so" do
@@ -64,10 +73,10 @@ defmodule Loge.Asp.Engines.ClingoTest do
     assert {:ok,
             %Outcome{
               status: :satisfiable,
-              views: [{:badge, "optimum found", :positive}, {:models, models}]
+              views: [{:badge, "optimum found", :positive}, {:text, text, "asp"}]
             } = outcome} = Clingo.run(program, [])
 
-    assert List.last(models) == ["b"]
+    assert String.ends_with?(text, "\nb.\n% Optimization: 1\n")
     assert %{"Result" => "OPTIMUM FOUND"} = JSON.decode!(outcome.raw)
   end
 
@@ -77,7 +86,7 @@ defmodule Loge.Asp.Engines.ClingoTest do
   end
 
   test "an optimisation stopped by the model limit is not an optimum" do
-    assert {:ok, %Outcome{status: :satisfiable, views: [{:models, _models}]}} =
+    assert {:ok, %Outcome{status: :satisfiable, views: [{:text, _models, "asp"}]}} =
              Clingo.run("{a; b}. #minimize {1,a : a; 2,b : b}.", models: 1)
   end
 

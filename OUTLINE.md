@@ -48,7 +48,7 @@ representations ("if this can be a satisfiability problem, translate it and solv
 
 | Course topic                                            | Languages and tasks                                                                   | State                                    |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Propositional logic, SAT                                | DIMACS and SAT solving; TPTP to CNF to DIMACS                                         | DIMACS with clasp; translations phase 8  |
+| Propositional logic, SAT                                | DIMACS CNF and SAT solving, WCNF (MaxSAT), QDIMACS (QBF), the other DIMACS dialects as each gets a solver; TPTP to CNF to DIMACS | clasp, CaDiCaL, Kissat, DepQBF; translations phase 8 |
 | Predicate logic, Horn logic, Datalog, logic programming | TPTP provers, Prolog, egglog; clausification, grounding                               | engines exist; translations phase 8      |
 | Modal and description logics, correspondences           | non-classical TPTP; embedding into THF; translations between DL, modal logic and FOL  | phase 9                                  |
 | TPTP infrastructure                                     | provers, verifiers (GDV, AGMV), problem tools                                         | provers and verifiers exist              |
@@ -82,7 +82,8 @@ loge/                       this repo
   loge_tptp/                Language + analyzers + engines for TPTP: provers, verifiers,
                             translations. Deps: loge, tptp, atp_client.
   kino_loge/                Smart cells and Kino.Render. Deps: loge, kino.
-  loge_dimacs/  (phase 2)   Deps: loge, clingo_elixir.
+  loge_dimacs/  (phase 2)   DIMACS CNF, WCNF, QDIMACS. Deps: loge, clingo_elixir (its clingo
+                            executable); CaDiCaL, Kissat, DepQBF executables.
   loge_asp/     (phase 2)   Deps: loge, clingo_elixir.
   loge_prolog/  (phase 3)   Deps: loge, swi_elixir.
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
@@ -181,6 +182,10 @@ words.
   and no output.
 
 One engine module performs one task; a tool that does several is several engines.
+An engine reads one language unless the text alone tells its languages apart: the
+generated source passes the editor's text as a binary, which has no language. clasp is
+therefore two engines, `Loge.Dimacs.Engines.Clasp` on DIMACS CNF and `ClaspMaxsat` on
+WCNF, since a CNF without its header is WCNF of the format without a problem line.
 
 `Loge.Engine.to_source(engine, input, options, references)` renders the one call a cell
 evaluates; it is the same for every engine, so it is a core function, not a callback.
@@ -401,8 +406,15 @@ Work outside the BEAM's reach needs more, and core provides three pieces:
   component, so no name written by a user reaches outside the directory. The pipe closes when the caller dies and when the node halts or crashes, so no
   tool outlives either; a line is how `:timeout` stops it, keeping the output so far.
   stderr is merged or discarded (the wrapper's own `Killed` notices are discarded).
-  Used by `loge_asp` (clingo) and `loge_smtlib` (z3, cvc5); the template for further
-  Port engines (kissat, CaDiCaL, Vampire).
+  Used by `loge_asp` (clingo), `loge_dimacs` (clasp, CaDiCaL, Kissat, DepQBF) and
+  `loge_smtlib` (z3, cvc5); the template for further Port engines (Vampire).
+  An engine whose tool the user installs names it by an `:executable` setting, and
+  `Loge.Executable` holds what such engines share: `setting/1`, the field with the
+  default name; `configure/2`, which keeps the settings in the `:loge` application
+  environment under the engine's module; `configured/3`, the executable a run uses (the
+  run's option, else the configured one, else the default); `verify/1`, a `--version`
+  probe; and `format_error/1` for a missing executable or an unexpected exit status.
+  Its engines' `config_schema/0`, `configure/1` and `verify/1` are one line each.
 - `Loge.Guard.start(release)`: a process monitoring its starter that calls `release`
   when the starter dies, unless dismissed. Used to kill a process holding a Port
   (`loge_prolog`'s SWI session, whose `swipl` exits when its stdin closes).
@@ -521,7 +533,8 @@ All read from source, not executed. Links in §11.
 | rudof 0.3.24, Turtle (rudof_elixir b9f5f4f, executed) | `Rudof.Session.read_data/3` → `{:error, %Rudof.Error{kind: :data_error, message: m}}`; the position is only in `m` | `… Parser error at line L between columns C and C2: msg`, or `… between line L column C and line L2 column C2: msg` | 1/1, code points, end exclusive | first | error |
 | rudof 0.3.24, SPARQL (executed) | `Rudof.Session.load_sparql_query/2` → `:query_error` | `… error at L:C: expected one of …`: the furthest point the parser reached, often the end of the input rather than the fault; an undeclared prefix is reported as such a syntax error | 1/1, code points, one position | first | error |
 | rudof 0.3.24, ShExC and ShapeMap (executed) | `Rudof.Session.check_shex/3` → `{:ok, {false, text}}`; `read_shex/3`, `read_shapemap/3` → `:shex_error` | `Parse error on line L, column C: msg`, then `Context:` lines, each the start of a production that failed, outermost first; an undeclared prefix has no position (`Alias 'ex' not found in prefix map`) | 1/1, code points | first | error |
-| kissat / CaDiCaL     | stderr                                                                                                                                                            | `<name>:<line>: parse error: msg`, exit 1                                            | line only                            | first                                                             | error                                                                             |
+| Kissat 4.0.4, CaDiCaL 3.0.1 (executed) | stdout; not read for diagnostics, as `Loge.Dimacs` checks the input first | `<name>: error: <file>:<line>: parse error: msg`, exit 1; answers `s SATISFIABLE` (exit 10) or `s UNSATISFIABLE` (20), a model in `v` lines | line only | first | error |
+| DepQBF 6.03 (executed) | not read: it accepts a literal beyond the problem line's variables | with `--qdo`, `s cnf <1\|0\|-1> <variables> <clauses>` and `V <literal> 0` lines, exit 10, 20 or 0; `--qdo` aborts unless `--no-dynamic-nenofex` | — | — | — |
 
 Notes:
 
@@ -534,14 +547,18 @@ Notes:
   stderr, which can land inside a JSON line, and uses clingo's `--time-limit` so the
   JSON stays complete. On exit 65 the engine runs the lint for diagnostics. Exit codes
   are clasp's `ExitCode` bits (1 interrupted, 10 a model, 20 exhausted, 65 error).
-- `Clingo.Dimacs.solve!/2` rewrites CNF as a choice-rule ASP program in Elixir; it does not
-  call clasp's DIMACS reader, and raises `ArgumentError` on input it does not read; the
-  engine sends only what `Loge.Dimacs.Cnf` accepts and renders. `picosat_elixir` and
-  `simple_sat` accept clause lists only; `picosat_elixir` 0.2.3 solves on a normal
-  scheduler without interrupt, so it cannot meet the cancellation contract.
-- clingo_elixir's dispatcher monitors the process that opened the session and aborts the
-  native search when it dies (`Clingo.Dispatcher.terminate/2`). Grounding is not aborted;
-  for a CNF, whose translation grounds in time linear in its size, it ends late but ends.
+- DIMACS runs clasp in the same `clingo` executable (`--mode=clasp`, executed with
+  5.8.2), not `Clingo.Dimacs.solve!/2`, which rewrote CNF as ASP and ground it in the
+  NIF, so a run cancelled while grounding went on. clasp reads DIMACS CNF and WCNF with
+  `p wcnf`, not WCNF without a problem line (`'h': unrecognized input format`), so
+  `Loge.Dimacs.Wcnf` renders the former; it prints `v`, `o` and `s` lines, ends with
+  clasp's exit codes, and at `--time-limit` exits 1 with `s UNKNOWN` if it has no model.
+  On WCNF it searches to the optimum, printing each better model; `--models=1` stops
+  after the first with a warning that it may not be optimal.
+- The other solvers of the family run as executables: CaDiCaL, Kissat and DepQBF. nixpkgs
+  has CaDiCaL 3.0.1 and Kissat 4.0.4, no DepQBF and no other QBF solver (2026-11-16).
+  `picosat_elixir` 0.2.3 solves on a normal scheduler without interrupt, so it cannot
+  meet the cancellation contract; Loge has no Picosat engine.
 - Include resolution (executed): SWI-Prolog 10.0.1 reads `:- [defs].` and
   `:- include(defs).` as `defs.pl` beside the loading file; clingo 5.8.2 reads
   `#include "defs".` as `defs` beside the including file, adding no extension, and an
@@ -620,14 +637,17 @@ Notes:
 
 - The editor is CodeMirror 6. Its source is `kino_loge/assets/editor.js`; `npm run build`
   there bundles it with esbuild into `kino_loge/lib/assets/editor.js`, which is committed
-  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 596 kB
-  with the eight grammars. Node comes from `.devcontainer`: `docker.io/library/node:26-trixie`
+  (as Kino packages commit their builds) and imported by `cell.js`. The bundle is 673 kB
+  with the ten grammars. Node comes from `.devcontainer`: `docker.io/library/node:26-trixie`
   as user `node`, the image the Node of the agent's container is copied from, so both
   sides share `node_modules` and the lockfile.
 - Output: `KinoLoge.Code` shows a `{:text, text, language}` view through the same bundle,
   read-only, with line numbers, search and coloured brackets, at most 300 px high. A
   text view without a language and the raw output stay terminal text: raw output mixes
-  languages, so an engine names the parts that are in one. A TPTP engine's outcome has
+  languages, so an engine names the parts that are in one: clingo's models are ASP
+  text, each model's atoms as facts under `% Answer: n`, and a solver's response to
+  `(get-model)` is SMT-LIB text. Prolog's answers stay tables, a column per variable.
+  A TPTP engine's outcome has
   what the system derived as its output, in TPTP: the derivation
   (`AtpClient.Result.derivation/1`), else the interpretation (`interpretation/1`). When
   neither reads, what the system printed is shown as TPTP text views titled by dataform
@@ -644,11 +664,18 @@ Notes:
   `c:Loge.Language.editor_language/0` returns; `nil` or a name without a grammar is plain
   text. A language change reconfigures the editor in place. Bundled, keyed by language id:
   `codemirror-lang-tptp`, `-asp`, `-dimacs`, `-egglog`, `-smtlib`, `-swipl` (as `prolog`),
-  and from other authors `codemirror-lang-turtle` 0.0.2 and `codemirror-lang-sparql`
-  2.1.0. Checked in Node only: both parse and highlight samples, but only Turtle's
-  `[ ]` carry `closedBy`, so their other brackets are not coloured by depth, and SPARQL
-  leaves `{ }` and prefixed names untagged. ShExC (`"shex"`) and shape maps
-  (`"shapemap"`) have no grammar yet and are plain text.
+  `-shex` and `-shapemap` 0.1.2, and from other authors `codemirror-lang-turtle` 0.0.2
+  and `codemirror-lang-sparql` 2.1.0. `codemirror-lang-dimacs` 0.2.0 is one grammar for
+  every dialect of DIMACS, so DIMACS CNF, WCNF and QDIMACS all name `"dimacs"`. Checked
+  in Node only: the four RDF grammars parse and highlight samples, and the DIMACS one
+  CNF, both WCNF formats and QDIMACS. Every bracket of ShExC and shape maps carries
+  `closedBy`, of Turtle only `[ ]` and of SPARQL none, so the others are not coloured by
+  depth; SPARQL leaves `{ }` and prefixed names untagged. All four tag IRIs `t.url`, and
+  ShExC and shape maps tag shape labels `t.className`. The bundle's style colours shape
+  labels yellow, as One Dark, the palette of Livebook's dark theme, colours classes
+  (Livebook's own style uses peach, which here is the operators beside them). IRIs stay
+  in the text colour: in the RDF languages they are the names, as variables are
+  elsewhere, and what a name does is coloured (a predicate, a datatype, a shape).
 - Collaboration is `@codemirror/collab` with the cell process as the authority. A client
   pushes `%{"version" => n, "updates" => [%{"clientID" => id, "changes" => change_set}]}`.
   The cell applies a push made against its current version (`KinoLoge.ChangeSet`, lengths
@@ -674,7 +701,12 @@ Notes:
   to the parent page with `isTargetEditable`, so notebook shortcuts that work while
   typing in an input keep working. Read in the source, not tried in Livebook.
 - Not provided, unlike Livebook's own editor: the user's editor settings (theme, font
-  size, vim/emacs keys), remote cursors. The theme copies Livebook's dark default.
+  size, vim/emacs keys), remote cursors. The theme copies Livebook's dark default. The
+  settings live in the local storage of Livebook's page (`assets/js/lib/settings.js`),
+  which the iframe's origin cannot read, and `ctx` passes none (Livebook main at
+  6f2eb97). A remote cursor needs to end with its client, and `Kino.JS.Live.Server`
+  drops a client on its `:DOWN` without telling the cell (Kino 0.19.1, main at
+  d8f6b0f). Both are rows of `UPSTREAM.md`.
 - Verified outside Livebook: three simulated clients with random interleavings converge
   (200 rounds); `KinoLoge.ChangeSet` agrees with CodeMirror on the 9906 change sets of
   that run; `cell.js` with two clients in headless Chromium against a stand-in for the
@@ -834,7 +866,12 @@ Upstream tools: [clingo locatable.hh](https://github.com/potassco/clingo/blob/v5
 [cvc5 lexer.cpp](https://github.com/cvc5/cvc5/blob/main/src/parser/lexer.cpp),
 [cvc5_parser.cpp](https://github.com/cvc5/cvc5/blob/main/src/api/cpp/cvc5_parser.cpp);
 [kissat application.c](https://github.com/arminbiere/kissat/blob/master/src/application.c);
-[cadical parse.cpp](https://github.com/arminbiere/cadical/blob/master/src/parse.cpp).
+[cadical parse.cpp](https://github.com/arminbiere/cadical/blob/master/src/parse.cpp);
+[QDIMACS 1.1](https://www.qbflib.org/qdimacs.html),
+[MaxSAT Evaluation 2023 rules](https://maxsat-evaluations.github.io/2023/rules.html) (WCNF
+since 2022), [2021 rules](https://maxsat-evaluations.github.io/2021/rules.html) (WCNF
+before), [DepQBF](https://github.com/lonsing/depqbf),
+[lang-dimacs](https://github.com/jcschuster/lang-dimacs).
 Registries: [codemirror-lang-tptp](https://registry.npmjs.org/codemirror-lang-tptp),
 [@codemirror/legacy-modes](https://registry.npmjs.org/@codemirror%2Flegacy-modes),
 [codemirror-lang-prolog](https://registry.npmjs.org/codemirror-lang-prolog),

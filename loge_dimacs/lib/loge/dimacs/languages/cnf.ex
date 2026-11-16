@@ -1,8 +1,8 @@
-defmodule Loge.Dimacs.Language do
+defmodule Loge.Dimacs.Languages.Cnf do
   @moduledoc """
-  DIMACS CNF as a `Loge.Language`, over `Loge.Dimacs.Cnf.parse/1`.
+  DIMACS CNF, the input of SAT solvers, as a `Loge.Language` over `Loge.Dimacs.Cnf.parse/1`.
 
-  The analysis's `native` is the `Loge.Dimacs.Cnf` when the source parses, `nil`
+  The analysis's `native` is the `Loge.Dimacs.Cnf` the source parses to, `nil`
   otherwise. The format has no includes and takes no options.
   """
 
@@ -29,7 +29,7 @@ defmodule Loge.Dimacs.Language do
   def analyze(source, _options) when is_binary(source) do
     {native, diagnostics} =
       case Cnf.parse(source) do
-        {:ok, cnf} -> {cnf, []}
+        {:ok, parsed} -> {parsed, []}
         {:error, diagnostics} -> {nil, diagnostics}
       end
 
