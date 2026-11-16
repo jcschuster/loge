@@ -37,8 +37,8 @@ defmodule Loge.Egglog.Engines.EgglogTest do
   end
 
   test "the e-graph as a Mermaid flowchart" do
-    assert {:ok, %Outcome{views: [{:graph, "flowchart TB\n" <> _}]}} =
-             Egglog.run(@math, graph: true)
+    assert {:ok, %Outcome{views: [{:graph, mermaid}]}} = Egglog.run(@math, graph: true)
+    assert mermaid =~ ~r/^flowchart TB$/m
   end
 
   test "the includes of the run and those the source carries are run with it" do
