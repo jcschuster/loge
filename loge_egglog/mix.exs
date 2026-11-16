@@ -25,7 +25,8 @@ defmodule Loge.Egglog.MixProject do
   defp deps do
     [
       loge_dep(),
-      {:egglog_elixir, github: "davfuenmayor/egglog_elixir", tag: "v0.2.0"},
+      {:egglog_elixir,
+       github: "davfuenmayor/egglog_elixir", ref: "901dc4a649d73af9abc460e2beb034868cbacfba"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
