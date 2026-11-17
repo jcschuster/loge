@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a clausifier that rejects its input.
+echo "User error: fake"
+exit 4

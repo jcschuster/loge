@@ -26,6 +26,7 @@ defmodule Loge.Asp.MixProject do
     [
       loge_dep(),
       {:clingo_elixir, github: "davfuenmayor/clingo_elixir"},
+      {:stream_data, "~> 1.1", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]

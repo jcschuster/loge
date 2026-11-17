@@ -1,1 +1,6 @@
-ExUnit.start(exclude: if(System.find_executable("isabelle"), do: [], else: [:isabelle]))
+absent =
+  for tool <- [:isabelle, :vampire],
+      is_nil(System.find_executable(Atom.to_string(tool))),
+      do: tool
+
+ExUnit.start(exclude: absent)

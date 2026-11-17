@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for a tool that prints something other than clauses.
+echo "fof(a, axiom, p)."

@@ -1,4 +1,4 @@
-:- module(loge, [read_program/3, capture/1, solve/2]).
+:- module(loge, [read_program/3, read_clauses/2, capture/1, solve/2]).
 
 % The Prolog half of Loge.Prolog.Swipl, loaded into a fresh swipl per lint or run.
 
@@ -138,3 +138,56 @@ binding_text(Bindings, Name=Value, [NameText, ValueText]) :-
                 [ quoted(true), variable_names(Bindings), module(user),
                   cycles(true), spacing(next_argument)
                 ]).
+
+% Reads every term of a UTF-8 file that has no syntax error, as read_program/3 does,
+% for a translation: clause(Line, Term, BuiltIns), Line the line the term starts on,
+% Term with each variable bound to '$VAR'(Name), an anonymous one named '_' and its
+% number in the term, and BuiltIns the Name/Arity of the head and of each goal of the
+% body that is a control construct or a built-in predicate.
+read_clauses(File, Clauses) :-
+    in_temporary_module(Module, true,
+        loge:setup_call_cleanup(open(File, read, Stream, [encoding(utf8)]),
+                           loge:clauses(Stream, Module, Clauses),
+                           close(Stream))).
+
+clauses(Stream, Module, Clauses) :-
+    read_term(Stream, Term,
+              [module(Module), variable_names(Names), term_position(Position)]),
+    (   Term == end_of_file
+    ->  Clauses = []
+    ;   directive(Term, Module),
+        stream_position_data(line_count, Position, Line),
+        clause_goals(Term, Goals),
+        include(built_in, Goals, BuiltIn),
+        maplist(indicator, BuiltIn, BuiltIns),
+        name_variables(Names, Term),
+        Clauses = [clause(Line, Term, BuiltIns)|Rest],
+        clauses(Stream, Module, Rest)
+    ).
+
+clause_goals((Head :- Body), [Head|Goals]) :- !, conjuncts(Body, Goals).
+clause_goals((?- Body), Goals) :- !, conjuncts(Body, Goals).
+clause_goals((:- _), []) :- !.
+clause_goals(Head, [Head]).
+
+conjuncts(Goal, [Goal]) :- var(Goal), !.
+conjuncts((Left, Right), Goals) :- !,
+    conjuncts(Left, LeftGoals), conjuncts(Right, RightGoals),
+    append(LeftGoals, RightGoals, Goals).
+conjuncts(true, []) :- !.
+conjuncts(Goal, [Goal]).
+
+built_in(Goal) :- var(Goal), !.
+built_in(Goal) :- \+ callable(Goal), !.
+built_in(Goal) :- predicate_property(system:Goal, built_in).
+
+indicator(Goal, "a variable") :- var(Goal), !.
+indicator(Goal, Text) :- callable(Goal), !,
+    functor(Goal, Name, Arity), format(string(Text), "~w/~w", [Name, Arity]).
+indicator(Goal, Text) :- format(string(Text), "~p", [Goal]).
+
+name_variables(Names, Term) :-
+    maplist([Name='$VAR'(Name)]>>true, Names),
+    term_variables(Term, Anonymous),
+    foldl([Variable, N0, N]>>(N is N0 + 1, format(atom(Name), "_~d", [N]), Variable = '$VAR'(Name)),
+          Anonymous, 0, _).

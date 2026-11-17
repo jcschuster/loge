@@ -11,6 +11,9 @@ defmodule Loge.Tptp do
   | `Loge.Tptp.Engines.LocalExec` | `AtpClient.LocalExec` |
   | `Loge.Tptp.Engines.Isabelle` | `AtpClient.Isabelle` |
   | `Loge.Tptp.Engines.Verify` | `AtpClient.verify/2` |
+  | `Loge.Tptp.Engines.Clausify` | Vampire, an executable |
+  | `Loge.Tptp.Engines.Ground`, `Dimacs`, `Prolog`, `Smtlib` | `Loge.Tptp.Formula`, `Loge.Tptp.Clause` |
+  | `Loge.Tptp.Engines.Fof`, `Tff`, `Thf`, `Untyped` | the same, between the dialects of TPTP; `Loge.Tptp.Typing` |
 
   All of them are registered with `Loge` when `:loge_tptp` starts.
   """
@@ -24,7 +27,16 @@ defmodule Loge.Tptp do
       Loge.Tptp.Engines.StarExec,
       Loge.Tptp.Engines.LocalExec,
       Loge.Tptp.Engines.Isabelle,
-      Loge.Tptp.Engines.Verify
+      Loge.Tptp.Engines.Verify,
+      Loge.Tptp.Engines.Clausify,
+      Loge.Tptp.Engines.Ground,
+      Loge.Tptp.Engines.Dimacs,
+      Loge.Tptp.Engines.Prolog,
+      Loge.Tptp.Engines.Smtlib,
+      Loge.Tptp.Engines.Fof,
+      Loge.Tptp.Engines.Tff,
+      Loge.Tptp.Engines.Thf,
+      Loge.Tptp.Engines.Untyped
     ]
   end
 end

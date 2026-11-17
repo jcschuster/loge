@@ -3,7 +3,13 @@ defmodule Loge.PrologTest do
 
   test "registers the language and its engine when the application starts" do
     assert Loge.Prolog.Language in Loge.Registry.languages()
-    assert Loge.Registry.engines_for(:prolog) == [Loge.Prolog.Engines.Swipl]
+
+    assert Loge.Registry.engines_for(:prolog) == [
+             Loge.Prolog.Engines.Swipl,
+             Loge.Prolog.Engines.Tptp,
+             Loge.Prolog.Engines.Asp
+           ]
+
     assert Loge.Registry.language_for_extension(".pl") == {:ok, Loge.Prolog.Language}
   end
 end

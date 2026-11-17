@@ -31,6 +31,7 @@ defmodule Loge.Tptp.MixProject do
       loge_dep(),
       {:tptp, "~> 0.3"},
       {:atp_client, "~> 0.8.1"},
+      {:stream_data, "~> 1.1", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]

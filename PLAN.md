@@ -5,7 +5,7 @@ needs; phases 2 and 4 can run beside 3. Phases 5 to 9 follow the scope of OUTLIN
 order: core contracts, cells, the existing languages, translations, new formalisms. Each
 phase has one gate that must pass before the next starts. Phase 10 needs phases 5 and 6
 only and can run beside 7 to 9; phase 11 extends the package of phase 2 and needs phase
-5. Phase 0 is issue-only and nothing waits on its answers.
+5; phase 12 needs phase 5 and, for its Prolog and TPTP ends, phase 8's formula type. Phase 0 is issue-only and nothing waits on its answers.
 
 ## Phase 0 — Upstream issues and PRs
 
@@ -219,27 +219,33 @@ languages that exist.
 
 ## Phase 8 — Translations, verified
 
-Goal: the first translations (OUTLINE §8) in Elixir, each with its verification
-(OUTLINE §9). A translation is not done before its record exists.
+Goal: the TPTP translations (OUTLINE §8), each with its verification (OUTLINE §9). A
+translation is not done before its record exists.
 
-### Before the first translation
+### Probe (record the findings in OUTLINE §6)
 
-- [ ] Send GDV a hand-written clausification derivation in E's annotation style through `AtpClient.verify/2`, and note which rule names and `status` values it accepts for Skolemisation and definition steps
+- [x] Vampire 5.1.0: the flags and the output of `--mode clausify` on FOF with a conjecture (its negation, the roles, what preprocessing removes, the exit status of an error)
 
 ### `loge_tptp`
 
-- [ ] `Loge.Tptp.Formula`: terms, atoms, connectives, quantifiers; read from `Tptp.Node`, printed through `Tptp.Printer`; round-trip property
-- [ ] `Loge.Tptp.Engines.Clausify`: FOF → CNF. Negated conjecture, simplification, negation normal form, variable renaming, Skolemisation, naming of subformulas (a control), distribution; `details.derivation`
-- [ ] `Loge.Tptp.Engines.Ground`: clauses with no function symbol of arity above 0 → their ground instances over the constants
-- [ ] `Loge.Tptp.Engines.Dimacs`: ground clauses without equality → DIMACS, with the atom table
-- [ ] `:inappropriate` with diagnostics for input outside each fragment
-- [ ] Properties with StreamData (a test-only dependency), in `mix test`
-- [ ] Verification suite tagged `:verification`, excluded in `test_helper.exs`: derivation (GDV), status (TPTP headers), differential (ECNF, VCNF, EGround)
+- [x] `Loge.Tptp.Formula`: terms, atoms, connectives, quantifiers; read from `Tptp.Node`, printed through `Tptp.Printer.Canonical`; round-trip property. `fof` and `cnf` only: TF0 is not read
+- [x] `Loge.Tptp.Clause` and `Loge.Tptp.Translation`, what the translations share
+- [x] `Loge.Tptp.Engines.Clausify`: FOF → CNF by Vampire through `Loge.Executable`, with an `executable` setting; an output that is not all `cnf` is an error. Tested with fake executables, and against Vampire 5.1.0 from its release archive (tagged `:vampire`, run when on `PATH`)
+- [x] `Loge.Tptp.Engines.Ground`: clauses with no function symbol of arity above 0 → their ground instances over the constants; equations are kept, as the instances of a clause with equality are sound without the equality axioms
+- [x] `Loge.Tptp.Engines.Dimacs`: ground clauses without equality → DIMACS, with the atom table
+- [x] `Loge.Tptp.Engines.Smtlib`: FOF and CNF → SMT-LIB in `UF`. z3 5.3.3 answered the outputs for a theorem and a non-theorem `unsat` and `sat`, by hand, not in the suite
+- [x] Between the dialects: `Fof` (CNF → FOF), `Tff` (FOF, CNF → TF0), `Thf` (FOF, CNF → TH0) and `Untyped` (monomorphic TF0 → FOF by type guards), over `Loge.Tptp.Signature` and `Loge.Tptp.Typing`; `Formula` reads `tff` formulas. Every output parses with `tptp` in its dialect (a property for the first three). Vampire 5.1.0 gave the input and each output the same status on eight problems, by hand, except two satisfiable TH0 outputs it timed out on
+- [ ] TF0 → SMT-LIB and TF0 → TH0: `Formula` reads typed formulas, the two engines take `fof` and `cnf` only
+- [ ] THF → a lower dialect, and TF0 with arithmetic → FOF: no engine
+- [x] `Loge.Tptp.Engines.Prolog`: Horn CNF without equality → Prolog. The output was not consulted by SWI-Prolog from `loge_tptp`
+- [x] `:inappropriate` with diagnostics for input outside each fragment
+- [x] Properties with StreamData (a test-only dependency), in `mix test`: the formula round trip, the number and groundness of instances, the clauses of the DIMACS output
+- [ ] Verification suite tagged `:verification`, excluded in `test_helper.exs`: status (TPTP headers), differential (ECNF, EGround)
 - [ ] `loge_tptp/VERIFICATION.md` for the version to be published
 
 ### Gate
 
-- [ ] `notebooks/demo.livemd`: one FOF problem whose Skolemisation introduces constants only, through Clausify, Ground, Dimacs and clasp in four cells; the SAT verdict agrees with a prover's on the original
+- [ ] `notebooks/demo.livemd`: one FOF problem whose Skolemisation introduces constants only, through Clausify, Ground, Dimacs and clasp in four cells; the SAT verdict agrees with a prover's on the original. Outside Livebook the chain ran on a theorem and on a non-theorem, with `Loge.run!/3` in `loge_tptp` and clasp in `loge_dimacs`: unsatisfiable and satisfiable. The notebook cells are not written
 - [ ] The record shows no disagreement
 
 ## Phase 9 — Course formalisms
@@ -347,6 +353,45 @@ solver, highlighted by the one grammar of `codemirror-lang-dimacs`.
 
 - [x] The family needed no change in `loge`, and in `kino_loge` only the grammar's version
 
+## Phase 12 — Translations between the other languages
+
+Goal: the edges of OUTLINE §8 outside `loge_tptp`, each in the package of its source
+language. Needs phase 5 only.
+
+### `loge_dimacs`
+
+- [x] `Tptp`, `Smtlib`, `Asp` on DIMACS CNF; `WcnfAsp` on WCNF; `QdimacsSmtlib` on QDIMACS, over `Loge.Dimacs.Translation`, `Script` and `Program`
+- [x] Properties with StreamData: the clauses read back from the TPTP and SMT-LIB outputs are the input's; the bundled clingo finds as many answer sets as the formula has models, and the least cost of a WCNF as its optimum. z3 5.3.3 answered two CNF and three QDIMACS outputs as expected, by hand, not in the suite; no prover was run on a TPTP output
+
+### Probe (record the findings in OUTLINE §6)
+
+- [x] z3 5.3.3: the tactics that leave propositional clauses of a bit-vector script, and how the goal is printed
+- [x] clingo 5.8.2: the ground output to read is aspif (`--mode=gringo --output=intermediate`)
+- [x] `swi_elixir`: how a clause crosses the bridge as a term
+- [x] `rudof_elixir`: the triples of a graph read with `read_data/3` are its N-Triples serialisation
+
+### `loge_smtlib`
+
+- [x] `Loge.Smtlib.Engines.Tptp`: core with uninterpreted sorts and functions → TF0, well-sortedness checked against the script's declarations. On four scripts z3 5.3.3 on the input and Vampire 5.1.0 on the output agreed (one unsatisfiable, three satisfiable); no property test
+- [x] `Loge.Smtlib.Engines.Dimacs`: propositional and bit-vector scripts → DIMACS, z3 bit-blasting. Tested with fake solvers, and against z3 5.3.3 from its release archive (tagged `:z3`, run when on `PATH`)
+- [x] `Loge.Smtlib.Translation`, what the two share
+
+### `loge_prolog`, `loge_asp`
+
+- [x] `priv/loge.pl` returns the clauses of a source as terms (`read_clauses/2`), with the built-in goals of each; `Loge.Prolog.Program` reads definite clauses and inlines the sources a directive includes; `Loge.Prolog.Engines.Tptp`, `Asp`. SWI-Prolog on three queries, Vampire 5.1.0 on the TPTP outputs and clingo on the ASP outputs agreed, by hand; no property test
+- [ ] `Loge.Prolog.Engines.Egglog`: not built. A query is a `check`, and a failed `check` is an error of an egglog run, not a verdict; decide what a query becomes first
+- [x] `Loge.Asp.Engines.Dimacs`: tight programs by Clark's completion (`Loge.Asp.Completion`) over clingo's ground program (`Loge.Asp.Aspif`); a program that is not tight, a disjunctive head, an aggregate left by grounding and `#minimize` are `:inappropriate`. Property: the models of the output on the atoms are as many as clingo's answer sets
+
+### `loge_turtle`
+
+- [x] `Loge.Turtle.Engines.Tptp`, `Prolog`, `Asp`: a graph as `triple/3` facts over `Loge.Turtle.NTriples` and `Loge.Turtle.Facts`; `:equi_satisfiable`, since a blank node becomes a name. clingo, Vampire 5.1.0 and SWI-Prolog read one graph's outputs, by hand
+
+### Gate
+
+- [ ] `Loge.Registry.translations/0` lists every edge of OUTLINE §8 with the packages loaded. Each package's tests assert its own edges; no test loads all packages
+- [x] No change in `loge` or `kino_loge`
+- [ ] `notebooks/demo.livemd`: a DIMACS problem solved as TPTP, SMT-LIB and ASP with the same verdict. Not written
+
 ## Cross-cutting (from day one)
 
 - [ ] `notebooks/<language>.livemd` template per language with a pinned `Mix.install`
@@ -375,7 +420,7 @@ solver, highlighted by the one grammar of `codemirror-lang-dimacs`.
 - [x] How SZS statuses are read is Loge's own decision: Ax of a TPTP problem is its axioms with the negated conjecture; across logics each side has its models in its own logic (OUTLINE §8)
 - [x] Loge's own statuses: a status type, `Loge.Status`, holding the ontology's values and Loge's own; every outcome has one (OUTLINE §3, phase 10)
 - [ ] Rules for carrying a verdict back along a translation: not written, not scheduled
-- [ ] Equality in `Ground` and `Dimacs`: reject it, or add the ground instances of the equality axioms
+- [ ] Equality in `Dimacs`: rejected as `:inappropriate`; adding the ground instances of the equality axioms is open. `Ground` keeps equations
 - [ ] Description logics: concrete syntax (OWL functional syntax, Manchester syntax, a TPTP encoding) and reasoner
 - [x] ShEx shape map: the source of the ShEx engine and a language of `loge_shex`; schema and data are its roles (OUTLINE §3)
 - [x] Semantic web packages: one per language, `loge_turtle`, `loge_sparql`, `loge_shex`; SHACL is an engine of `loge_turtle`, and `loge_shex` holds ShExC with its shape maps

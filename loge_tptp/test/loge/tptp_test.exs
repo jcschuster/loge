@@ -4,7 +4,7 @@ defmodule Loge.TptpTest do
   test "starting the application registers every module" do
     assert Loge.Tptp.Language in Loge.Registry.languages()
     assert Loge.Registry.language_for_extension(".p") == {:ok, Loge.Tptp.Language}
-    assert length(Loge.Registry.engines_for(:tptp)) == 5
+    assert length(Loge.Registry.engines_for(:tptp)) == 14
     assert Loge.Registry.engine("verify") == {:ok, Loge.Tptp.Engines.Verify}
   end
 

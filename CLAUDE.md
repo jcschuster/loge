@@ -34,10 +34,13 @@ contract or an upstream library, say so instead of routing around it.
 - No control carries part of a problem. A question the language has syntax for is part of
   the source; a reference the language can express is an include; a source the language
   cannot name is a role (OUTLINE §3).
-- A translation is written in Elixir, lives in the package of its source language, emits
-  the target's text itself and declares the SZS relation it preserves. It calls no
-  external tool and no remote service at run time. Input outside its fragment is an
-  outcome with `:inappropriate`, never a best effort (OUTLINE §8).
+- A translation lives in the package of its source language, emits the target's text
+  itself and declares the SZS relation it preserves. It is written in Elixir where it
+  is syntactic or small. Where the algorithm is the hard part (clausification,
+  bit-blasting, grounding) it runs a tool Loge already has as an engine, through
+  `Loge.Executable` or the package's binding: no new binary and no remote service at
+  run time. Input outside its fragment is an outcome with `:inappropriate`, never a
+  best effort (OUTLINE §8).
 - A consumer makes no atom from external input: ids through `Loge.Registry.language/1`
   and `engine/1`, control values through `Loge.Control.cast/2`, names through
   `Loge.Variable.parse/1`.

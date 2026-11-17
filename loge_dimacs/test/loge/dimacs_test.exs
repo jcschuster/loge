@@ -7,9 +7,18 @@ defmodule Loge.DimacsTest do
     for language <- [Languages.Cnf, Languages.Wcnf, Languages.Qdimacs],
         do: assert(language in Loge.Registry.languages())
 
-    assert Loge.Registry.engines_for(:dimacs) == [Engines.Clasp, Engines.Cadical, Engines.Kissat]
-    assert Loge.Registry.engines_for(:wcnf) == [Engines.ClaspMaxsat]
-    assert Loge.Registry.engines_for(:qdimacs) == [Engines.Depqbf]
+    assert Loge.Registry.engines_for(:dimacs) ==
+             [
+               Engines.Clasp,
+               Engines.Cadical,
+               Engines.Kissat,
+               Engines.Tptp,
+               Engines.Smtlib,
+               Engines.Asp
+             ]
+
+    assert Loge.Registry.engines_for(:wcnf) == [Engines.ClaspMaxsat, Engines.WcnfAsp]
+    assert Loge.Registry.engines_for(:qdimacs) == [Engines.Depqbf, Engines.QdimacsSmtlib]
     assert Loge.Registry.language_for_extension(".wcnf") == {:ok, Languages.Wcnf}
   end
 end

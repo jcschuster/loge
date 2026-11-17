@@ -75,6 +75,20 @@ defmodule Loge.Prolog.Swipl do
   end
 
   @doc """
+  The terms of `source`, which `read/2` found without a syntax error, each with the
+  line it starts on and the indicators of its head and body goals that are control
+  constructs or built-in predicates. A term is as `swi_elixir` gives it, a variable as
+  `{:compound, "$VAR", [{:atom, name}]}`, an anonymous one named `_` and a number.
+  """
+  @spec clauses(t(), binary()) :: [{pos_integer(), term(), [String.t()]}]
+  def clauses(%__MODULE__{} = swipl, source) when is_binary(source) do
+    file = write_program(swipl, source)
+    query = SWI.query(swipl.session, "loge:read_clauses(#{literal(file)}, Clauses)")
+    [%{"Clauses" => clauses}] = Enum.take(query, 1)
+    for {:compound, "clause", [line, term, built_ins]} <- clauses, do: {line, term, built_ins}
+  end
+
+  @doc """
   Consults `source` as the program the session's goals run against, leaving out its
   queries. Each of `includes` whose name is a word, of letters, digits and
   underscores, is written beside it as `<name>.pl`, where `swipl` looks for the source

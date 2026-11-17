@@ -6,12 +6,13 @@ defmodule Loge.Asp do
   |--------|------|
   | `Loge.Asp.Language` | `clingo --solve-limit=0` |
   | `Loge.Asp.Engines.Clingo` | `clingo --outf=2` |
+  | `Loge.Asp.Engines.Dimacs` | `clingo --mode=gringo`, `Loge.Asp.Aspif`, `Loge.Asp.Completion` |
 
-  Both run the `clingo` executable bundled with `clingo_elixir` and are registered
+  All run the `clingo` executable bundled with `clingo_elixir` and are registered
   with `Loge` when `:loge_asp` starts.
   """
 
   @doc "The modules `:loge_asp` registers with `Loge`."
   @spec modules() :: [module()]
-  def modules, do: [Loge.Asp.Language, Loge.Asp.Engines.Clingo]
+  def modules, do: [Loge.Asp.Language, Loge.Asp.Engines.Clingo, Loge.Asp.Engines.Dimacs]
 end

@@ -6,7 +6,9 @@ defmodule Loge.SmtlibTest do
 
     assert Loge.Registry.engines_for(:smtlib) == [
              Loge.Smtlib.Engines.Z3,
-             Loge.Smtlib.Engines.Cvc5
+             Loge.Smtlib.Engines.Cvc5,
+             Loge.Smtlib.Engines.Dimacs,
+             Loge.Smtlib.Engines.Tptp
            ]
 
     assert Loge.Registry.language_for_extension(".smt2") == {:ok, Loge.Smtlib.Language}

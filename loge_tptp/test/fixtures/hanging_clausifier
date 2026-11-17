@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for a clausifier that does not end.
+exec sleep 1000
