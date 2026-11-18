@@ -170,6 +170,14 @@ const diagnostic = (doc) => (d) => {
 
 const scrolling = EditorView.theme({ "&": { maxHeight: "300px" }, ".cm-scroller": { overflow: "auto" } });
 
+// https://github.com/livebook-dev/livebook/blob/427774a143ade64c1ef8cb65084025960aed3292/assets/js/hooks/session.js#L336-L351
+const evaluationKeys = [
+  { key: "Mod-Enter" },
+  { key: "Shift-Enter" },
+  { key: "Mod-Shift-Enter" },
+  { mac: "Ctrl-Shift-Enter" },
+].map((binding) => ({ ...binding, run: () => true }));
+
 export function viewer(parent, text, language) {
   return new EditorView({
     parent,
@@ -228,7 +236,7 @@ export function editor(parent, { source, version, editor_language }, push) {
         search({ top: true }),
         lintGutter(),
         rainbowBrackets,
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+        keymap.of([...evaluationKeys, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         collab({ startVersion: version }),
         language.of(grammar(editor_language)),
         syntaxHighlighting(highlighting),
@@ -261,6 +269,10 @@ export function editor(parent, { source, version, editor_language }, push) {
     },
     setDiagnostics(diagnostics) {
       view.dispatch(setDiagnostics(view.state, diagnostics.flatMap(diagnostic(view.state.doc))));
+    },
+    insert(text) {
+      view.dispatch({ ...view.state.replaceSelection(text), scrollIntoView: true, userEvent: "input.paste" });
+      view.focus();
     },
   };
 }

@@ -27,6 +27,12 @@ defmodule Loge.StructsTest do
     end
   end
 
+  test "a library entry names its file and describes it" do
+    assert_raise ArgumentError, ~r/:description/, fn ->
+      struct!(Loge.Library.Entry, name: "lib/a")
+    end
+  end
+
   test "a control has no choices by default" do
     assert %Control{key: :k, type: :text, label: "K"}.choices == []
   end

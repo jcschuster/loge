@@ -16,17 +16,21 @@ defmodule KinoLoge.Editor do
   `Loge.Input` with a language, as a `Loge.Source`, by variable name. Those of the
   cell's language are what its includes resolve against, and those its setup names
   for the roles of its engine are the lint's `:roles` (`t:Loge.Language.roles/0`).
+
+  A client searches a `Loge.Library` and reads a file of it to insert at its cursor,
+  where the insertion reaches the source as any edit does. The editor answers that
+  client alone, and reads the file under `Loge.Run`.
   """
 
-  import Kino.JS.Live.Context, only: [assign: 2, update: 3, broadcast_event: 3]
+  import Kino.JS.Live.Context, only: [assign: 2, update: 3, broadcast_event: 3, send_event: 4]
 
   alias KinoLoge.ChangeSet
-  alias Loge.{Diagnostic, Range}
+  alias Loge.{Diagnostic, Range, Registry}
 
   @lint_delay 300
 
   @enforce_keys [:roles]
-  defstruct [:roles, :lint, :timer, version: 0, diagnostics: [], sources: %{}]
+  defstruct [:roles, :lint, :timer, version: 0, diagnostics: [], sources: %{}, reads: %{}]
 
   @typedoc """
   The variables a setup names for the roles of its engine, by role key; `nil` for a
@@ -36,7 +40,8 @@ defmodule KinoLoge.Editor do
 
   @typedoc """
   How the setup names its roles, the version of the source, the diagnostics last sent,
-  the bound sources, the running lint and the pending one.
+  the bound sources, the running lint and the pending one, and the running reads, each
+  with the client that asked and the file's name.
   """
   @type t :: %__MODULE__{
           roles: roles(),
@@ -44,7 +49,8 @@ defmodule KinoLoge.Editor do
           diagnostics: [map()],
           sources: %{String.t() => Loge.Source.t()},
           lint: Task.t() | nil,
-          timer: reference() | nil
+          timer: reference() | nil,
+          reads: %{reference() => {Kino.JS.Live.Context.origin(), String.t()}}
         }
 
   @doc """
@@ -94,6 +100,43 @@ defmodule KinoLoge.Editor do
 
   def push(ctx, _payload), do: ctx
 
+  @doc """
+  Answers a client's `"search"`, `%{"library" => id, "query" => query}`, with a
+  `"found"` event to that client: the entries `Loge.Library.search/3` finds in the
+  library. An unknown library or another payload changes nothing.
+  """
+  @spec search(Kino.JS.Live.Context.t(), term()) :: Kino.JS.Live.Context.t()
+  def search(ctx, %{"library" => id, "query" => query}) when is_binary(id) and is_binary(query) do
+    with {:ok, library} <- Registry.library(id) do
+      entries = Enum.map(Loge.Library.search(library, query), &Map.from_struct/1)
+      send_event(ctx, ctx.origin, "found", entries)
+    end
+
+    ctx
+  end
+
+  def search(ctx, _payload), do: ctx
+
+  @doc """
+  Reads the file a client's `"read"`, `%{"library" => id, "name" => name}`, names, and
+  sends that client a `"file"` event with the `name` and its `text`, or an `error`
+  sentence when it cannot be read. An unknown library or another payload changes
+  nothing.
+  """
+  @spec read(Kino.JS.Live.Context.t(), term()) :: Kino.JS.Live.Context.t()
+  def read(ctx, %{"library" => id, "name" => name}) when is_binary(id) and is_binary(name) do
+    case Registry.library(id) do
+      {:ok, library} ->
+        %Task{ref: ref} = Loge.Run.async(fn -> file(library, name) end)
+        update(ctx, :editor, &%{&1 | reads: Map.put(&1.reads, ref, {ctx.origin, name})})
+
+      :error ->
+        ctx
+    end
+  end
+
+  def read(ctx, _payload), do: ctx
+
   @doc "Lints the source after a pause, as after an edit; for a change of language."
   @spec schedule_lint(Kino.JS.Live.Context.t()) :: Kino.JS.Live.Context.t()
   def schedule_lint(%{assigns: %{editor: editor}} = ctx) do
@@ -103,8 +146,8 @@ defmodule KinoLoge.Editor do
 
   @doc """
   Handles every message a cell with an editor receives: the lint timer, the lint's
-  result or failure, and the bound sources `scan_binding/2` sends. Others are stale and
-  change nothing.
+  result or failure, the result or failure of a read, and the bound sources
+  `scan_binding/2` sends. Others are stale and change nothing.
   """
   @spec handle_info(term(), Kino.JS.Live.Context.t()) :: Kino.JS.Live.Context.t()
   def handle_info(:lint, ctx), do: lint(ctx)
@@ -133,6 +176,20 @@ defmodule KinoLoge.Editor do
     show(ctx, [failure])
   end
 
+  def handle_info({ref, file}, %{assigns: %{editor: %{reads: reads}}} = ctx)
+      when is_map_key(reads, ref) do
+    Process.demonitor(ref, [:flush])
+    answer(ctx, ref, file)
+  end
+
+  def handle_info(
+        {:DOWN, ref, :process, _pid, reason},
+        %{assigns: %{editor: %{reads: reads}}} = ctx
+      )
+      when is_map_key(reads, ref) do
+    answer(ctx, ref, %{error: "reading failed: " <> Exception.format_exit(reason)})
+  end
+
   def handle_info(_stale, ctx), do: ctx
 
   @doc """
@@ -159,6 +216,19 @@ defmodule KinoLoge.Editor do
 
   defp source(input),
     do: Loge.source(Loge.Input.language(input), IO.iodata_to_binary(Loge.Input.to_iodata(input)))
+
+  defp file(library, name) do
+    case library.read(name, []) do
+      {:ok, text} -> %{text: text}
+      {:error, reason} -> %{error: library.format_error(reason)}
+    end
+  end
+
+  defp answer(ctx, ref, file) do
+    {{origin, name}, reads} = Map.pop!(ctx.assigns.editor.reads, ref)
+    send_event(ctx, origin, "file", Map.put(file, :name, name))
+    update(ctx, :editor, &%{&1 | reads: reads})
+  end
 
   defp apply_updates(source, updates) do
     Enum.reduce_while(updates, {:ok, source}, fn update, {:ok, source} ->

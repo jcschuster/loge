@@ -11,7 +11,7 @@ defmodule Loge.Application do
   end
 
   defp register_configured do
-    [:languages, :analyzers, :engines]
+    [:languages, :analyzers, :engines, :libraries]
     |> Enum.flat_map(&Application.get_env(:loge, &1, []))
     |> Enum.reduce_while(:ok, fn module, :ok ->
       case Loge.Registry.register(module) do

@@ -6,6 +6,7 @@ defmodule Loge.RegistryTest do
   test "holds the modules named in the application environment" do
     assert Fake.Language in Registry.languages()
     assert Fake.Engine in Registry.engines()
+    assert Fake.Library in Registry.libraries()
   end
 
   test "register/1 files a module under the behaviour it implements" do
@@ -66,11 +67,23 @@ defmodule Loge.RegistryTest do
     assert Registry.engine("fake_solver") == {:ok, Fake.Solver}
   end
 
-  test "language/1 and engine/1 make no atom from an unknown id" do
+  test "library/1 finds a library by its id, which a language may share" do
+    assert Registry.library(:fake) == {:ok, Fake.Library}
+    assert Registry.library("fake") == {:ok, Fake.Library}
+    assert Registry.language("fake") == {:ok, Fake.Language}
+  end
+
+  test "libraries_for/1 lists the libraries of a language" do
+    assert Registry.libraries_for(:fake) == [Fake.Library]
+    assert Registry.libraries_for(:fake_target) == []
+  end
+
+  test "language/1, engine/1 and library/1 make no atom from an unknown id" do
     id = "no_such_id_#{System.unique_integer([:positive])}"
 
     assert Registry.language(id) == :error
     assert Registry.engine(id) == :error
+    assert Registry.library(id) == :error
     assert_raise ArgumentError, fn -> String.to_existing_atom(id) end
   end
 

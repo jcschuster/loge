@@ -262,3 +262,29 @@ defmodule KinoLoge.Fake.Validator do
   @impl true
   def format_error(reason), do: inspect(reason)
 end
+
+defmodule KinoLoge.Fake.Library do
+  @moduledoc false
+  @behaviour Loge.Library
+
+  alias Loge.Library.Entry
+
+  @impl true
+  def id, do: :fake
+  @impl true
+  def label, do: "Fake library"
+  @impl true
+  def language, do: :fake
+
+  @impl true
+  def entries,
+    do: [%Entry{name: "lib/a", description: "Alpha"}, %Entry{name: "lib/b", description: "Beta"}]
+
+  @impl true
+  def read("lib/" <> _ = name, _options), do: {:ok, "fact from #{name}"}
+  def read("crash", _options), do: exit(:crashed)
+  def read(_name, _options), do: {:error, :missing}
+
+  @impl true
+  def format_error(:missing), do: "no such file"
+end

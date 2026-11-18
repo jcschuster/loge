@@ -5,7 +5,8 @@ needs; phases 2 and 4 can run beside 3. Phases 5 to 9 follow the scope of OUTLIN
 order: core contracts, cells, the existing languages, translations, new formalisms. Each
 phase has one gate that must pass before the next starts. Phase 10 needs phases 5 and 6
 only and can run beside 7 to 9; phase 11 extends the package of phase 2 and needs phase
-5; phase 12 needs phase 5 and, for its Prolog and TPTP ends, phase 8's formula type. Phase 0 is issue-only and nothing waits on its answers.
+5; phase 12 needs phase 5 and, for its Prolog and TPTP ends, phase 8's formula type;
+phase 13 needs phases 5 and 6 only. Phase 0 is issue-only and nothing waits on its answers.
 
 ## Phase 0 — Upstream issues and PRs
 
@@ -65,6 +66,7 @@ in `kino_loge`.
 - [x] Run in Livebook with two browsers: sync, persistence across restart, notebook shortcuts from inside the editor
 - [x] Evaluation right after typing: the `ctx.handleSync` handler resolves when the cell has confirmed the client's edits
 - [x] Search and replace (Ctrl+F); brackets coloured by nesting depth from the syntax tree (`closedBy`)
+- [x] Ctrl+Enter, Shift+Enter and Ctrl+Shift+Enter left to Livebook: the editor's keymap claims them before `defaultKeymap` inserts a line, and the keydown still reaches Livebook (OUTLINE §7). Driven in jsdom; to be checked in Livebook
 - [x] `.devcontainer` built with Podman; the bundle rebuilt in it
 - [x] Highlighted output: `KinoLoge.Code` for text views in a language; TPTP engines emit SZS output blocks as TPTP text
 - [x] `{:titled, title, view}` view; an output block is titled by its dataform (`CNFRefutation`, `FiniteModel`)
@@ -399,6 +401,34 @@ language. Needs phase 5 only.
 - [x] `Loge.Registry.translations/0` lists every edge of OUTLINE §8 with the packages loaded: `loge_verification` asserts the registered translate engines are the ones it checks
 - [x] No change in `loge` or `kino_loge`
 - [x] `notebooks/translations.livemd`: every edge, with the table of the registry, a chain per language and an input outside a fragment; generated from cell attrs with each cell's `to_source/1`, and its 44 engine cells evaluated in order outside Livebook with Vampire 5.1.0 and z3 5.3.3 on `PATH`, each with the expected status. To be checked in Livebook
+
+## Phase 13 — Libraries
+
+Goal: the files a language offers beside the notebook's sources, searched in the cell
+and inserted into its editor (OUTLINE §3, §4). Needs phases 5 and 6 only.
+
+### `loge`
+
+- [x] `Loge.Library` (`id`, `label`, `language`, `entries`, `read/2`, `format_error/1`) and `Loge.Library.Entry`; `Loge.Library.search/3`, the one search; the registry's fourth kind (`libraries/0`, `library/1`, `libraries_for/1`, `config :loge, libraries:`); a fake library in `test/support/fakes.ex`, read through by the consumer test
+
+### `loge_tptp`
+
+- [x] `mix loge.tptp.library ROOT` writes `priv/library.tsv` from the headers of a distribution; run on TPTP v10.0.0: 29,467 files, every one described, none other than UTF-8
+- [x] `Loge.Tptp.Library` over the index, reading through `Tptp.Resolver.Http`; tptp 0.3.6 required, which fetches under `mix run`, reads every name from seetptp.tptp.org, decodes its numeric references and unpacks a file above 10 MiB. Read from tptp.org by hand, each the distribution's bytes: three nested axiom sets, the 12 files with a `"` in a formula and 21 with one in a comment, and large files from 5 MB to 70 MB
+- [x] The 2,101 axiom sets in subdirectories of `Axioms` (`SET007/`, `ITP001/`), in the index since tptp 0.3.4
+- [x] A `"` no longer arrives as `&#34;` (tptp 0.3.5); a file cached by 0.3.4 is fetched again
+- [x] The 104 files larger than 10 MiB, which seetptp.tptp.org offers only as a `.tgz` (tptp 0.3.6); the four above 260 MB time out after the resolver's 30 s here
+- [ ] Six files just under 10 MiB raise `SystemLimitError` in `Tptp.Resolver.Http.contents/1`: wait on tptp (`UPSTREAM.md`)
+
+### `kino_loge`
+
+- [x] Both cells: a button per library of the cell's language; a search answered to the client that asked, a click reading the file under `Loge.Run` and inserting it at that client's cursor as an edit; none while a bound input is shown. ExUnit for the events; `library.js` driven in jsdom against a stand-in for the cell; to be checked in Livebook
+- [x] `editor()` returns `insert/1`; the bundle rebuilt
+
+### Gate
+
+- [x] `rg -i tptp kino_loge/lib -g '*.ex'` returns nothing
+- [ ] In Livebook: search the TPTP library in a Source cell, insert a problem, undo it, and see the insertion in a second browser (to be checked in Livebook)
 
 ## Cross-cutting (from day one)
 

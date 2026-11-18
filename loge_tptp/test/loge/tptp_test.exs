@@ -6,6 +6,8 @@ defmodule Loge.TptpTest do
     assert Loge.Registry.language_for_extension(".p") == {:ok, Loge.Tptp.Language}
     assert length(Loge.Registry.engines_for(:tptp)) == 14
     assert Loge.Registry.engine("verify") == {:ok, Loge.Tptp.Engines.Verify}
+    assert Loge.Registry.libraries_for(:tptp) == [Loge.Tptp.Library]
+    assert Loge.Registry.library("tptp") == {:ok, Loge.Tptp.Library}
   end
 
   test "a problem names its other sources by includes, so no engine has a role" do

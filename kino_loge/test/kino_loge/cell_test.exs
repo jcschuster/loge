@@ -41,7 +41,19 @@ defmodule KinoLoge.CellTest do
     assert data.input == nil
     assert data.roles == []
     assert data.variable == ""
+    assert data.libraries == [%{id: "fake", label: "Fake library"}]
     assert data.diagnostics == []
+  end
+
+  test "a client searches the libraries of the cell's language and reads a file" do
+    {kino, _source} = start_smart_cell!(Cell, %{})
+    connect(kino)
+
+    push_event(kino, "search", %{"library" => "fake", "query" => ""})
+    assert_send_event(kino, "found", [%{name: "lib/a"}, %{name: "lib/b"}])
+
+    push_event(kino, "read", %{"library" => "fake", "name" => "lib/b"})
+    assert_send_event(kino, "file", %{name: "lib/b", text: "fact from lib/b"}, 1_000)
   end
 
   test "the client gets the source, its version and the name of its grammar" do

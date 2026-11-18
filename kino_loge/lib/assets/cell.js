@@ -1,6 +1,7 @@
 import { viewer } from "./editor.js";
 import { mount, element, field, input, select, assign } from "./form.js";
 import { edit } from "./editing.js";
+import { library } from "./library.js";
 
 export function init(ctx, data) {
   const app = mount(
@@ -19,6 +20,8 @@ export function init(ctx, data) {
   const bound = app.querySelector(".bound");
   const list = app.querySelector(".diagnostics");
   const source = edit(ctx, own, list, data);
+  const files = library(ctx, source);
+  own.before(files.panel);
   let shape = null;
   let shown = null;
   let inputs = {};
@@ -60,7 +63,8 @@ export function init(ctx, data) {
       field("Engine", inputs.engine),
       ...(setup.inputs.length > 1 ? [field("Input", inputs.input)] : []),
       ...setup.roles.map(role),
-      field("Bind to", inputs.variable)
+      field("Bind to", inputs.variable),
+      files.toggles
     );
     controls = new Map();
     options.replaceChildren(...setup.controls.map(control));
@@ -103,6 +107,7 @@ export function init(ctx, data) {
     assign(inputs.variable, setup.variable);
     for (const c of setup.controls) assign(controls.get(c.key), c.value);
     source.setLanguage(setup.editor_language);
+    files.render(setup.input === null ? setup.libraries : []);
     show(setup);
   };
 

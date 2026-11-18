@@ -12,7 +12,8 @@ defmodule Loge.Tptp.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      docs: docs()
+      docs: docs(),
+      dialyzer: [plt_add_apps: [:mix]]
     ]
   end
 
@@ -29,7 +30,7 @@ defmodule Loge.Tptp.MixProject do
   defp deps do
     [
       loge_dep(),
-      {:tptp, "~> 0.3"},
+      {:tptp, "~> 0.3.6"},
       {:atp_client, "~> 0.8.1"},
       {:stream_data, "~> 1.1", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},

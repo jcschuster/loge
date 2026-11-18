@@ -1,7 +1,7 @@
 defmodule Loge.Tptp do
   @moduledoc """
-  TPTP for Loge: the language over `tptp`, one engine per `atp_client` backend, and the
-  verifiers of the TPTP World.
+  TPTP for Loge: the language over `tptp`, one engine per `atp_client` backend, the
+  verifiers of the TPTP World, and the TPTP library.
 
   | Module | Over |
   |--------|------|
@@ -14,6 +14,7 @@ defmodule Loge.Tptp do
   | `Loge.Tptp.Engines.Clausify` | Vampire, an executable |
   | `Loge.Tptp.Engines.Ground`, `Dimacs`, `Prolog`, `Smtlib` | `Loge.Tptp.Formula`, `Loge.Tptp.Clause` |
   | `Loge.Tptp.Engines.Fof`, `Tff`, `Thf`, `Untyped` | the same, between the dialects of TPTP; `Loge.Tptp.Typing` |
+  | `Loge.Tptp.Library` | `Tptp.Resolver.Http` |
 
   All of them are registered with `Loge` when `:loge_tptp` starts.
   """
@@ -36,7 +37,8 @@ defmodule Loge.Tptp do
       Loge.Tptp.Engines.Fof,
       Loge.Tptp.Engines.Tff,
       Loge.Tptp.Engines.Thf,
-      Loge.Tptp.Engines.Untyped
+      Loge.Tptp.Engines.Untyped,
+      Loge.Tptp.Library
     ]
   end
 end

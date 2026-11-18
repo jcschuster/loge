@@ -7,7 +7,9 @@ defmodule KinoLoge.SourceCell do
   The source is edited and linted as in the Logic Engine cell (`KinoLoge.Editor`), its
   includes resolve against the sources of its language bound in the notebook, and the
   value it binds carries the sources its includes name. The variable defaults to a
-  fresh `source`, `source2`, ... (`Kino.SmartCell.prefixed_var_name/2`).
+  fresh `source`, `source2`, ... (`Kino.SmartCell.prefixed_var_name/2`). Each library
+  of the language (`Loge.Library`) can be searched, and a file of it inserted at the
+  cursor.
 
   The cell's state is a `KinoLoge.SourceSetup`; its source is
   `KinoLoge.SourceSetup.to_source/1`.
@@ -38,6 +40,8 @@ defmodule KinoLoge.SourceCell do
     do: change(ctx, &SourceSetup.put_variable(&1, name))
 
   def handle_event("push", payload, ctx), do: {:noreply, Editor.push(ctx, payload)}
+  def handle_event("search", payload, ctx), do: {:noreply, Editor.search(ctx, payload)}
+  def handle_event("read", payload, ctx), do: {:noreply, Editor.read(ctx, payload)}
 
   def handle_event(_event, _payload, ctx), do: {:noreply, ctx}
 
@@ -64,7 +68,8 @@ defmodule KinoLoge.SourceCell do
       languages: Enum.map(Loge.Registry.languages(), &choice/1),
       language: Atom.to_string(setup.language.id()),
       editor_language: setup.language.editor_language(),
-      variable: setup.variable
+      variable: setup.variable,
+      libraries: Enum.map(Loge.Registry.libraries_for(setup.language.id()), &choice/1)
     }
   end
 

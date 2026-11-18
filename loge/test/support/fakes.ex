@@ -430,3 +430,35 @@ defmodule Loge.PeerTest.Report do
     Process.sleep(:infinity)
   end
 end
+
+defmodule Loge.Fake.Library do
+  @moduledoc false
+  @behaviour Loge.Library
+
+  alias Loge.Library.Entry
+
+  @impl true
+  def id, do: :fake
+
+  @impl true
+  def label, do: "Fake library"
+
+  @impl true
+  def language, do: :fake
+
+  @impl true
+  def entries do
+    [
+      %Entry{name: "lib/a", description: "Alpha and Beta"},
+      %Entry{name: "lib/b", description: "beta"},
+      %Entry{name: "other/c", description: ""}
+    ]
+  end
+
+  @impl true
+  def read("other/c", _options), do: {:error, :gone}
+  def read(name, _options), do: {:ok, "from(#{name})."}
+
+  @impl true
+  def format_error(:gone), do: "the file is gone"
+end

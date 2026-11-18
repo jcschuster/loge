@@ -1,20 +1,25 @@
 defmodule Loge.Registry do
   @moduledoc """
-  The languages, analyzers and engines known to this node.
+  The languages, analyzers, engines and libraries known to this node.
 
-  Modules arrive from the `:languages`, `:engines` and `:analyzers` lists in the `:loge`
-  application environment, read when `:loge` starts, and from `register/1`. A module
-  is filed under each of the `Loge.Language`, `Loge.Analyzer` and `Loge.Engine`
-  behaviours it declares, and its id is unique among the modules of that kind. The
-  registry lives in `:persistent_term`: lookups are cheap and registration, which
-  happens once per package start, is not.
+  Modules arrive from the `:languages`, `:engines`, `:analyzers` and `:libraries` lists
+  in the `:loge` application environment, read when `:loge` starts, and from
+  `register/1`. A module is filed under each of the `Loge.Language`, `Loge.Analyzer`,
+  `Loge.Engine` and `Loge.Library` behaviours it declares, and its id is unique among
+  the modules of that kind. The registry lives in `:persistent_term`: lookups are cheap
+  and registration, which happens once per package start, is not.
 
-  `language/1` and `engine/1` find a module by its id given as an atom or as the atom's
-  string form, so a consumer reading an id from a notebook, a form or a JSON request
-  makes no atom of it.
+  `language/1`, `engine/1` and `library/1` find a module by its id given as an atom or
+  as the atom's string form, so a consumer reading an id from a notebook, a form or a
+  JSON request makes no atom of it.
   """
 
-  @kinds %{Loge.Language => :languages, Loge.Analyzer => :analyzers, Loge.Engine => :engines}
+  @kinds %{
+    Loge.Language => :languages,
+    Loge.Analyzer => :analyzers,
+    Loge.Engine => :engines,
+    Loge.Library => :libraries
+  }
 
   @typedoc "Why a module could not be registered."
   @type error ::
@@ -58,6 +63,10 @@ defmodule Loge.Registry do
   @spec analyzers() :: [module()]
   def analyzers, do: modules().analyzers
 
+  @doc "Registered libraries, in registration order."
+  @spec libraries() :: [module()]
+  def libraries, do: modules().libraries
+
   @doc "The registered language with the id `id`, an atom or its string form."
   @spec language(atom() | String.t()) :: {:ok, module()} | :error
   def language(id), do: find(languages(), id)
@@ -65,6 +74,10 @@ defmodule Loge.Registry do
   @doc "The registered engine with the id `id`, an atom or its string form."
   @spec engine(atom() | String.t()) :: {:ok, module()} | :error
   def engine(id), do: find(engines(), id)
+
+  @doc "The registered library with the id `id`, an atom or its string form."
+  @spec library(atom() | String.t()) :: {:ok, module()} | :error
+  def library(id), do: find(libraries(), id)
 
   @doc "Engines whose `c:Loge.Engine.languages/0` include `language`."
   @spec engines_for(atom()) :: [module()]
@@ -75,6 +88,10 @@ defmodule Loge.Registry do
   def analyzers_for(language) do
     Enum.filter(analyzers(), &(&1.languages() == :any or language in &1.languages()))
   end
+
+  @doc "Libraries whose `c:Loge.Library.language/0` is `language`."
+  @spec libraries_for(atom()) :: [module()]
+  def libraries_for(language), do: Enum.filter(libraries(), &(&1.language() == language))
 
   @doc """
   The edges of the graph whose nodes are the languages: one per translate engine and
@@ -98,7 +115,7 @@ defmodule Loge.Registry do
   end
 
   defp modules do
-    :persistent_term.get(__MODULE__, %{languages: [], analyzers: [], engines: []})
+    :persistent_term.get(__MODULE__, %{languages: [], analyzers: [], engines: [], libraries: []})
   end
 
   defp find(modules, id) when is_atom(id), do: modules |> Enum.find(&(&1.id() == id)) |> found()

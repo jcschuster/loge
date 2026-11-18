@@ -9,5 +9,6 @@ if config_env() == :test do
       Loge.Fake.Solver,
       Loge.Fake.Checker,
       Loge.Fake.Validator
-    ]
+    ],
+    libraries: [Loge.Fake.Library]
 end

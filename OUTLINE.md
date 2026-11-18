@@ -21,6 +21,7 @@ translations between them that preserve a stated semantic relation.
 | Engine   | Performs one task on sources (`Loge.Engine`).                                                                                       |
 | Outcome  | What a run returns: a status (`Loge.Status`), views, and possibly a source as output (`Loge.Outcome`).                              |
 | Role     | A source an engine needs beside its input and that the input's language cannot name (`Loge.Role`).                                  |
+| Library  | Files in one language that a source can include or hold, searched by name and description (`Loge.Library`).                         |
 
 An engine belongs in Loge when it passes both tests:
 
@@ -80,7 +81,7 @@ loge/                       this repo
   OUTLINE.md  PLAN.md  README.md  .formatter.exs  .gitignore
   loge/                     core: behaviours, registry, structs, run supervision. Deps: tptp (SZS ontology).
   loge_tptp/                Language + analyzers + engines for TPTP: provers, verifiers,
-                            translations. Deps: loge, tptp, atp_client.
+                            translations; the TPTP library. Deps: loge, tptp, atp_client.
   kino_loge/                Smart cells and Kino.Render. Deps: loge, kino.
   loge_dimacs/  (phase 2)   DIMACS CNF, WCNF, QDIMACS. Deps: loge, clingo_elixir (its clingo
                             executable); CaDiCaL, Kissat, DepQBF executables.
@@ -275,6 +276,40 @@ the language's comments, strings and quoted atoms, without starting the tool. Th
 lint grounds with the includes and names an included file in a finding on line 1;
 the Prolog and egglog lints read the program alone.
 
+### Libraries (`Loge.Library`)
+
+A library is files in one language that a source can include by name or hold as its
+text: the problems and axiom sets of the TPTP library.
+
+```elixir
+@callback id() :: atom()                         # :tptp; unique among registered libraries
+@callback label() :: String.t()
+@callback language() :: atom()
+@callback entries() :: [Loge.Library.Entry.t()]  # %{name, description}, in index order
+@callback read(String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+@callback format_error(term()) :: String.t()
+```
+
+An entry's name is the name an include of the language writes. `Loge.Library.search/3`
+is the one search: the entries whose name or description holds every word of the
+query, ignoring case, in index order, at most `:limit` (50). `read/2` gives valid UTF-8,
+as a consumer sends the text on as JSON. A consumer inserts what it read as text; the
+includes in it stay as written and resolve as any include does.
+
+`Loge.Tptp.Library` is compiled from `priv/library.tsv`, which `mix loge.tptp.library`
+writes from a TPTP distribution: the problems and the axiom sets, those of `Axioms`
+and of its subdirectories `SET007/` and `ITP001/`, each described by its header's
+`Problem` or `Axioms` line, reading only the comment lines at the top of a file. From
+v10.0.0 that is 29,467 files, every one described, in 1.9 MB, a 4.2 MB module. A file
+is read through `Tptp.Resolver.Http`, as an include is, from seetptp.tptp.org since
+tptp 0.3.4, a file above 10 MiB as the `.tgz` it offers since 0.3.6. Read with tptp
+0.3.6, 33 files with a `"`, among them the 12 with one in a formula, and 20 large
+files of 5 MB to 70 MB were the distribution's bytes, 70 MB in 9 s; six files just
+under 10 MiB raise in the resolver (`UPSTREAM.md`), and the three problems of 266 MB
+and the axiom set of 455 MB do not arrive within its 30 s timeout here. A search scans
+the index: under 1 ms to 13 ms for a query with many matches, 47 ms for
+one with none (measured here).
+
 ### Roles (`Loge.Role`)
 
 A role is a source an engine needs beside its input and that the input's language has no
@@ -376,16 +411,18 @@ as a goal that fails is no error, and `:nonconformant` in the negative one, as
 
 ### `Loge.Registry`
 
-Sources, in order: `config :loge, languages: [...], engines: [...], analyzers: [...]`
+Sources, in order: `config :loge, languages: [...], engines: [...], analyzers: [...],
+libraries: [...]`
 (read once in `Loge.Application.start/2`) and runtime `Loge.register/1` called from each
 package's `Application.start/2` (works under `Mix.install`). Stored in `:persistent_term`;
 no process. A module's kind is read from its `@behaviour`; anything else is
 `{:error, {:not_a_loge_module, module}}`. Guards with `Code.ensure_loaded?/1`. An id is
 unique within its kind: another module with an id its kind holds is
 `{:error, {:duplicate_id, id, holder}}`.
-API: `languages/0`, `engines/0`, `engines_for(language_id)`, `analyzers_for(language_id)`,
-`language_for_extension/1`; `language/1` and `engine/1`, which find a module by its id
-given as an atom or as the atom's string form, so that no consumer makes an atom from
+API: `languages/0`, `engines/0`, `libraries/0`, `engines_for(language_id)`,
+`analyzers_for(language_id)`, `libraries_for(language_id)`, `language_for_extension/1`;
+`language/1`, `engine/1` and `library/1`, which find a module by its id given as an
+atom or as the atom's string form, so that no consumer makes an atom from
 external input; `translations/0`, which gives for each translate engine and each language
 it accepts the engine with its source language, target language and relation: the edges
 of the graph whose nodes are the languages.
@@ -440,6 +477,10 @@ bind  → scan_binding/3 → every bound Loge.Input with a language, as Loge.Sou
 edit  → "push" event (version, change sets) → KinoLoge.ChangeSet.apply/2 → "updates"
         broadcast to every client (§7) → debounced (300 ms) Loge.lint/3 under Loge.Run
       → diagnostics in Kino's editor format, drawn in the editor and listed under it
+find  → a library's button → "search" (library, query) → Loge.Library.search/3 → "found"
+        to that client → a click on an entry → "read" (library, name) →
+        c:Loge.Library.read/2 under Loge.Run → "file" to that client → inserted at its
+        cursor, an edit as above
 eval  → Source cell: `defs = Loge.source(:lang, "...")` → Loge.Source
       → Engine cell: `result = Loge.run!(Engine, input, ..., includes: %{"defs" => defs})`
         → Outcome
@@ -494,7 +535,11 @@ Cells:
   Generalises `KinoAtpClient.BackendConfig`, without its directory browser.
 
 The collaborative source and the lint loop (§7) are one module, `KinoLoge.Editor`, which
-both cells with an editor use.
+both cells with an editor use. It also answers a client's search of the libraries of
+the cell's language (`Loge.Registry.libraries_for/1`): each is a button at the end of
+the header that opens a search above the editor, and a click on an entry reads the file
+and inserts it at that client's cursor. The Engine cell offers none while a bound input
+is shown.
 
 Robustness: `handle_event/3` must be total (no `String.to_existing_atom/1` on untrusted
 keys); persist the source attr on every change; supervised unlinked tasks only.
@@ -742,6 +787,18 @@ Notes:
 - Keys: Livebook's iframe (`iframe/priv/static/iframe/v6.html`) replicates every `keydown`
   to the parent page with `isTargetEditable`, so notebook shortcuts that work while
   typing in an input keep working. Read in the source, not tried in Livebook.
+- Evaluation keys: Livebook evaluates on Ctrl+Enter, Shift+Enter and Ctrl+Shift+Enter
+  (Cmd for Ctrl on macOS) even while an editor has focus, in the capture phase
+  (`assets/js/hooks/session.js`, `handleDocumentKeyDown`, at 427774a), so its own editor
+  never sees them. In the cell's iframe CodeMirror sees them first, and `defaultKeymap`
+  inserts a line for `Mod-Enter` and `Shift-Enter`. The editor's keymap therefore begins
+  with those keys, and Ctrl+Shift+Enter on macOS, bound to a command that only claims
+  them: CodeMirror prevents the default and does not stop propagation, so `v6.html`
+  still forwards the keydown. Plain Enter breaks the line. Checked in jsdom (no change,
+  no push, the keydown reaches `window`); to be checked in Livebook.
+- `editor()` returns `insert(text)`: the client's selection replaced by `text` as a
+  paste, its own undo step, pushed as any edit. A library's files reach the editor this
+  way (§4).
 - Not provided, unlike Livebook's own editor: the user's editor settings (theme, font
   size, vim/emacs keys), remote cursors. The theme copies Livebook's dark default. The
   settings live in the local storage of Livebook's page (`assets/js/lib/settings.js`),
@@ -888,14 +945,14 @@ A consumer needs `loge` and the language packages it wants, nothing else. `kino_
 one; `loge_mcp` will be another and is not planned here. What every consumer may rely
 on, and what the tests of `loge` hold with fake modules:
 
-- Discovery is data. `Loge.Registry` lists languages and engines and finds one by the
-  string form of its id. An engine's `label/0`, `languages/0`, `task/0`, `roles/0`,
+- Discovery is data. `Loge.Registry` lists languages, engines and libraries and finds
+  one by the string form of its id. An engine's `label/0`, `languages/0`, `task/0`, `roles/0`,
   `controls/0` and `config_schema/0` say everything needed to call it. `translations/0`
   gives the edges between languages.
 - External values are read by the core: `Loge.Control.cast/2` for control values,
   `Loge.Variable.parse/1` for names. A consumer makes no atom from its input.
 - One call per purpose: `Loge.lint/3`, `Loge.run!/3` or `c:Loge.Engine.run/2`,
-  `Loge.configure!/2`. Runs go under `Loge.Run`, and the death of the caller cancels.
+  `Loge.configure!/2`, `Loge.Library.search/3` and `c:Loge.Library.read/2`. Runs go under `Loge.Run`, and the death of the caller cancels.
 - Results are data: an outcome's status, views of the closed set (§3), raw text and
   output; diagnostics with ranges; errors as the sentence of `format_error/1`.
 - Nothing in `loge` or in a language package depends on Kino or on a transport.

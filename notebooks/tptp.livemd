@@ -15,10 +15,10 @@ Mix.install([
 Nothing to set for SystemOnTPTP. To try another engine, fill in its fields and press
 **Verify**; a password field takes the name of a Livebook secret, not the password.
 
-<!-- livebook:{"attrs":"eyJ2YWx1ZXMiOnt9fQ","chunks":null,"kind":"Elixir.KinoLoge.ConfigCell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJ2YWx1ZXMiOnsic3lzdGVtX29uX3RwdHAiOnsieDJ0cHRwIjp0cnVlfX19","chunks":null,"kind":"Elixir.KinoLoge.ConfigCell","livebook_object":"smart_cell"} -->
 
 ```elixir
-:ok
+Loge.configure!(Loge.Tptp.Engines.SystemOnTptp, x2tptp: true)
 ```
 
 ## Sources

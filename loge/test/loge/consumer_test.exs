@@ -45,6 +45,19 @@ defmodule Loge.ConsumerTest do
     assert %Loge.Outcome{status: :conformant} = Loge.run!(validator, "p.", roles)
   end
 
+  test "a consumer finds the library of a language by string id, searches it and reads a file" do
+    {:ok, language} = Registry.language("fake")
+    [library] = Registry.libraries_for(language.id())
+    {:ok, ^library} = Registry.library("fake")
+
+    assert [%Loge.Library.Entry{name: name}] = Loge.Library.search(library, "alpha")
+    assert {:ok, text} = library.read(name, [])
+    assert Loge.lint(language, text, []) == []
+
+    assert {:error, reason} = library.read("other/c", [])
+    assert library.format_error(reason) == "the file is gone"
+  end
+
   test "loge depends on no consumer" do
     applications = Application.spec(:loge, :applications)
 

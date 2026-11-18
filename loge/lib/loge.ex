@@ -4,9 +4,10 @@ defmodule Loge do
   source, checks one, or translates it into another language under a stated semantic
   relation (`Loge.Engine`); a run's outcome can be the input of the next.
 
-  A language package implements `Loge.Language`, `Loge.Analyzer` and `Loge.Engine`
-  and registers its modules; a consumer such as a smart cell or an agent discovers
-  them through `Loge.Registry` and runs them under `Loge.Run`.
+  A language package implements `Loge.Language`, `Loge.Analyzer`, `Loge.Engine` and,
+  for files a source can include, `Loge.Library`, and registers its modules; a consumer
+  such as a smart cell or an agent discovers them through `Loge.Registry` and runs them
+  under `Loge.Run`.
 
   A package registers its modules when it starts:
 
@@ -15,8 +16,8 @@ defmodule Loge do
         Supervisor.start_link([], strategy: :one_for_one)
       end
 
-  Modules can also be listed in the application environment, which is read when
-  `:loge` starts:
+  Modules can also be listed in the application environment, under `:languages`,
+  `:analyzers`, `:engines` and `:libraries`, which is read when `:loge` starts:
 
       config :loge, languages: [MyLang.Language], engines: [MyLang.Engine], analyzers: []
   """
@@ -151,7 +152,8 @@ defmodule Loge do
   end
 
   @doc """
-  Registers a language, analyzer or engine module. See `Loge.Registry.register/1`.
+  Registers a language, analyzer, engine or library module. See
+  `Loge.Registry.register/1`.
   """
   @spec register(module()) :: :ok | {:error, Loge.Registry.error()}
   defdelegate register(module), to: Loge.Registry

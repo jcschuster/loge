@@ -58,11 +58,51 @@ defmodule KinoLoge.SourceCellTest do
 
   test "an event it does not know changes nothing" do
     {kino, _source} = start_smart_cell!(SourceCell, %{"variable" => "defs"})
+    connect(kino)
     push_event(kino, "set_variable", "not a map")
     push_event(kino, "explode", %{})
+    push_event(kino, "search", %{"library" => "nope", "query" => "a"})
+    push_event(kino, "read", %{"library" => 1, "name" => "lib/a"})
 
     assert connect(kino).variable == "defs"
     refute_received {:runtime_smart_cell_update, _, _, _, _}
+    refute_received {:event, _event, _payload, _info}
+  end
+
+  test "the client gets the libraries of the cell's language, and those of another" do
+    {kino, _source} = start_smart_cell!(SourceCell, %{"variable" => "defs"})
+    assert connect(kino).libraries == [%{id: "fake", label: "Fake library"}]
+
+    push_event(kino, "set_language", %{"id" => "other"})
+    assert_broadcast_event(kino, "setup", %{libraries: []})
+  end
+
+  test "a client's search of a library is answered to that client" do
+    {kino, _source} = start_smart_cell!(SourceCell, %{"variable" => "defs"})
+    connect(kino)
+    push_event(kino, "search", %{"library" => "fake", "query" => "BETA"})
+
+    assert_send_event(kino, "found", [%{name: "lib/b", description: "Beta"}])
+  end
+
+  test "a file a client reads is sent to that client, or why it cannot be read" do
+    {kino, _source} = start_smart_cell!(SourceCell, %{"variable" => "defs"})
+    connect(kino)
+
+    push_event(kino, "read", %{"library" => "fake", "name" => "lib/a"})
+    assert_send_event(kino, "file", %{name: "lib/a", text: "fact from lib/a"}, 1_000)
+
+    push_event(kino, "read", %{"library" => "fake", "name" => "nope"})
+    assert_send_event(kino, "file", %{name: "nope", error: "no such file"}, 1_000)
+  end
+
+  @tag :capture_log
+  test "a read that crashes is reported to its client" do
+    {kino, _source} = start_smart_cell!(SourceCell, %{"variable" => "defs"})
+    connect(kino)
+    push_event(kino, "read", %{"library" => "fake", "name" => "crash"})
+
+    assert_send_event(kino, "file", %{name: "crash", error: "reading failed: " <> _}, 1_000)
   end
 
   test "includes are linted against the binding and passed in the source" do

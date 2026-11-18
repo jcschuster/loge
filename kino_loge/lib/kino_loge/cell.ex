@@ -8,7 +8,9 @@ defmodule KinoLoge.Cell do
   select groups the language's engines by their task, solve, check or translate; a
   translation names the language it leads to. An engine's roles (`Loge.Role`) are one
   select each, over the bound inputs of the role's languages. Includes resolve against
-  the sources of the cell's language bound in the notebook (`KinoLoge.Editor`).
+  the sources of the cell's language bound in the notebook (`KinoLoge.Editor`). Each
+  library of the language (`Loge.Library`) can be searched, and a file of it inserted
+  at the cursor of the editor.
 
   The cell's state is a `KinoLoge.Setup`; its source is `KinoLoge.Setup.to_source/1`.
   The cell brings its own editor, which highlights the language named by
@@ -51,6 +53,8 @@ defmodule KinoLoge.Cell do
     do: change(ctx, &Setup.put_variable(&1, name))
 
   def handle_event("push", payload, ctx), do: {:noreply, Editor.push(ctx, payload)}
+  def handle_event("search", payload, ctx), do: {:noreply, Editor.search(ctx, payload)}
+  def handle_event("read", payload, ctx), do: {:noreply, Editor.read(ctx, payload)}
 
   def handle_event(_event, _payload, ctx), do: {:noreply, ctx}
 
@@ -90,7 +94,8 @@ defmodule KinoLoge.Cell do
       input: setup.input,
       input_text: input_text(setup, editor.sources),
       roles: roles(setup, editor.sources),
-      variable: setup.variable
+      variable: setup.variable,
+      libraries: Enum.map(Registry.libraries_for(setup.language.id()), &choice/1)
     }
   end
 
