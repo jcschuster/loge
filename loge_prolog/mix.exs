@@ -25,7 +25,7 @@ defmodule Loge.Prolog.MixProject do
   defp deps do
     [
       loge_dep(),
-      {:swi_elixir, github: "davfuenmayor/swi_elixir"},
+      {:swi_elixir, github: "davfuenmayor/swi_elixir", tag: "v0.1.0"},
       {:stream_data, "~> 1.1", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
