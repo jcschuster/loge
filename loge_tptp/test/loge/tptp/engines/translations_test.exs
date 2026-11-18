@@ -185,6 +185,7 @@ defmodule Loge.Tptp.Engines.TranslationsTest do
              cnf(d, axiom, $false).
              cnf(e, axiom, p | $true).
              """) == """
+             :- dynamic 'Is it'/1.
              parent(tom, bob).
              ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
              ?- ancestor(tom, X), 'Is it'(f(X)).
@@ -238,8 +239,8 @@ defmodule Loge.Tptp.Engines.TranslationsTest do
             {"p(1)", "number 1"},
             {"p(\"d\")", "distinct object"},
             {"$less(a, b)", "$less"},
-            {"'and'", "named and"},
-            {"p('a|b')", "named a|b"}
+            {"'and'", "the name and"},
+            {"p('a|b')", "the name a|b"}
           ] do
         assert {:ok,
                 %Outcome{
@@ -252,7 +253,35 @@ defmodule Loge.Tptp.Engines.TranslationsTest do
       end
 
       assert {:ok, %Outcome{status: :inappropriate}} = Smtlib.run("fof(a, type, p).", [])
-      assert {:ok, %Outcome{status: :inappropriate}} = Smtlib.run("tff(a, axiom, p).", [])
+      assert {:ok, %Outcome{status: :inappropriate}} = Smtlib.run("thf(a, axiom, p).", [])
+
+      assert {:ok, %Outcome{status: :inappropriate}} =
+               Smtlib.run("tff(a, axiom, ![X: $int]: p(X)).", [])
+
+      assert {:ok, %Outcome{status: :inappropriate}} =
+               Smtlib.run("tff(u, type, 'U': $tType).", [])
+    end
+
+    test "a type is a sort and a typed symbol is declared with its sorts" do
+      assert text(Smtlib, """
+             tff(human_type, type, human: $tType).
+             tff(socrates_type, type, socrates: human).
+             tff(father_type, type, father: (human * $i) > human).
+             tff(mortal_type, type, mortal: human > $o).
+             tff(a, axiom, ![X: human, Y]: (mortal(father(X, Y)) | r(Y))).
+             tff(b, conjecture, ?[Z: human]: mortal(Z)).
+             """) == """
+             (set-logic UF)
+             (declare-sort U 0)
+             (declare-sort human 0)
+             (declare-const socrates human)
+             (declare-fun father (human U) human)
+             (declare-fun mortal (human) Bool)
+             (declare-fun r (U) Bool)
+             (assert (forall ((X human) (Y U)) (or (mortal (father X Y)) (r Y))))
+             (assert (not (exists ((Z human)) (mortal Z))))
+             (check-sat)
+             """
     end
 
     test "a name used in two ways is outside" do
@@ -268,7 +297,7 @@ defmodule Loge.Tptp.Engines.TranslationsTest do
                 }} =
                  Smtlib.run(problem, [])
 
-        assert message =~ "Used in two ways"
+        assert message =~ "used in two ways"
       end
     end
   end

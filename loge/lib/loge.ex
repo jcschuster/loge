@@ -66,11 +66,14 @@ defmodule Loge do
   The options are the engine's roles (`c:Loge.Engine.roles/0`), its controls
   (`c:Loge.Engine.controls/0`), its settings (`c:Loge.Engine.config_schema/0`) and
   `:includes`. Raises `ArgumentError` for any other key, for a required role that is
-  missing, and for an input or a role's value in a language the engine or the role
-  does not read.
+  missing, for an input or a role's value in a language the engine or the role
+  does not read, and for an input that is the outcome of a translation without an
+  output, naming its status and what its diagnostics say: a pipeline stops at the
+  translation that did not translate instead of running on nothing.
   """
   @spec run!(module(), Loge.Input.t(), keyword()) :: Loge.Outcome.t()
   def run!(engine, input, options) when is_list(options) do
+    check_translated!(input)
     check_language!(inspect(engine), engine.languages(), Loge.Input.language(input))
     check_options!(engine, Keyword.keys(options))
     Enum.each(engine.roles(), &check_role!(engine, &1, options))
@@ -80,6 +83,19 @@ defmodule Loge do
       {:error, reason} -> raise Loge.Error, engine: engine, reason: reason
     end
   end
+
+  defp check_translated!(%Loge.Outcome{problem: :translation, output: nil} = outcome) do
+    reasons =
+      for {:diagnostics, diagnostics} <- outcome.views,
+          diagnostic <- diagnostics,
+          do: "\nline #{diagnostic.range.line}: #{diagnostic.message}"
+
+    raise ArgumentError,
+          "the input is a translation by #{inspect(outcome.engine)} that gave no output " <>
+            "(#{Loge.Status.name(outcome.status)})" <> Enum.join(reasons)
+  end
+
+  defp check_translated!(_input), do: :ok
 
   defp check_language!(_reader, _languages, nil), do: :ok
 

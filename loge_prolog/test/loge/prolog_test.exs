@@ -7,7 +7,8 @@ defmodule Loge.PrologTest do
     assert Loge.Registry.engines_for(:prolog) == [
              Loge.Prolog.Engines.Swipl,
              Loge.Prolog.Engines.Tptp,
-             Loge.Prolog.Engines.Asp
+             Loge.Prolog.Engines.Asp,
+             Loge.Prolog.Engines.Egglog
            ]
 
     assert Loge.Registry.language_for_extension(".pl") == {:ok, Loge.Prolog.Language}

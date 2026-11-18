@@ -52,10 +52,11 @@ defmodule Loge.Tptp.Engines.ClausifyTest do
 
     assert Clausify.format_error(reason) =~ "did not print clauses"
 
-    assert {:error, {:exit_status, 4, "User error: fake\n"} = reason} =
+    assert {:error, {:rejected, "User error: fake\n"} = reason} =
              Clausify.run("fof(a, axiom, p).", executable: fake("failing_clausifier"))
 
-    assert Clausify.format_error(reason) =~ "exited with status 4"
+    assert Clausify.format_error(reason) ==
+             "Vampire does not read the problem:\nUser error: fake\n"
 
     assert {:error, {:executable_not_found, "loge-no-such-tool"} = reason} =
              Clausify.run("fof(a, axiom, p).", executable: "loge-no-such-tool")
@@ -107,7 +108,7 @@ defmodule Loge.Tptp.Engines.ClausifyTest do
     end
 
     test "what Vampire rejects is its error" do
-      assert {:error, {:exit_status, 4, message}} = Clausify.run("fof(a, axiom, p(1)).", [])
+      assert {:error, {:rejected, message}} = Clausify.run("fof(a, axiom, p(1)).", [])
       assert message =~ "User error"
     end
 

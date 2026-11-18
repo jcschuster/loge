@@ -17,7 +17,8 @@ defmodule Loge.Smtlib.Engines.Dimacs do
   (`Loge.Smtlib.Translation`): a command that changes the assertions other than by
   asserting, such as `push`; and a script whose goal has a formula that is no clause
   over Boolean constants, as integers, arrays and uninterpreted functions leave. An
-  `(error …)` of z3 is `{:error, {:solver, messages}}`.
+  `(error …)` of z3 is `{:error, {:solver, messages}}`, and an output without a goal,
+  as of another solver set as the executable, `{:error, {:no_goal, output}}`.
 
   The executable is `z3` on `PATH` unless the `:executable` setting names another. The
   `:time_limit` control is the seconds z3 may take; past it z3 is killed and the status
@@ -80,6 +81,11 @@ defmodule Loge.Smtlib.Engines.Dimacs do
 
   @impl true
   def format_error({:solver, messages}), do: "z3 reported: " <> Enum.join(messages, "; ")
+
+  def format_error({:no_goal, output}),
+    do:
+      "The solver printed no goal for the tactics; is the executable z3? It printed:\n" <> output
+
   def format_error(reason), do: Solver.format_error(reason)
 
   defp name({:list, [{:symbol, name, _span} | _arguments], _list_span}), do: name
@@ -132,7 +138,7 @@ defmodule Loge.Smtlib.Engines.Dimacs do
     end)
   end
 
-  defp clauses(nil, output), do: {:error, {:exit_status, 0, output}}
+  defp clauses(nil, output), do: {:error, {:no_goal, output}}
 
   defp clauses(formulas, output) do
     read = Enum.map(formulas, &clause/1)

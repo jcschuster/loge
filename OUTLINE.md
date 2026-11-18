@@ -65,7 +65,7 @@ representations ("if this can be a satisfiability problem, translate it and solv
 | Tasks             | An engine declares one: `:solve`, `:check` or `{:translate, to, preserves}` (§3). Cells and consumers treat the three alike.                   |
 | Verdicts          | Every `Loge.Outcome` carries a status of `Loge.Status`: a value of the SZS ontology where it describes the result, one of Loge's own otherwise (§3). A translation's status is the relation it preserves between input and output. |
 | Sources in a run  | A question the language has syntax for is part of the source (a conjecture, `(check-sat)`, `?- Goal.`). A reference the language can express is an include. A source the language cannot name is a role (§3). No control carries part of a problem. |
-| Translations      | In the package of the source language. Elixir where syntactic or small; otherwise a tool Loge already runs as an engine, never a new binary or a remote service. Verified before publication, not in CI (§8, §9). |
+| Translations      | In the package of the source language. Elixir where syntactic or small; a tool where the algorithm is the hard part: first one Loge already runs, and a new binary or a remote service only when it does not add to what a user must install by much (§8). Verified semantically on generated inputs (`loge_verification`, in `mix test`) and on a corpus before publication (§9). |
 | Cells             | Two, by what they produce: a Source cell binds a source, an Engine cell binds an outcome (§4). None per task.                                  |
 | Solve             | Livebook's own cell evaluation (Kino has no API for a cell to evaluate itself). Raw output is the outcome's Output tab.                          |
 | Input             | `Loge.Input` protocol (mirrors `AtpClient.Input`). An outcome is an input: its output.                                                         |
@@ -89,6 +89,8 @@ loge/                       this repo
   loge_egglog/  (phase 3)   Deps: loge, egglog_elixir.
   loge_smtlib/  (phase 4)   Deps: loge only; z3/cvc5 executables via Loge.Executable.
   loge_turtle/  (phase 10)  Turtle; SHACL validation. Deps: loge, rudof_elixir.
+  loge_verification/        Tests only: every translation against independent solvers on
+                            generated inputs (§9). Deps: the language packages. Not published.
   loge_sparql/  (phase 10)  SPARQL; queries on a graph and on an endpoint. Deps: loge, rudof_elixir.
   loge_shex/    (phase 10)  ShExC and ShapeMap; ShEx validation. Deps: loge, rudof_elixir.
   notebooks/                demo.livemd (guided tour of every package), and one smoke-test
@@ -163,7 +165,9 @@ backend's `config_key/0`. `Loge.run!/3` calls `run/2` and returns the outcome or
 is the engine's `format_error/1`. Before that it raises `ArgumentError` for an option
 that is not a role key, a control key, a setting key or `:includes`, for a required
 role that is missing, and for an input or a role's value whose `Loge.Input.language/1`
-the engine or the role does not read: a misspelt option or a mismatched
+the engine or the role does not read, and for an input that is the outcome of a
+translation without an output, with its status and what its diagnostics say, so that a
+pipeline stops at the translation that did not translate: a misspelt option or a mismatched
 pipeline fails with a sentence instead of running with defaults or failing in the tool's
 words.
 
@@ -661,6 +665,15 @@ Notes:
 - rudof 0.3.24 (executed): `Rudof.Session.serialize_data(session, :ntriples)` gives the
   graph read with `read_data/3` a triple per line, blank nodes as `_:b<N>`, a plain
   literal without a datatype, `\"` and `\n` escaped and other characters as they are.
+- egglog (executed): a rule stated twice is an error (`Rule already exists`); a relation
+  named as a command or an action (`run`, `set`) does not parse, and one named as a
+  sort (`String`) is `Sort … already declared`; `(print-function name)` without a count
+  prints every row, as `(name args) -> (name args)`.
+- SWI-Prolog 10.0.1 (executed): a goal of a predicate without clauses raises
+  `existence_error(procedure, …)` unless the predicate is declared `dynamic`.
+- Vampire 5.1.0 (executed): `--mode casc_sat` is named by `-explain mode` and refused as
+  a value; `--mode casc` decides theorems and non-theorems, and on a problem whose only
+  model is small it may time out where `--saturation_algorithm fmb` answers at once.
 
 ## 7. Editor facts (Kino 0.19.1, Livebook main on 2026-11-11)
 
@@ -755,13 +768,17 @@ Notes:
 A translation is an engine with the task `{:translate, to, preserves}` (§3).
 
 - Written in Elixir, as a function of the source, where the translation is syntactic
-  or small. Where the algorithm is the hard part it runs a tool Loge already has as an
-  engine: Vampire clausifies, z3 bit-blasts, the bundled clingo grounds, the package's
-  `swipl` reads Prolog terms. Such a translation names its tool by an `:executable`
-  setting (`Loge.Executable`) or uses the package's binding, checks that what the tool
-  printed lies in the target fragment, and prints the target itself. No new binary and
-  no remote service at run time: the tools of the TPTP World stay the references a
-  translation is verified against (§9), not dependencies.
+  or small. Where the algorithm is the hard part it runs a tool: Vampire clausifies, z3
+  bit-blasts, the bundled clingo grounds, the package's `swipl` reads Prolog terms. Such
+  a translation names its tool by an `:executable` setting (`Loge.Executable`) or uses
+  the package's binding, checks that what the tool printed lies in the target fragment,
+  and prints the target itself.
+- Sparing with what a user installs. A tool Loge already runs as an engine comes first.
+  A new binary or a remote service is acceptable when it is one more thing at most: a
+  single executable that exists for Linux, macOS and Windows, or a service of the TPTP
+  World that `atp_client` already reaches. A translation that would need a compiler, a
+  virtual machine or a language runtime of its own is not built. A translation whose
+  tool is missing says which tool and where to set it (`Loge.Executable.format_error/1`).
 - In the package of its source language. It emits the target's text itself, so
   `loge_tptp` produces DIMACS text without depending on `loge_dimacs`.
 - Total on its language: an input outside its fragment is an outcome with
@@ -790,7 +807,7 @@ printed back through `Tptp.Printer.Canonical`; `Loge.Tptp.Clause` is a clause of
 literals, and `Loge.Tptp.Translation` reads the problem, collects the statements outside
 an engine's fragment and builds the two outcomes. `Formula` reads `tff` formulas too, a
 typed variable with its type, and `Loge.Tptp.Typing` the `type` statements of monomorphic
-TF0; only `Untyped` takes them, so TF0 has no edge to SMT-LIB yet.
+TF0, which `Untyped`, `Thf` and `Smtlib` take through `Loge.Tptp.Translation.typed/1`.
 It lives in `loge_tptp`, the adapter between `tptp` and Loge; `tptp` stays a reading of
 the syntax.
 
@@ -806,13 +823,14 @@ dialect before it where the package has several languages.
 | `Loge.Dimacs.Engines.QdimacsSmtlib` | QDIMACS → SMT-LIB (quantified Bool)                        | Elixir                                                              | `:equivalent`       |
 | `Loge.Tptp.Engines.Fof`             | CNF → FOF, each clause under its universal closure          | Elixir                                                              | `:equivalent`       |
 | `Loge.Tptp.Engines.Tff`             | FOF and CNF → TF0, nothing declared: untyped is over `$i`   | Elixir                                                              | `:equivalent`       |
-| `Loge.Tptp.Engines.Thf`             | FOF and CNF → TH0, every symbol declared, application by `@` | Elixir, on `Loge.Tptp.Signature`                                   | `:equivalent`       |
+| `Loge.Tptp.Engines.Thf`             | FOF, CNF and monomorphic TF0 → TH0, every symbol declared, application by `@` | Elixir, on `Loge.Tptp.Signature`                | `:equivalent`       |
 | `Loge.Tptp.Engines.Untyped`         | monomorphic TF0 without arithmetic → FOF by type guards     | Elixir, on `Loge.Tptp.Typing`                                       | `:equi_satisfiable` |
 | `Loge.Tptp.Engines.Clausify`        | FOF → CNF                                                  | Vampire, `--mode clausify`                                          | `:equi_satisfiable` |
 | `Loge.Tptp.Engines.Ground`          | CNF with no function symbol of arity above 0 → ground CNF, equations kept | Elixir                                               | `:equi_satisfiable` |
 | `Loge.Tptp.Engines.Dimacs`          | ground CNF without equality → DIMACS                       | Elixir; an atom per variable, the table in `details.atoms` and as `c` comment lines | `:equi_satisfiable` |
-| `Loge.Tptp.Engines.Smtlib`          | FOF and CNF without defined symbols → SMT-LIB (`UF`), the conjecture negated | Elixir, on `Loge.Tptp.Formula`                    | `:equivalent`       |
-| `Loge.Tptp.Engines.Prolog`          | Horn CNF without equality → Prolog                         | Elixir                                                              | `:equivalent`       |
+| `Loge.Tptp.Engines.Smtlib`          | FOF, CNF and monomorphic TF0 without defined symbols → SMT-LIB (`UF`), a sort per type, the conjecture negated | Elixir, on `Loge.Tptp.Formula` | `:equivalent` |
+| `Loge.Tptp.Engines.Prolog`          | Horn CNF without equality → Prolog, a predicate without clauses declared `dynamic` | Elixir                                      | `:equivalent`       |
+| `Loge.Prolog.Engines.Egglog`        | definite clauses without function symbols → egglog: relations over strings, a `?- G.` as a relation of its answers, printed and checked | as `Loge.Prolog.Engines.Asp` | `:equivalent` |
 | `Loge.Smtlib.Engines.Tptp`          | SMT-LIB core with uninterpreted sorts and functions → TF0  | Elixir, on `Loge.Smtlib.Sexp`                                       | `:equivalent`       |
 | `Loge.Smtlib.Engines.Dimacs`        | propositional and bit-vector SMT-LIB → DIMACS              | z3 bit-blasts and encodes; Elixir reads the goal and prints DIMACS  | `:equi_satisfiable` |
 | `Loge.Prolog.Engines.Tptp`          | definite clauses → TPTP Horn `cnf`, a `?- G.` as the negated conjecture | Elixir, on terms the package's `swipl` reads (`Loge.Prolog.Program`) | `:equivalent` |
@@ -820,10 +838,10 @@ dialect before it where the package has several languages.
 | `Loge.Asp.Engines.Dimacs`           | tight ASP → DIMACS by Clark's completion                   | the bundled clingo grounds; Elixir reads the ground program and completes it | `:equi_satisfiable` |
 | `Loge.Turtle.Engines.Tptp`, `Prolog`, `Asp` | Turtle → `triple(S, P, O)` facts, a blank node as a name | Elixir, on the N-Triples rudof serialises (`Loge.Turtle.NTriples`, `Facts`) | `:equi_satisfiable` |
 
-No edge exists into Turtle, SPARQL or ShEx, into or out of egglog, out of THF, from ASP
-that is not tight (loop formulas, or lp2sat, a binary Loge does not have) or from
-SMT-LIB with arithmetic into TPTP. Prolog to egglog is not built: a query without an
-answer would be a failed `check`, an error of the run and not a verdict. A pair of languages without an engine has no edge in
+No edge exists into Turtle, SPARQL or ShEx, out of egglog, out of THF, from ASP that
+is not tight (loop formulas, or lp2sat, a binary Loge does not have), for TPTP
+arithmetic or from SMT-LIB with a theory into TPTP. A pair of languages without an
+engine has no edge in
 `Loge.Registry.translations/0`. No function finds a path of edges: that needs the rules
 for composing `preserves`, which are not written.
 
@@ -834,12 +852,13 @@ SystemB4TPTP listed on 2026-11-14.
 
 ## 9. Verifying translations
 
-A translation is checked by tools that share none of its code. There are four checks.
-The first runs with the test suite. The other three run before a package is published
+A translation is checked by tools that share none of its code. There are five checks.
+The first two run with the test suites. The other three run before a package is published
 and never in CI: they need the network, the TPTP library and minutes to hours.
 
 | Check        | What it establishes                                                                                                                                                                                              | With                                                                                                             |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Semantic     | On generated inputs, for every translate engine: an independent solver's answer to the input is the answer another gives to the output, as the relation predicts. clasp, clingo, SWI-Prolog and egglog judge in every run; z3 and Vampire where installed (tagged). A translate engine without a check fails the suite | `loge_verification`: StreamData, `mix test` there; `LOGE_VERIFICATION_RUNS` sets the runs per property |
 | Properties   | On generated small inputs: the output is in the target fragment, introduced symbols are fresh, and for propositional inputs the relation holds by truth table (input and output are equisatisfiable, and each model of the output restricted to the input's atoms is a model of the input) | StreamData, in `mix test`                                                                 |
 | Derivation   | Each step of `details.derivation` has the status it claims, and the derivation is well-formed                                                                                                                    | GDV through `AtpClient.verify/2`: trusted ATP systems discharge an obligation per step                           |
 | Status       | On problems whose status is recorded, solving the output gives the status the relation predicts                                                                                                                  | TPTP library headers (`Tptp.Header.status/1`); a reference prover through the engines of `loge_tptp`; clasp for DIMACS |

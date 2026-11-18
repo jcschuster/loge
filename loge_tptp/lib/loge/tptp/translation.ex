@@ -11,7 +11,7 @@ defmodule Loge.Tptp.Translation do
   """
 
   alias Loge.{Diagnostic, Outcome}
-  alias Loge.Tptp.{Clause, Diagnostics, Formula, Language, Signature}
+  alias Loge.Tptp.{Clause, Diagnostics, Formula, Language, Signature, Typing}
   alias Tptp.Statement.Annotated
 
   @typedoc "What a statement is read as, or the sentence saying why it lies outside the fragment."
@@ -67,6 +67,34 @@ defmodule Loge.Tptp.Translation do
 
   def formula(%Annotated{language: language}),
     do: {:outside, "A #{language} statement is not a first-order formula."}
+
+  @doc """
+  What a statement of a typed first-order problem is: the typing of a `tff` statement
+  with the role `type` (`Loge.Tptp.Typing`), else the formula of a `tff`, `fof` or
+  `cnf` statement, closed over its free variables. Outside are a statement of another
+  TPTP language, a typing that is not monomorphic over declared types and `$i`, and a
+  variable of a defined type such as `$int`.
+  """
+  @spec typed(Annotated.t()) ::
+          reading({:typing, String.t(), Typing.t()} | {:formula, Formula.t()})
+  def typed(%Annotated{language: :tff, formula: node} = statement) do
+    case {Annotated.role_word(statement), Typing.from_node(node)} do
+      {"type", {:ok, {name, declared}}} ->
+        {:ok, {:typing, name, declared}}
+
+      {"type", {:error, _node}} ->
+        {:outside, "This declaration is not monomorphic over declared types and $i."}
+
+      {_role, _no_typing} ->
+        typed_formula(node)
+    end
+  end
+
+  def typed(%Annotated{language: language, formula: node}) when language in [:fof, :cnf],
+    do: typed_formula(node)
+
+  def typed(%Annotated{language: language}),
+    do: {:outside, "A #{language} statement is not first-order."}
 
   @doc "The clause of a `cnf` statement."
   @spec clause(Annotated.t()) :: reading(Clause.t())
@@ -132,27 +160,37 @@ defmodule Loge.Tptp.Translation do
   end
 
   @doc """
-  `:ok` when no name among `uses` stands for two things (`Loge.Tptp.Signature`); else
-  the diagnostic naming them, with `sentence` saying why the target cannot tell them
-  apart.
+  `:ok` when no name stands for two things in `unit` (`Loge.Tptp.Signature`), `uses`
+  giving what a statement uses; else a diagnostic on every statement that uses such a
+  name, with `sentence` saying why the target cannot tell the two apart.
   """
-  @spec unambiguous([Signature.use()], String.t()) :: :ok | {:inappropriate, [Diagnostic.t()]}
-  def unambiguous(uses, sentence) do
-    case Signature.ambiguous(uses) do
+  @spec unambiguous(Tptp.Unit.t(), (Annotated.t() -> [Signature.use()]), String.t()) ::
+          :ok | {:inappropriate, [Diagnostic.t()]}
+  def unambiguous(%Tptp.Unit{} = unit, uses, sentence) when is_function(uses, 1) do
+    formulae = Tptp.Unit.formulae(unit)
+
+    case formulae
+         |> Enum.flat_map(fn {_file, statement} -> uses.(statement) end)
+         |> Signature.ambiguous() do
       [] ->
         :ok
 
-      names ->
+      ambiguous ->
         {:inappropriate,
-         [
-           Diagnostic.new(
-             "fragment",
-             :error,
-             Loge.Range.new(1),
-             "Used in two ways, as a variable and a symbol, a function and a predicate, " <>
-               "or with two arities: #{Enum.join(names, ", ")}. " <> sentence
-           )
-         ]}
+         Diagnostics.from_tptp(
+           for {file, statement} <- formulae,
+               [_ | _] = names <- [
+                 Enum.filter(ambiguous, &(&1 in Signature.names(uses.(statement))))
+               ] do
+             outside(
+               file,
+               statement,
+               "#{Enum.join(names, ", ")} is used in two ways in the problem, as a variable " <>
+                 "and a symbol, a function and a predicate, or with two arities. " <> sentence
+             )
+           end,
+           unit
+         )}
     end
   end
 
@@ -164,6 +202,18 @@ defmodule Loge.Tptp.Translation do
   end
 
   def format_error(reason), do: inspect(reason, pretty: true, width: 80)
+
+  defp typed_formula(node) do
+    with {:ok, formula} <- Formula.from_node(node),
+         formula = Formula.closure(formula),
+         nil <-
+           Enum.find(Signature.types(formula), &match?({:defined, name} when name != "$i", &1)) do
+      {:ok, {:formula, formula}}
+    else
+      {:error, _node} -> {:outside, "This statement is not a first-order formula."}
+      {:defined, name} -> {:outside, "A variable of the defined type #{name} is not translated."}
+    end
+  end
 
   defp outside(file, statement, message) do
     %Tptp.Diagnostic{

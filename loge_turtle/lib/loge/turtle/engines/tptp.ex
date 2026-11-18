@@ -63,6 +63,6 @@ defmodule Loge.Turtle.Engines.Tptp do
   defp word(text) do
     if text =~ ~r/\A[\x20-\x7E]*\z/,
       do: {:ok, [?', String.replace(text, ~r/['\\]/, "\\\\\\0"), ?']},
-      else: {:outside, "A TPTP word is of printable ASCII; this graph has a term that is not."}
+      else: {:outside, "A TPTP word is of printable ASCII, which #{inspect(text)} is not."}
   end
 end

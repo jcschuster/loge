@@ -37,10 +37,15 @@ contract or an upstream library, say so instead of routing around it.
 - A translation lives in the package of its source language, emits the target's text
   itself and declares the SZS relation it preserves. It is written in Elixir where it
   is syntactic or small. Where the algorithm is the hard part (clausification,
-  bit-blasting, grounding) it runs a tool Loge already has as an engine, through
-  `Loge.Executable` or the package's binding: no new binary and no remote service at
-  run time. Input outside its fragment is an outcome with `:inappropriate`, never a
-  best effort (OUTLINE §8).
+  bit-blasting, grounding) it runs a tool, through `Loge.Executable` or the package's
+  binding: first one Loge already has as an engine; a new binary or a remote service
+  only when it adds little to what a user installs (one executable that exists for
+  Linux, macOS and Windows; no compiler, VM or runtime of its own). Input outside its
+  fragment is an outcome with `:inappropriate` and diagnostics on what lies outside,
+  never a best effort (OUTLINE §8).
+- Every translate engine has a semantic check in `loge_verification`, which compares
+  independent solvers on its input and its output; its suite fails for an engine it
+  does not name (OUTLINE §9).
 - A consumer makes no atom from external input: ids through `Loge.Registry.language/1`
   and `engine/1`, control values through `Loge.Control.cast/2`, names through
   `Loge.Variable.parse/1`.
@@ -54,7 +59,8 @@ contract or an upstream library, say so instead of routing around it.
   implementation in `test/support`.
 - Before finishing a task run, from the package directory: `mix format`,
   `mix compile --warnings-as-errors`, `mix test`. Run `mix dialyzer` when touching typespecs.
-- Translations: property tests (StreamData) run in `mix test`. Tests tagged
+- Translations: property tests (StreamData) run in `mix test`, in the package and, across
+  packages, in `loge_verification`. Tests tagged
   `:verification` call remote TPTP tools and read the TPTP library; they are excluded by
   default and from CI. Run them with `mix test --only verification` before a release and
   record the figures in the package's `VERIFICATION.md` (OUTLINE §9). Never weaken, skip

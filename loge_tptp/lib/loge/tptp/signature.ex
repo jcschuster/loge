@@ -37,9 +37,43 @@ defmodule Loge.Tptp.Signature do
     Enum.uniq(names -- Enum.uniq(names))
   end
 
+  @doc """
+  The types of the variables a formula binds, each once, in order; a variable bound
+  without a type is of type `$i`.
+
+      iex> Loge.Tptp.Signature.types({:forall, [{"X", {:plain, "human"}}, "Y"], true})
+      [{:plain, "human"}, {:defined, "$i"}]
+  """
+  @spec types(Formula.t()) :: [Formula.symbol()]
+  def types(formula), do: formula |> bound_types() |> Enum.uniq()
+
+  @doc "The type of a variable as a quantifier binds it."
+  @spec type(Formula.bound()) :: Formula.symbol()
+  def type({_name, type}), do: type
+  def type(_name), do: {:defined, "$i"}
+
+  @doc "The name of a variable as a quantifier binds it."
+  @spec bound_name(Formula.bound()) :: String.t()
+  def bound_name({name, _type}), do: name
+  def bound_name(name), do: name
+
+  @doc "The names among `uses`: of the variables and of the symbols."
+  @spec names([use()]) :: [String.t()]
+  def names(uses), do: for(use <- uses, name = name(use), uniq: true, do: name)
+
   defp name({:variable, name}), do: name
   defp name({_kind, {_plain, name}, _arity}), do: name
   defp name(_constant), do: nil
+
+  defp bound_types({quantifier, variables, formula}) when quantifier in [:forall, :exists],
+    do: Enum.map(variables, &type/1) ++ bound_types(formula)
+
+  defp bound_types({:not, formula}), do: bound_types(formula)
+
+  defp bound_types({connective, left, right}) when connective in [:and, :or, :implies, :iff],
+    do: bound_types(left) ++ bound_types(right)
+
+  defp bound_types(_atom), do: []
 
   defp formula(boolean) when is_boolean(boolean), do: []
   defp formula({:not, formula}), do: formula(formula)

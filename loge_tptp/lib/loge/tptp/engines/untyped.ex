@@ -34,10 +34,9 @@ defmodule Loge.Tptp.Engines.Untyped do
 
   @behaviour Loge.Engine
 
-  alias Loge.Tptp.{Formula, Signature, Translation, Typing}
+  alias Loge.Tptp.{Formula, Signature, Translation}
   alias Tptp.Node
   alias Tptp.Printer.Canonical
-  alias Tptp.Statement.Annotated
 
   @individual {:defined, "$i"}
 
@@ -85,33 +84,13 @@ defmodule Loge.Tptp.Engines.Untyped do
   @impl true
   def format_error(reason), do: Translation.format_error(reason)
 
-  defp statement(%Annotated{language: :tff, formula: node} = statement) do
-    case {Annotated.role_word(statement), Typing.from_node(node)} do
-      {"type", {:ok, {name, declared}}} ->
-        {:ok, {:typing, name, declared}}
-
-      {"type", {:error, _node}} ->
-        {:outside, "This declaration is not monomorphic over declared types and $i."}
-
-      {_role, _no_typing} ->
-        formula(statement)
-    end
-  end
-
-  defp statement(%Annotated{language: language} = statement) when language in [:fof, :cnf],
-    do: formula(statement)
-
-  defp statement(%Annotated{language: language}),
-    do: {:outside, "A #{language} statement is not first-order."}
-
-  defp formula(%Annotated{formula: node} = statement) do
-    with {:ok, formula} <- Formula.from_node(node),
-         formula = Formula.closure(formula),
-         nil <- Enum.find_value(Signature.uses(formula), &outside/1),
-         nil <- Enum.find_value(types(formula), &defined/1) do
+  defp statement(statement) do
+    with {:ok, {:formula, formula}} <- Translation.typed(statement),
+         nil <- Enum.find_value(Signature.uses(formula), &outside/1) do
       {:ok, {:formula, statement, formula}}
     else
-      {:error, _node} -> {:outside, "This statement is not a first-order formula."}
+      {:ok, {:typing, _name, _declared}} = typing -> typing
+      {:outside, _sentence} = outside -> outside
       sentence when is_binary(sentence) -> {:outside, sentence}
     end
   end
@@ -123,24 +102,6 @@ defmodule Loge.Tptp.Engines.Untyped do
     do: "#{name} is not translated; its type is not $i."
 
   defp outside({_kind, text}), do: "#{text} is not translated; its type is not $i."
-
-  defp defined({:defined, name}) when name != "$i",
-    do: "A variable of the defined type #{name} is not translated."
-
-  defp defined(_type), do: nil
-
-  defp types(boolean) when is_boolean(boolean), do: []
-  defp types({:not, formula}), do: types(formula)
-  defp types({:equal, _left, _right}), do: []
-  defp types({:predicate, _symbol, _arguments}), do: []
-
-  defp types({quantifier, variables, formula}) when quantifier in [:forall, :exists],
-    do: Enum.map(variables, &type/1) ++ types(formula)
-
-  defp types({_connective, left, right}), do: types(left) ++ types(right)
-
-  defp type({_name, type}), do: type
-  defp type(_name), do: @individual
 
   defp problem(statements) do
     formulas = for {:formula, statement, formula} <- statements, do: {statement, formula}
@@ -166,7 +127,7 @@ defmodule Loge.Tptp.Engines.Untyped do
         for({name, :type} <- typings, do: {:plain, name}) ++
           Enum.flat_map(typings, fn {_name, declared} -> mentioned(declared) end) ++
           Enum.map(functions, &elem(&1, 2)) ++
-          Enum.flat_map(formulas, fn {_statement, formula} -> types(formula) end)
+          Enum.flat_map(formulas, fn {_statement, formula} -> Signature.types(formula) end)
       )
 
     symbols =
@@ -233,12 +194,12 @@ defmodule Loge.Tptp.Engines.Untyped do
 
   defp relativised({:forall, variables, formula}, guards),
     do:
-      {:forall, Enum.map(variables, &name/1),
+      {:forall, Enum.map(variables, &Signature.bound_name/1),
        {:implies, guarded(variables, guards), relativised(formula, guards)}}
 
   defp relativised({:exists, variables, formula}, guards),
     do:
-      {:exists, Enum.map(variables, &name/1),
+      {:exists, Enum.map(variables, &Signature.bound_name/1),
        {:and, guarded(variables, guards), relativised(formula, guards)}}
 
   defp relativised({connective, left, right}, guards),
@@ -246,10 +207,7 @@ defmodule Loge.Tptp.Engines.Untyped do
 
   defp guarded(variables, guards) do
     variables
-    |> Enum.map(&guard(guards, type(&1), {:variable, name(&1)}))
+    |> Enum.map(&guard(guards, Signature.type(&1), {:variable, Signature.bound_name(&1)}))
     |> Enum.reduce(&{:and, &2, &1})
   end
-
-  defp name({name, _type}), do: name
-  defp name(name), do: name
 end

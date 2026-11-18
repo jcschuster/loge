@@ -124,8 +124,10 @@ defmodule Loge.Smtlib.Engines.DimacsTest do
 
     assert Dimacs.format_error(reason) == "z3 reported: line 1 column 9: unknown constant q"
 
-    assert {:error, {:exit_status, 0, "sat\n"}} =
+    assert {:error, {:no_goal, "sat\n"} = reason} =
              Dimacs.run("(assert true)", executable: printing(directory, "sat"))
+
+    assert Dimacs.format_error(reason) =~ "is the executable z3?"
 
     assert {:error, {:executable_not_found, "loge-no-z3"}} =
              Dimacs.run("(assert true)", executable: "loge-no-z3")

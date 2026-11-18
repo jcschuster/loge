@@ -2,10 +2,11 @@ defmodule Loge.Prolog.Engines.TranslationsTest do
   use ExUnit.Case, async: true
 
   alias Loge.{Diagnostic, Outcome, Range, Source}
-  alias Loge.Prolog.Engines.{Asp, Tptp}
+  alias Loge.Prolog.Engines.{Asp, Egglog, Tptp}
   alias Loge.Prolog.Program
 
   doctest Asp
+  doctest Egglog
   doctest Tptp
 
   defp text(engine, program, options \\ []) do
@@ -25,7 +26,11 @@ defmodule Loge.Prolog.Engines.TranslationsTest do
   end
 
   test "each engine translates Prolog equivalently, without settings, and is registered" do
-    for {engine, id, to} <- [{Tptp, :prolog_tptp, :tptp}, {Asp, :prolog_asp, :asp}] do
+    for {engine, id, to} <- [
+          {Tptp, :prolog_tptp, :tptp},
+          {Asp, :prolog_asp, :asp},
+          {Egglog, :prolog_egglog, :egglog}
+        ] do
       assert engine.id() == id
       assert engine.languages() == [:prolog]
       assert engine.task() == {:translate, to, :equivalent}
@@ -199,6 +204,66 @@ defmodule Loge.Prolog.Engines.TranslationsTest do
                includes: %{"facts" => Loge.source(:prolog, "p(a).")}
              ) ==
                "p(a).\n:- p(a).\n"
+    end
+  end
+
+  describe "Egglog" do
+    test "relations, facts, rules, then each query printed and checked" do
+      assert text(Egglog, """
+             edge(a, 'B c'). edge('B c', 'd"').
+             path(X, Y) :- edge(X, Y).
+             path(X, Y) :- path(X, Z), edge(Z, Y).
+             ok.
+             ?- path(a, _), ok.
+             ?- ok.
+             ?- true.
+             """) == """
+             (relation edge (String String))
+             (relation path (String String))
+             (relation ok ())
+             (relation query1 (String))
+             (relation query2 ())
+             (relation query3 ())
+             (edge "a" "B c")
+             (edge "B c" "d\\"")
+             (rule ((edge X Y)) ((path X Y)))
+             (rule ((path X Z) (edge Z Y)) ((path X Y)))
+             (ok)
+             (rule ((path "a" V1) (ok)) ((query1 V1)))
+             (rule ((ok)) ((query2)))
+             (query3)
+             (run-schedule (saturate (run)))
+             (print-function query1)
+             (print-function query2)
+             (print-function query3)
+             (check (query1 V1))
+             (check (query2))
+             (check (query3))
+             """
+    end
+
+    test "a clause stated twice is one rule" do
+      text = text(Egglog, "p(X) :- q(X).\np(X) :- q(X).\nq(a).\nq(a).\n")
+      assert length(String.split(text, "(rule ")) == 2
+      assert length(String.split(text, "(q \"a\")")) == 2
+    end
+
+    test "a query relation is named apart from the program's predicates" do
+      assert text(Egglog, "query1.\n?- query1.\n") =~ "(relation query2 ())"
+    end
+
+    test "what is not Datalog, and what egglog cannot name, is outside" do
+      for {program, sentence} <- [
+            {"p(f(a)).", "f is a function symbol with arguments"},
+            {"p(X).", "X in the head is in no body goal"},
+            {"run(a).", "run cannot name a relation"},
+            {"'P'(a).", "P cannot name a relation"},
+            {"p(a).\np(a, b).", "p is used with 1 and 2 arguments"},
+            {"p :- \\+ q.", "built-in"}
+          ] do
+        assert [%Diagnostic{message: message} | _] = outside(Egglog, program)
+        assert message =~ sentence
+      end
     end
   end
 end

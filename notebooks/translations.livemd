@@ -1,0 +1,517 @@
+# Loge: translations
+
+```elixir
+root = Path.expand("..", __DIR__)
+
+Mix.install([
+  {:loge, path: Path.join(root, "loge"), override: true},
+  {:loge_tptp, path: Path.join(root, "loge_tptp")},
+  {:loge_dimacs, path: Path.join(root, "loge_dimacs")},
+  {:loge_asp, path: Path.join(root, "loge_asp")},
+  {:loge_prolog, path: Path.join(root, "loge_prolog")},
+  {:loge_egglog, path: Path.join(root, "loge_egglog")},
+  {:loge_smtlib, path: Path.join(root, "loge_smtlib")},
+  {:loge_turtle, path: Path.join(root, "loge_turtle")},
+  {:kino_loge, path: Path.join(root, "kino_loge")}
+])
+```
+
+A translation is an engine: a source in one language in, an outcome whose output is a
+source in another. Its status is the relation it preserves between the two:
+
+* **Equivalent**: input and output have the same models.
+* **EquiSatisfiable**: one is satisfiable exactly when the other is.
+
+So a verdict on the output is a verdict on the input: *unsatisfiable* carries back
+under both relations, a model only under the first. An input outside the fragment a
+translation is defined on gives **Inappropriate** with the reasons and no output;
+nothing is translated by best effort. Bind an outcome to a name and the next cell
+takes it as its input.
+
+Most translations are written in Elixir and need nothing installed. Three run a
+tool: `Clausify` runs **Vampire**, SMT-LIB to DIMACS runs **z3**, and ASP to DIMACS
+grounds with the **clingo** that comes with the package. Vampire and z3 are found
+on `PATH` or set in a Logic Engine Settings cell; cells that need one say so.
+
+## Every edge
+
+This table is read from the registry, so it lists what is installed.
+
+```elixir
+label = fn id ->
+  case Loge.Registry.language(id) do
+    {:ok, language} -> language.label()
+    :error -> Atom.to_string(id)
+  end
+end
+
+Loge.Registry.translations()
+|> Enum.map(fn edge ->
+  %{
+    "from" => label.(edge.from),
+    "to" => label.(edge.to),
+    "engine" => edge.engine.label(),
+    "preserves" => Loge.Status.name(edge.preserves),
+    "module" => inspect(edge.engine)
+  }
+end)
+|> Kino.DataTable.new(name: "Translations", keys: ["from", "to", "engine", "preserves", "module"])
+```
+
+| From | To | Engine | Fragment | Preserves | Needs |
+| ---- | -- | ------ | -------- | --------- | ----- |
+| DIMACS CNF | TPTP | `Loge.Dimacs.Engines.Tptp` | all | Equivalent | |
+| DIMACS CNF | SMT-LIB | `Loge.Dimacs.Engines.Smtlib` | all | Equivalent | |
+| DIMACS CNF | ASP | `Loge.Dimacs.Engines.Asp` | all | Equivalent | |
+| WCNF | ASP | `Loge.Dimacs.Engines.WcnfAsp` | all | Equivalent | |
+| QDIMACS | SMT-LIB | `Loge.Dimacs.Engines.QdimacsSmtlib` | all | Equivalent | |
+| TPTP | TPTP (CNF) | `Loge.Tptp.Engines.Clausify` | FOF, CNF | EquiSatisfiable | Vampire |
+| TPTP | TPTP (ground CNF) | `Loge.Tptp.Engines.Ground` | CNF without function symbols | EquiSatisfiable | |
+| TPTP | TPTP (FOF) | `Loge.Tptp.Engines.Fof` | CNF, FOF | Equivalent | |
+| TPTP | TPTP (TF0) | `Loge.Tptp.Engines.Tff` | FOF, CNF | Equivalent | |
+| TPTP | TPTP (TH0) | `Loge.Tptp.Engines.Thf` | FOF, CNF, monomorphic TF0 | Equivalent | |
+| TPTP | TPTP (FOF) | `Loge.Tptp.Engines.Untyped` | monomorphic TF0 without arithmetic | EquiSatisfiable | |
+| TPTP | DIMACS CNF | `Loge.Tptp.Engines.Dimacs` | ground CNF without equality | EquiSatisfiable | |
+| TPTP | SMT-LIB | `Loge.Tptp.Engines.Smtlib` | FOF, CNF, monomorphic TF0 | Equivalent | |
+| TPTP | Prolog | `Loge.Tptp.Engines.Prolog` | Horn CNF without equality | Equivalent | |
+| SMT-LIB | TPTP (TF0) | `Loge.Smtlib.Engines.Tptp` | Core with uninterpreted sorts and functions | Equivalent | |
+| SMT-LIB | DIMACS CNF | `Loge.Smtlib.Engines.Dimacs` | propositional and bit-vector | EquiSatisfiable | z3 |
+| ASP | DIMACS CNF | `Loge.Asp.Engines.Dimacs` | tight programs | EquiSatisfiable | |
+| Prolog | TPTP | `Loge.Prolog.Engines.Tptp` | definite clauses | Equivalent | |
+| Prolog | ASP | `Loge.Prolog.Engines.Asp` | Datalog | Equivalent | |
+| Prolog | egglog | `Loge.Prolog.Engines.Egglog` | Datalog | Equivalent | |
+| Turtle | TPTP | `Loge.Turtle.Engines.Tptp` | graphs in printable ASCII | EquiSatisfiable | |
+| Turtle | Prolog | `Loge.Turtle.Engines.Prolog` | all | EquiSatisfiable | |
+| Turtle | ASP | `Loge.Turtle.Engines.Asp` | all | EquiSatisfiable | |
+
+There is no edge into Turtle, SPARQL or ShEx, out of egglog or out of THF, and none
+for arithmetic. A pair without an engine has no row above.
+
+## DIMACS
+
+A formula, bound to `cnf`: satisfiable.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6ImRpbWFjcyIsInNvdXJjZSI6InAgY25mIDMgM1xuMSAtMiAwXG4yIDMgMFxuLTEgLTMgMFxuIiwidmFyaWFibGUiOiJjbmYifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+cnf = Loge.source(:dimacs, "p cnf 3 3\n1 -2 0\n2 3 0\n-1 -3 0\n")
+```
+
+As TPTP clauses. Expected: **Equivalent**, three `cnf` statements over `p1`, `p2`, `p3`.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkaW1hY3NfdHB0cCIsImlucHV0IjoiY25mIiwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6ImNuZl9hc190cHRwIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+cnf_as_tptp = Loge.run!(Loge.Dimacs.Engines.Tptp, cnf, [])
+```
+
+And back: ground clauses are a SAT problem again. Expected: **EquiSatisfiable**, then **Satisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX2RpbWFjcyIsImlucHV0IjoiY25mX2FzX3RwdHAiLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6ImNuZl9hZ2FpbiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+cnf_again = Loge.run!(Loge.Tptp.Engines.Dimacs, cnf_as_tptp, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjoiY25mX2FnYWluIiwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7Im1vZGVscyI6MSwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Clasp, cnf_again, models: 1, time_limit: 10)
+```
+
+As an answer set program, solved by clingo. Expected: **Equivalent**, then **Satisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkaW1hY3NfYXNwIiwiaW5wdXQiOiJjbmYiLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiY25mX2FzX2FzcCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+cnf_as_asp = Loge.run!(Loge.Dimacs.Engines.Asp, cnf, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJpbnB1dCI6ImNuZl9hc19hc3AiLCJsYW5ndWFnZSI6ImFzcCIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Asp.Engines.Clingo, cnf_as_asp, time_limit: 10)
+```
+
+As an SMT-LIB script. Expected: **Equivalent**; z3 on it, if installed, answers **Satisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJkaW1hY3Nfc210bGliIiwiaW5wdXQiOiJjbmYiLCJsYW5ndWFnZSI6ImRpbWFjcyIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiY25mX2FzX3NtdGxpYiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+cnf_as_smtlib = Loge.run!(Loge.Dimacs.Engines.Smtlib, cnf, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImlucHV0IjoiY25mX2FzX3NtdGxpYiIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, cnf_as_smtlib, time_limit: 10)
+```
+
+Weighted MaxSAT as weak constraints. Expected: **Equivalent**, then clingo finds the optimum of cost 2.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ3Y25mX2FzcCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6IndjbmYiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiJoIDEgMiAwXG4zIC0xIDBcbjIgLTIgMFxuIiwidmFyaWFibGUiOiJtYXhzYXRfYXNfYXNwIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+maxsat_as_asp = Loge.run!(Loge.Dimacs.Engines.WcnfAsp, "h 1 2 0\n3 -1 0\n2 -2 0\n", [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJpbnB1dCI6Im1heHNhdF9hc19hc3AiLCJsYW5ndWFnZSI6ImFzcCIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Asp.Engines.Clingo, maxsat_as_asp, time_limit: 10)
+```
+
+A quantified Boolean formula, here that x and y can always be made equal, as one quantified assertion. Expected: **Equivalent**; z3 answers **Satisfiable**, the formula is true.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJxZGltYWNzX3NtdGxpYiIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InFkaW1hY3MiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiJwIGNuZiAyIDJcbmEgMSAwXG5lIDIgMFxuLTEgMiAwXG4xIC0yIDBcbiIsInZhcmlhYmxlIjoicWJmX2FzX3NtdGxpYiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+qbf_as_smtlib =
+  Loge.run!(Loge.Dimacs.Engines.QdimacsSmtlib, "p cnf 2 2\na 1 0\ne 2 0\n-1 2 0\n1 -2 0\n", [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImlucHV0IjoicWJmX2FzX3NtdGxpYiIsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, qbf_as_smtlib, time_limit: 10)
+```
+
+## TPTP: from a first-order problem to SAT
+
+A theorem, bound to `problem`.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InRwdHAiLCJzb3VyY2UiOiJmb2YobW9ydGFscywgYXhpb20sICFbWF06IChodW1hbihYKSA9PiBtb3J0YWwoWCkpKS5cbmZvZihzb2NyYXRlcywgYXhpb20sIGh1bWFuKHNvY3JhdGVzKSkuXG5mb2Yoc29tZW9uZV9kaWVzLCBjb25qZWN0dXJlLCA/W1hdOiBtb3J0YWwoWCkpLlxuIiwidmFyaWFibGUiOiJwcm9ibGVtIn0","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+problem =
+  Loge.source(
+    :tptp,
+    "fof(mortals, axiom, ![X]: (human(X) => mortal(X))).\nfof(socrates, axiom, human(socrates)).\nfof(someone_dies, conjecture, ?[X]: mortal(X)).\n"
+  )
+```
+
+Clauses, by Vampire (needs `vampire`). Expected: **EquiSatisfiable**; the conjecture is negated.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGF1c2lmeSIsImlucHV0IjoicHJvYmxlbSIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiY2xhdXNlcyJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+clauses = Loge.run!(Loge.Tptp.Engines.Clausify, problem, time_limit: 10)
+```
+
+Ground instances over the constants. Expected: **EquiSatisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJncm91bmQiLCJpbnB1dCI6ImNsYXVzZXMiLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6Imdyb3VuZCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+ground = Loge.run!(Loge.Tptp.Engines.Ground, clauses, [])
+```
+
+Ground atoms as variables. Expected: **EquiSatisfiable**, the atoms in `c` lines.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX2RpbWFjcyIsImlucHV0IjoiZ3JvdW5kIiwibGFuZ3VhZ2UiOiJ0cHRwIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiJzYXQifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+sat = Loge.run!(Loge.Tptp.Engines.Dimacs, ground, [])
+```
+
+Expected: **Unsatisfiable**, so the conjecture follows.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0Ijoic2F0IiwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7Im1vZGVscyI6MSwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Clasp, sat, models: 1, time_limit: 10)
+```
+
+The clauses are Horn, so they are a Prolog program too. Expected: **Equivalent**, then **Yes** with `socrates` for the variable, which Vampire has renamed.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX3Byb2xvZyIsImlucHV0IjoiY2xhdXNlcyIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiY2xhdXNlc19hc19wcm9sb2cifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+clauses_as_prolog = Loge.run!(Loge.Tptp.Engines.Prolog, clauses, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImlucHV0IjoiY2xhdXNlc19hc19wcm9sb2ciLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnsiYW5zd2VycyI6MSwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Prolog.Engines.Swipl, clauses_as_prolog, answers: 1, time_limit: 10)
+```
+
+The problem as an SMT-LIB script, the conjecture negated. Expected: **Equivalent**; z3 answers **Unsatisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX3NtdGxpYiIsImlucHV0IjoicHJvYmxlbSIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoicHJvYmxlbV9hc19zbXRsaWIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+problem_as_smtlib = Loge.run!(Loge.Tptp.Engines.Smtlib, problem, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImlucHV0IjoicHJvYmxlbV9hc19zbXRsaWIiLCJsYW5ndWFnZSI6InNtdGxpYiIsIm9wdGlvbnMiOnsidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, problem_as_smtlib, time_limit: 10)
+```
+
+## TPTP: between the dialects
+
+Clauses as first-order formulas. Expected: **Equivalent**, each clause under its quantifier.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJmb2YiLCJpbnB1dCI6ImNsYXVzZXMiLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Tptp.Engines.Fof, clauses, [])
+```
+
+Untyped as typed first-order, and as typed higher-order with every symbol declared. Expected: **Equivalent** twice.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0ZmYiLCJpbnB1dCI6InByb2JsZW0iLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Tptp.Engines.Tff, problem, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0aGYiLCJpbnB1dCI6InByb2JsZW0iLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Tptp.Engines.Thf, problem, [])
+```
+
+A typed problem, bound to `typed`.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InRwdHAiLCJzb3VyY2UiOiJ0ZmYoaHVtYW5fdHlwZSwgdHlwZSwgaHVtYW46ICR0VHlwZSkuXG50ZmYoc29jcmF0ZXNfdHlwZSwgdHlwZSwgc29jcmF0ZXM6IGh1bWFuKS5cbnRmZihmYXRoZXJfdHlwZSwgdHlwZSwgZmF0aGVyOiBodW1hbiA+IGh1bWFuKS5cbnRmZihtb3J0YWxfdHlwZSwgdHlwZSwgbW9ydGFsOiBodW1hbiA+ICRvKS5cbnRmZihpbmhlcml0ZWQsIGF4aW9tLCAhW1g6IGh1bWFuXTogKG1vcnRhbChmYXRoZXIoWCkpID0+IG1vcnRhbChYKSkpLlxudGZmKGZpcnN0LCBheGlvbSwgbW9ydGFsKGZhdGhlcihzb2NyYXRlcykpKS5cbnRmZihnb2FsLCBjb25qZWN0dXJlLCBtb3J0YWwoc29jcmF0ZXMpKS5cbiIsInZhcmlhYmxlIjoidHlwZWQifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+typed =
+  Loge.source(
+    :tptp,
+    "tff(human_type, type, human: $tType).\ntff(socrates_type, type, socrates: human).\ntff(father_type, type, father: human > human).\ntff(mortal_type, type, mortal: human > $o).\ntff(inherited, axiom, ![X: human]: (mortal(father(X)) => mortal(X))).\ntff(first, axiom, mortal(father(socrates))).\ntff(goal, conjecture, mortal(socrates)).\n"
+  )
+```
+
+Without its types: each type a guard predicate. Expected: **EquiSatisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ1bnR5cGVkIiwiaW5wdXQiOiJ0eXBlZCIsImxhbmd1YWdlIjoidHB0cCIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiZ3VhcmRlZCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+guarded = Loge.run!(Loge.Tptp.Engines.Untyped, typed, [])
+```
+
+The typed problem in TH0 and as SMT-LIB with a sort per type. Expected: **Equivalent** twice; z3 answers **Unsatisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0aGYiLCJpbnB1dCI6InR5cGVkIiwibGFuZ3VhZ2UiOiJ0cHRwIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Tptp.Engines.Thf, typed, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX3NtdGxpYiIsImlucHV0IjoidHlwZWQiLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6InR5cGVkX2FzX3NtdGxpYiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+typed_as_smtlib = Loge.run!(Loge.Tptp.Engines.Smtlib, typed, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ6MyIsImlucHV0IjoidHlwZWRfYXNfc210bGliIiwibGFuZ3VhZ2UiOiJzbXRsaWIiLCJvcHRpb25zIjp7InRpbWVfbGltaXQiOjEwfSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Smtlib.Engines.Z3, typed_as_smtlib, time_limit: 10)
+```
+
+## SMT-LIB
+
+Uninterpreted sorts and functions as TF0. Expected: **Equivalent**, a type per sort.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzbXRsaWJfdHB0cCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InNtdGxpYiIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IihkZWNsYXJlLXNvcnQgUyAwKVxuKGRlY2xhcmUtY29uc3QgYSBTKVxuKGRlY2xhcmUtZnVuIGYgKFMpIFMpXG4oZGVjbGFyZS1mdW4gcCAoUykgQm9vbClcbihhc3NlcnQgKGZvcmFsbCAoKHggUykpICg9IChmIHgpIHgpKSlcbihhc3NlcnQgKHAgYSkpXG4oYXNzZXJ0IChub3QgKHAgKGYgKGYgYSkpKSkpXG4oY2hlY2stc2F0KVxuIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Smtlib.Engines.Tptp,
+  "(declare-sort S 0)\n(declare-const a S)\n(declare-fun f (S) S)\n(declare-fun p (S) Bool)\n(assert (forall ((x S)) (= (f x) x)))\n(assert (p a))\n(assert (not (p (f (f a)))))\n(check-sat)\n",
+  []
+)
+```
+
+Bit-vectors as clauses, by z3 (needs `z3`): is there an x with x + 1 = 0 in two bits? Expected: **EquiSatisfiable**, then clasp answers **Satisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzbXRsaWJfZGltYWNzIiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoic210bGliIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiKHNldC1sb2dpYyBRRl9CVilcbihkZWNsYXJlLWNvbnN0IHggKF8gQml0VmVjIDIpKVxuKGFzc2VydCAoPSAoYnZhZGQgeCAjYjAxKSAjYjAwKSlcbihjaGVjay1zYXQpXG4iLCJ2YXJpYWJsZSI6ImJpdHMifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+bits =
+  Loge.run!(
+    Loge.Smtlib.Engines.Dimacs,
+    "(set-logic QF_BV)\n(declare-const x (_ BitVec 2))\n(assert (= (bvadd x #b01) #b00))\n(check-sat)\n",
+    time_limit: 10
+  )
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjoiYml0cyIsImxhbmd1YWdlIjoiZGltYWNzIiwib3B0aW9ucyI6eyJtb2RlbHMiOjEsInRpbWVfbGltaXQiOjEwfSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Clasp, bits, models: 1, time_limit: 10)
+```
+
+## ASP
+
+A tight program, two nodes to colour, completed to SAT. Expected: **EquiSatisfiable**, then **Satisfiable** with the two colourings among the models.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJhc3BfZGltYWNzIiwiaW5wdXQiOm51bGwsImxhbmd1YWdlIjoiYXNwIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoibm9kZSgxLi4yKS4gZWRnZSgxLCAyKS5cbnsgcmVkKFgpIH0gOi0gbm9kZShYKS5cbmdyZWVuKFgpIDotIG5vZGUoWCksIG5vdCByZWQoWCkuXG46LSBlZGdlKFgsIFkpLCByZWQoWCksIHJlZChZKS5cbjotIGVkZ2UoWCwgWSksIGdyZWVuKFgpLCBncmVlbihZKS5cbiIsInZhcmlhYmxlIjoiY29sb3VyaW5nIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+colouring =
+  Loge.run!(
+    Loge.Asp.Engines.Dimacs,
+    "node(1..2). edge(1, 2).\n{ red(X) } :- node(X).\ngreen(X) :- node(X), not red(X).\n:- edge(X, Y), red(X), red(Y).\n:- edge(X, Y), green(X), green(Y).\n",
+    time_limit: 10
+  )
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjoiY29sb3VyaW5nIiwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7Im1vZGVscyI6MCwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Clasp, colouring, models: 0, time_limit: 10)
+```
+
+## Prolog
+
+Datalog with a left-recursive rule, bound to `paths`: Prolog's own search does not end on it.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InByb2xvZyIsInNvdXJjZSI6ImVkZ2UoYSwgYikuIGVkZ2UoYiwgYykuIGVkZ2UoYywgZCkuXG5wYXRoKFgsIFkpIDotIHBhdGgoWCwgWiksIGVkZ2UoWiwgWSkuXG5wYXRoKFgsIFkpIDotIGVkZ2UoWCwgWSkuXG4/LSBwYXRoKGEsIFdoZXJlKS5cbiIsInZhcmlhYmxlIjoicGF0aHMifQ","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths =
+  Loge.source(
+    :prolog,
+    "edge(a, b). edge(b, c). edge(c, d).\npath(X, Y) :- path(X, Z), edge(Z, Y).\npath(X, Y) :- edge(X, Y).\n?- path(a, Where).\n"
+  )
+```
+
+Bottom-up in egglog. Expected: **Equivalent**; the run prints the three answers and is **Success**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJwcm9sb2dfZWdnbG9nIiwiaW5wdXQiOiJwYXRocyIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiJwYXRoc19hc19lZ2dsb2cifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths_as_egglog = Loge.run!(Loge.Prolog.Engines.Egglog, paths, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJlZ2dsb2ciLCJpbnB1dCI6InBhdGhzX2FzX2VnZ2xvZyIsImxhbmd1YWdlIjoiZWdnbG9nIiwib3B0aW9ucyI6eyJncmFwaCI6ZmFsc2V9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Egglog.Engines.Egglog, paths_as_egglog, graph: false)
+```
+
+As an answer set program, the query a constraint. Expected: **Equivalent**, then **Unsatisfiable**: the query has an answer.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJwcm9sb2dfYXNwIiwiaW5wdXQiOiJwYXRocyIsImxhbmd1YWdlIjoicHJvbG9nIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiJwYXRoc19hc19hc3AifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths_as_asp = Loge.run!(Loge.Prolog.Engines.Asp, paths, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGluZ28iLCJpbnB1dCI6InBhdGhzX2FzX2FzcCIsImxhbmd1YWdlIjoiYXNwIiwib3B0aW9ucyI6eyJ0aW1lX2xpbWl0IjoxMH0sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Asp.Engines.Clingo, paths_as_asp, time_limit: 10)
+```
+
+As Horn clauses for a prover, the query the negated conjecture. Expected: **Equivalent**. Grounded and as SAT it is **Unsatisfiable**.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJwcm9sb2dfdHB0cCIsImlucHV0IjoicGF0aHMiLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoicGF0aHNfYXNfdHB0cCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths_as_tptp = Loge.run!(Loge.Prolog.Engines.Tptp, paths, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJncm91bmQiLCJpbnB1dCI6InBhdGhzX2FzX3RwdHAiLCJsYW5ndWFnZSI6InRwdHAiLCJvcHRpb25zIjp7fSwicm9sZXMiOnt9LCJzb3VyY2UiOiIiLCJ2YXJpYWJsZSI6InBhdGhzX2dyb3VuZCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths_ground = Loge.run!(Loge.Tptp.Engines.Ground, paths_as_tptp, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0cHRwX2RpbWFjcyIsImlucHV0IjoicGF0aHNfZ3JvdW5kIiwibGFuZ3VhZ2UiOiJ0cHRwIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiJwYXRoc19zYXQifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+paths_sat = Loge.run!(Loge.Tptp.Engines.Dimacs, paths_ground, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJjbGFzcCIsImlucHV0IjoicGF0aHNfc2F0IiwibGFuZ3VhZ2UiOiJkaW1hY3MiLCJvcHRpb25zIjp7Im1vZGVscyI6MSwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Dimacs.Engines.Clasp, paths_sat, models: 1, time_limit: 10)
+```
+
+## Turtle
+
+A graph, bound to `graph`.
+
+<!-- livebook:{"attrs":"eyJsYW5ndWFnZSI6InR1cnRsZSIsInNvdXJjZSI6IkBwcmVmaXggZXg6IDxodHRwOi8vZXhhbXBsZS5vcmcvPiAuXG5cbmV4OmFsaWNlIGV4Omtub3dzIGV4OmJvYiA7XG4gICAgICAgICBleDpuYW1lIFwiQWxpY2VcIiAuXG5leDpib2IgZXg6a25vd3MgZXg6Y2Fyb2wgLlxuIiwidmFyaWFibGUiOiJncmFwaCJ9","chunks":null,"kind":"Elixir.KinoLoge.SourceCell","livebook_object":"smart_cell"} -->
+
+```elixir
+graph =
+  Loge.source(
+    :turtle,
+    "@prefix ex: <http://example.org/> .\n\nex:alice ex:knows ex:bob ;\n         ex:name \"Alice\" .\nex:bob ex:knows ex:carol .\n"
+  )
+```
+
+As facts for Prolog, bound to `facts`, and a program that includes them by that name. Expected: **EquiSatisfiable**, then **Yes** with `Who` being Bob's IRI.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0dXJ0bGVfcHJvbG9nIiwiaW5wdXQiOiJncmFwaCIsImxhbmd1YWdlIjoidHVydGxlIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiJmYWN0cyJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+facts = Loge.run!(Loge.Turtle.Engines.Prolog, graph, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJzd2lwbCIsImlucHV0IjpudWxsLCJsYW5ndWFnZSI6InByb2xvZyIsIm9wdGlvbnMiOnsiYW5zd2VycyI6MSwidGltZV9saW1pdCI6MTB9LCJyb2xlcyI6e30sInNvdXJjZSI6IjotIFtmYWN0c10uXG5cbj8tIHRyaXBsZSgnaHR0cDovL2V4YW1wbGUub3JnL2FsaWNlJywgJ2h0dHA6Ly9leGFtcGxlLm9yZy9rbm93cycsIFdobykuXG4iLCJ2YXJpYWJsZSI6IiJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(
+  Loge.Prolog.Engines.Swipl,
+  ":- [facts].\n\n?- triple('http://example.org/alice', 'http://example.org/knows', Who).\n",
+  answers: 1,
+  time_limit: 10,
+  includes: %{"facts" => facts}
+)
+```
+
+As facts for ASP and for a prover. Expected: **EquiSatisfiable** twice.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0dXJ0bGVfYXNwIiwiaW5wdXQiOiJncmFwaCIsImxhbmd1YWdlIjoidHVydGxlIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiIiwidmFyaWFibGUiOiIifQ","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Turtle.Engines.Asp, graph, [])
+```
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJ0dXJ0bGVfdHB0cCIsImlucHV0IjoiZ3JhcGgiLCJsYW5ndWFnZSI6InR1cnRsZSIsIm9wdGlvbnMiOnt9LCJyb2xlcyI6e30sInNvdXJjZSI6IiIsInZhcmlhYmxlIjoiIn0","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+Loge.run!(Loge.Turtle.Engines.Tptp, graph, [])
+```
+
+## Outside a fragment
+
+Clauses with a function symbol have infinitely many ground instances. Expected: **Inappropriate**, with the statement and the reason; the outcome has no output.
+
+<!-- livebook:{"attrs":"eyJlbmdpbmUiOiJncm91bmQiLCJpbnB1dCI6bnVsbCwibGFuZ3VhZ2UiOiJ0cHRwIiwib3B0aW9ucyI6e30sInJvbGVzIjp7fSwic291cmNlIjoiY25mKG51bWJlcnMsIGF4aW9tLCBuYXQoemVybykpLlxuY25mKHN1Y2Nlc3NvciwgYXhpb20sIG5hdChzKFgpKSB8IH4gbmF0KFgpKS5cbiIsInZhcmlhYmxlIjoibm90X2dyb3VuZCJ9","chunks":null,"kind":"Elixir.KinoLoge.Cell","livebook_object":"smart_cell"} -->
+
+```elixir
+not_ground =
+  Loge.run!(
+    Loge.Tptp.Engines.Ground,
+    "cnf(numbers, axiom, nat(zero)).\ncnf(successor, axiom, nat(s(X)) | ~ nat(X)).\n",
+    []
+  )
+```
+
+A cell that takes such an outcome as its input does not run on nothing: it stops with the same reasons.
+
+```elixir
+try do
+  Loge.run!(Loge.Tptp.Engines.Dimacs, not_ground, [])
+rescue
+  error in ArgumentError -> Kino.Markdown.new("```\n" <> Exception.message(error) <> "\n```")
+end
+```
+
+## How the translations are checked
+
+`loge_verification` runs every edge above on generated inputs and compares what a
+solver says about the input with what another says about the output: clasp, clingo,
+SWI-Prolog and egglog always, z3 and Vampire when installed. From that directory:
+`mix test`, or `mix test --include z3 --include vampire`.

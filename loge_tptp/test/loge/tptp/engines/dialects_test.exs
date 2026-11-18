@@ -120,13 +120,36 @@ defmodule Loge.Tptp.Engines.DialectsTest do
       assert dialect(lines) in [:thf, :th0]
     end
 
+    test "a typing is curried and a typed variable keeps its type" do
+      assert lines(Thf, """
+             tff(human_type, type, human: $tType).
+             tff(father_type, type, father: (human * $i) > human).
+             tff(mortal_type, type, mortal: human > $o).
+             tff(a, axiom, ![X: human, Y]: (mortal(father(X, Y)) | r(Y))).
+             """) == [
+               "thf(human_type, type, human: $tType).",
+               "thf(father_type, type, father: human > $i > human).",
+               "thf(mortal_type, type, mortal: human > $o).",
+               "thf(t1, type, r: $i > $o).",
+               "thf(a, axiom, (![X: human, Y: $i]: ((mortal @ (father @ X @ Y)) | (r @ Y))))."
+             ]
+    end
+
     test "what is not over $i, and a name with two types, are outside" do
       assert outside(Thf, "fof(a, axiom, p(1)).") =~ "1 is not translated"
       assert outside(Thf, "fof(a, axiom, $less(a, b)).") =~ "$less"
       assert outside(Thf, "fof(a, axiom, p(a) & p(a, a)).") =~ "A symbol of TH0 has one type"
-      assert outside(Thf, "fof(a, axiom, p(p)).") =~ "Used in two ways"
-      assert outside(Thf, "tff(a, axiom, p).") =~ "tff statement"
+      assert outside(Thf, "fof(a, axiom, p(p)).") =~ "used in two ways"
+      assert outside(Thf, "thf(a, axiom, p).") =~ "thf statement"
+      assert outside(Thf, "tff(a, axiom, ![X: $int]: p(X)).") =~ "defined type $int"
     end
+  end
+
+  test "a name used in two ways is reported on each statement that uses it" do
+    assert {:ok, %Outcome{status: :inappropriate, views: [{:diagnostics, [first, second]}]}} =
+             Thf.run("fof(a, axiom, q).\nfof(b, axiom, p(c)).\nfof(c, axiom, r(p)).\n", [])
+
+    assert {first.range.line, second.range.line} == {2, 3}
   end
 
   describe "Untyped" do

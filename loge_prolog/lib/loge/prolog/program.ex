@@ -120,6 +120,32 @@ defmodule Loge.Prolog.Program do
     |> Enum.uniq()
   end
 
+  @doc """
+  Why a clause is not Datalog, as a sentence: a function symbol with arguments is among
+  its terms, or a variable of the head is in no body goal, so that the clause has
+  infinitely many instances. `nil` for a Datalog clause; a query has no head.
+  """
+  @spec not_datalog(goal() | nil, [goal()]) :: String.t() | nil
+  def not_datalog(head, body) do
+    goals = List.wrap(head) ++ body
+
+    compound =
+      Enum.find_value(goals, fn {_name, arguments} ->
+        Enum.find(arguments, &match?({:function, _name, [_ | _]}, &1))
+      end)
+
+    case {compound, variables(List.wrap(head)) -- variables(body)} do
+      {{:function, name, _arguments}, _unbound} ->
+        "#{name} is a function symbol with arguments; Datalog has none."
+
+      {nil, [_ | _] = unbound} ->
+        "#{Enum.join(unbound, ", ")} in the head is in no body goal; the rule has infinitely many instances."
+
+      {nil, []} ->
+        nil
+    end
+  end
+
   @doc "A sentence describing an error of `read/2`."
   @spec format_error(term()) :: String.t()
   def format_error({:invalid_program, diagnostics}) do

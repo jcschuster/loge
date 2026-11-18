@@ -5,7 +5,9 @@ defmodule Loge.Tptp.Engines.Prolog do
   clause with none is the query `?- body.`, which asks for what the clause denies, and
   the empty clause is `?- true.`. A clause with `$true` holds and is left out.
   Variables, symbols and quoted words are written as TPTP writes them, which Prolog
-  reads the same.
+  reads the same. A predicate that only bodies and queries have is declared `dynamic`
+  first: no clause says it holds, so a goal of it fails, where Prolog raises an error
+  for a predicate it does not know.
 
   The program's clauses are the input's, so the status is `:equivalent`, and a query
   has an answer from the least Herbrand model exactly when the input is unsatisfiable.
@@ -68,14 +70,22 @@ defmodule Loge.Tptp.Engines.Prolog do
   @impl true
   def format_error(reason), do: Translation.format_error(reason)
 
-  defp translated(clauses),
-    do:
-      Translation.translated(
-        id(),
-        :equivalent,
-        :prolog,
-        for(clause <- Enum.concat(clauses), do: [clause, ".\n"])
-      )
+  defp translated(clauses) do
+    clauses = Enum.concat(clauses)
+
+    defined =
+      for %{head: {:predicate, _symbol, _arguments} = head} <- clauses, do: indicator(head)
+
+    undefined =
+      for %{body: body} <- clauses, atom <- body, indicator(atom) not in defined, uniq: true do
+        [":- dynamic ", indicator(atom), ".\n"]
+      end
+
+    Translation.translated(id(), :equivalent, :prolog, [
+      undefined,
+      Enum.map(clauses, &[text(&1), ".\n"])
+    ])
+  end
 
   defp clause(statement) do
     with {:ok, clause} <- Translation.clause(statement) do
@@ -91,22 +101,25 @@ defmodule Loge.Tptp.Engines.Prolog do
     do: {:outside, "This clause has more than one positive literal; it is not a Horn clause."}
 
   defp horn(%{positive: [head]} = literals),
-    do: {:ok, [rule(head, Map.get(literals, :negative, []))]}
+    do: {:ok, [%{head: head, body: Map.get(literals, :negative, [])}]}
 
-  defp horn(literals), do: {:ok, [["?- ", body(Map.get(literals, :negative, []))]]}
+  defp horn(literals), do: {:ok, [%{head: :query, body: Map.get(literals, :negative, [])}]}
 
-  defp rule(head, []), do: head
-  defp rule(head, body), do: [head, " :- ", body(body)]
+  defp indicator({:predicate, {:plain, name}, arguments}),
+    do: Formula.atomic_word(name) <> "/" <> Integer.to_string(length(arguments))
+
+  defp text(%{head: :query, body: body}), do: ["?- ", body(body)]
+  defp text(%{head: head, body: []}), do: written(head)
+  defp text(%{head: head, body: body}), do: [written(head), " :- ", body(body)]
 
   defp body([]), do: "true"
-  defp body(atoms), do: Enum.intersperse(atoms, ", ")
+  defp body(atoms), do: Enum.map_intersperse(atoms, ", ", &written/1)
 
   defp polarity(literal), do: literal |> Clause.polarity() |> elem(0)
 
-  defp atom(literal) do
-    {_polarity, atom} = Clause.polarity(literal)
-    atom |> Formula.to_node() |> Canonical.to_iodata()
-  end
+  defp atom(literal), do: literal |> Clause.polarity() |> elem(1)
+
+  defp written(atom), do: atom |> Formula.to_node() |> Canonical.to_iodata()
 
   defp outside({:not, atom}), do: outside(atom)
 

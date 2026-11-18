@@ -1,25 +1,30 @@
 defmodule Loge.Tptp.Engines.Smtlib do
   @moduledoc """
-  A first-order problem, `fof` and `cnf` statements, as an SMT-LIB script in `UF`.
+  A first-order problem, untyped (`fof`, `cnf`) or in monomorphic TF0 (`tff`), as an
+  SMT-LIB script in `UF`.
 
-  The individuals are the sort `U`. Every function symbol is declared over `U`, every
-  predicate symbol into `Bool`, in the order they first occur. A statement is an
-  assertion of its formula, closed by a `forall` over its free variables; a
+  The type `$i` is the sort `U`, and a type a `type` statement declares a sort of its
+  name. A symbol with a `type` statement is declared with the sorts it names, in the
+  order of the statements; any other is over `U`, a predicate into `Bool`, in the order
+  the symbols first occur. A statement is an assertion of its formula, closed by a
+  `forall` over its free variables, a variable without a type being of sort `U`. A
   `conjecture` is asserted negated, several as the negation of their conjunction; and
   the script ends with `(check-sat)`, the question a prover is asked: it is
   unsatisfiable exactly when the conjecture follows from the axioms. `<=>` is `=` on
-  `Bool`, and a symbol that is no simple symbol of SMT-LIB is written between bars.
+  `Bool`, and a name that is no simple symbol of SMT-LIB is written between bars.
 
   The assertions are the formulas of the problem over the same symbols, so the script
   has the models of the axioms with the negated conjecture: the status is
-  `:equivalent`.
+  `:equivalent`. The problem is taken to be well-typed; a solver reports a term that
+  is not.
 
   Outside the fragment, with the outcome `:inappropriate` (`Loge.Tptp.Translation`):
-  a statement of another TPTP language or with a role that is neither a conjecture nor
-  asserted; a number, a distinct object, a defined or a system symbol other than
-  `$true` and `$false`; a symbol SMT-LIB cannot declare, since it is one of its
-  reserved words or of the Core theory, has `|` or `\\`, or starts with `@` or `.`; and
-  a name the problem uses in two ways, as a variable and a symbol, a function and a
+  a statement of another TPTP language or with a role that is neither `type`, a
+  conjecture nor asserted; a typing that is not monomorphic over declared types and
+  `$i`; a number, a distinct object, a defined or a system symbol other than `$true`
+  and `$false`; a name SMT-LIB cannot declare, since it is one of its reserved words,
+  of the Core theory or `U`, has `|` or `\\`, or starts with `@` or `.`; and a name
+  the problem uses in two ways, as a variable and a symbol, a function and a
   predicate, or with two arities.
 
       iex> {:ok, outcome} = Loge.Tptp.Engines.Smtlib.run("fof(a, axiom, ![X]: (p(X) => q)). fof(c, conjecture, q).", [])
@@ -37,9 +42,10 @@ defmodule Loge.Tptp.Engines.Smtlib do
 
   @behaviour Loge.Engine
 
-  alias Loge.Tptp.{Formula, Signature, Translation}
+  alias Loge.Tptp.{Signature, Translation}
   alias Tptp.Statement.Annotated
 
+  @individual {:defined, "$i"}
   @asserted ~w(axiom hypothesis definition assumption lemma theorem corollary plain negated_conjecture)
 
   # https://smt-lib.org/papers/smt-lib-reference-v2.6-r2021-05-12.pdf, §3.1 (reserved
@@ -50,7 +56,7 @@ defmodule Loge.Tptp.Engines.Smtlib do
                define-funs-rec define-sort echo exit get-assertions get-assignment get-info
                get-model get-option get-proof get-unsat-assumptions get-unsat-core get-value
                pop push reset reset-assertions set-info set-logic set-option
-               true false not => and or xor = distinct ite)
+               true false not => and or xor = distinct ite Bool U)
 
   @impl true
   def id, do: :tptp_smtlib
@@ -84,8 +90,8 @@ defmodule Loge.Tptp.Engines.Smtlib do
     with {:ok, unit} <- Translation.read(input, options) do
       {:ok,
        with {:ok, statements} <- Translation.statements(unit, &statement/1),
-            {:ok, signature} <- signature(statements) do
-         Translation.translated(id(), :equivalent, :smtlib, script(statements, signature))
+            :ok <- Translation.unambiguous(unit, &uses/1, "SMT-LIB declares a name once.") do
+         Translation.translated(id(), :equivalent, :smtlib, script(statements))
        else
          {:inappropriate, diagnostics} -> Translation.inappropriate(id(), diagnostics)
        end}
@@ -96,14 +102,22 @@ defmodule Loge.Tptp.Engines.Smtlib do
   def format_error(reason), do: Translation.format_error(reason)
 
   defp statement(statement) do
-    with {:ok, formula} <- Translation.formula(statement),
+    with {:ok, {:formula, formula}} <- Translation.typed(statement),
          {:ok, role} <- role(Annotated.role_word(statement)),
          uses = Signature.uses(formula),
-         nil <- Enum.find_value(uses, &outside/1) do
+         nil <- Enum.find_value(uses ++ Signature.types(formula), &outside/1) do
       {:ok, %{role: role, formula: formula, uses: uses}}
     else
+      {:ok, {:typing, name, declared}} -> typing(name, declared)
       {:outside, _message} = outside -> outside
       message when is_binary(message) -> {:outside, message}
+    end
+  end
+
+  defp typing(name, declared) do
+    case outside({:typing, {:plain, name}, declared}) do
+      nil -> {:ok, %{typing: {name, declared}, uses: []}}
+      message -> {:outside, message}
     end
   end
 
@@ -115,10 +129,9 @@ defmodule Loge.Tptp.Engines.Smtlib do
 
   defp outside({:variable, _name}), do: nil
 
-  defp outside({_kind, {:plain, name}, _arity}) do
-    if name in @reserved or name =~ ~r/[|\\]|\A[@.]/,
-      do: "SMT-LIB cannot declare a symbol named #{name}."
-  end
+  defp outside({:plain, name}), do: undeclarable(name)
+  defp outside({:defined, "$i"}), do: nil
+  defp outside({_kind, {:plain, name}, _arity}), do: undeclarable(name)
 
   defp outside({_kind, {_defined, name}, _arity}),
     do: "#{name} has no counterpart in the logic UF."
@@ -128,50 +141,74 @@ defmodule Loge.Tptp.Engines.Smtlib do
   defp outside({:distinct_object, text}),
     do: "The distinct object #{text} has no counterpart in the logic UF."
 
-  defp signature(statements) do
-    uses = statements |> Enum.flat_map(& &1.uses) |> Enum.uniq()
-
-    with :ok <- Translation.unambiguous(uses, "SMT-LIB declares a name once."),
-         do: {:ok, Enum.reject(uses, &match?({:variable, _name}, &1))}
+  defp undeclarable(name) do
+    if name in @reserved or name =~ ~r/[|\\]|\A[@.]/,
+      do: "SMT-LIB cannot declare the name #{name}."
   end
 
-  defp script(statements, signature) do
-    conjectures = for %{role: :conjecture, formula: formula} <- statements, do: closed(formula)
+  defp uses(statement) do
+    case statement(statement) do
+      {:ok, %{uses: uses}} -> uses
+      {:outside, _sentence} -> []
+    end
+  end
+
+  defp script(statements) do
+    typings = for %{typing: typing} <- statements, do: typing
+    declared = MapSet.new(typings, &elem(&1, 0))
+
+    used =
+      for %{uses: uses} <- statements,
+          {kind, {:plain, name}, arity} when kind in [:predicate, :function] <- uses,
+          name not in declared,
+          uniq: true,
+          do: {name, over_individuals(kind, arity)}
+
+    conjectures = for %{role: :conjecture, formula: formula} <- statements, do: term(formula)
 
     [
       "(set-logic UF)\n(declare-sort U 0)\n",
-      Enum.map(signature, &declaration/1),
-      for(%{role: :asserted, formula: formula} <- statements, do: assertion(closed(formula))),
+      Enum.map(typings ++ used, &declaration/1),
+      for(%{role: :asserted, formula: formula} <- statements, do: assertion(term(formula))),
       negated(conjectures),
       "(check-sat)\n"
     ]
   end
 
-  defp declaration({kind, {:plain, name}, 0}),
-    do: ["(declare-const ", symbol(name), ?\s, sort(kind), ")\n"]
+  defp over_individuals(:function, arity),
+    do: {:function, List.duplicate(@individual, arity), @individual}
 
-  defp declaration({kind, {:plain, name}, arity}) do
+  defp over_individuals(:predicate, arity), do: {:predicate, List.duplicate(@individual, arity)}
+
+  defp declaration({name, :type}), do: ["(declare-sort ", symbol(name), " 0)\n"]
+
+  defp declaration({name, {:function, arguments, result}}),
+    do: declared(name, arguments, sort(result))
+
+  defp declaration({name, {:predicate, arguments}}), do: declared(name, arguments, "Bool")
+
+  defp declared(name, [], result), do: ["(declare-const ", symbol(name), ?\s, result, ")\n"]
+
+  defp declared(name, arguments, result) do
     [
       "(declare-fun ",
       symbol(name),
       " (",
-      Enum.intersperse(List.duplicate("U", arity), ?\s),
+      Enum.map_intersperse(arguments, ?\s, &sort/1),
       ") ",
-      sort(kind),
+      result,
       ")\n"
     ]
   end
 
-  defp sort(:function), do: "U"
-  defp sort(:predicate), do: "Bool"
+  defp sort({:defined, "$i"}), do: "U"
+  defp sort({:plain, name}), do: symbol(name)
 
   defp assertion(term), do: ["(assert ", term, ")\n"]
 
   defp negated([]), do: []
   defp negated([conjecture]), do: assertion(["(not ", conjecture, ?)])
   defp negated(conjectures), do: assertion(["(not ", application("and", conjectures), ?)])
-
-  defp closed(formula), do: formula |> Formula.closure() |> term()
 
   defp term(true), do: "true"
   defp term(false), do: "false"
@@ -194,7 +231,11 @@ defmodule Loge.Tptp.Engines.Smtlib do
       ?(,
       Atom.to_string(quantifier),
       " (",
-      Enum.map_intersperse(variables, ?\s, &[?(, &1, " U)"]),
+      Enum.map_intersperse(
+        variables,
+        ?\s,
+        &[?(, Signature.bound_name(&1), ?\s, sort(Signature.type(&1)), ?)]
+      ),
       ") ",
       term(formula),
       ?)

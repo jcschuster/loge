@@ -235,7 +235,8 @@ translation is not done before its record exists.
 - [x] `Loge.Tptp.Engines.Dimacs`: ground clauses without equality → DIMACS, with the atom table
 - [x] `Loge.Tptp.Engines.Smtlib`: FOF and CNF → SMT-LIB in `UF`. z3 5.3.3 answered the outputs for a theorem and a non-theorem `unsat` and `sat`, by hand, not in the suite
 - [x] Between the dialects: `Fof` (CNF → FOF), `Tff` (FOF, CNF → TF0), `Thf` (FOF, CNF → TH0) and `Untyped` (monomorphic TF0 → FOF by type guards), over `Loge.Tptp.Signature` and `Loge.Tptp.Typing`; `Formula` reads `tff` formulas. Every output parses with `tptp` in its dialect (a property for the first three). Vampire 5.1.0 gave the input and each output the same status on eight problems, by hand, except two satisfiable TH0 outputs it timed out on
-- [ ] TF0 → SMT-LIB and TF0 → TH0: `Formula` reads typed formulas, the two engines take `fof` and `cnf` only
+- [x] TF0 → SMT-LIB and TF0 → TH0: `Smtlib` and `Thf` take monomorphic TF0 through `Loge.Tptp.Translation.typed/1`, a type as a sort and as a `$tType` declaration
+- [ ] TPTP arithmetic (`$int`, `$less`, …) ↔ SMT-LIB with `Int` and `Real`: not built; both sides have the syntax, so it is a translation in Elixir
 - [ ] THF → a lower dialect, and TF0 with arithmetic → FOF: no engine
 - [x] `Loge.Tptp.Engines.Prolog`: Horn CNF without equality → Prolog. The output was not consulted by SWI-Prolog from `loge_tptp`
 - [x] `:inappropriate` with diagnostics for input outside each fragment
@@ -379,18 +380,25 @@ language. Needs phase 5 only.
 ### `loge_prolog`, `loge_asp`
 
 - [x] `priv/loge.pl` returns the clauses of a source as terms (`read_clauses/2`), with the built-in goals of each; `Loge.Prolog.Program` reads definite clauses and inlines the sources a directive includes; `Loge.Prolog.Engines.Tptp`, `Asp`. SWI-Prolog on three queries, Vampire 5.1.0 on the TPTP outputs and clingo on the ASP outputs agreed, by hand; no property test
-- [ ] `Loge.Prolog.Engines.Egglog`: not built. A query is a `check`, and a failed `check` is an error of an egglog run, not a verdict; decide what a query becomes first
+- [x] `Loge.Prolog.Engines.Egglog`: Datalog bottom-up. Decided by use: a query asks for bindings, so it is a relation of its answers, printed after saturation, and then checked, so that a run is `:no` when a query has none. A left-recursive program, on which Prolog does not end, is answered
 - [x] `Loge.Asp.Engines.Dimacs`: tight programs by Clark's completion (`Loge.Asp.Completion`) over clingo's ground program (`Loge.Asp.Aspif`); a program that is not tight, a disjunctive head, an aggregate left by grounding and `#minimize` are `:inappropriate`. Property: the models of the output on the atoms are as many as clingo's answer sets
 
 ### `loge_turtle`
 
 - [x] `Loge.Turtle.Engines.Tptp`, `Prolog`, `Asp`: a graph as `triple/3` facts over `Loge.Turtle.NTriples` and `Loge.Turtle.Facts`; `:equi_satisfiable`, since a blank node becomes a name. clingo, Vampire 5.1.0 and SWI-Prolog read one graph's outputs, by hand
 
+### Verification and errors
+
+- [x] `loge_verification`: a mix project of tests only. For every translate engine, on generated inputs, the answer of a solver on the input against that of another on the output: clasp, clingo, SWI-Prolog and egglog in every run, z3 and Vampire tagged. It found three faults the unit tests had not: a query of a predicate without clauses raised in the Prolog output of `Loge.Tptp.Engines.Prolog` (now declared `dynamic`), a clause stated twice made the egglog output invalid (now one rule), and the generator's own Prolog needed the same declaration
+- [x] Run with Vampire 5.1.0 and z3 5.3.3 on `PATH`: all 19 checks (17 properties, 2 tests) passed at 100 runs per property, in 25 minutes
+- [x] `Loge.run!/3` raises for an input that is a translation without an output, with its status and reasons (`loge`); a name used in two ways is reported on each statement that uses it; Vampire's rejection is `{:rejected, message}` in its words; a z3 output without a goal asks whether the executable is z3
+- [ ] Status and differential suites on the TPTP library (OUTLINE §9), and `VERIFICATION.md` per package: not written
+
 ### Gate
 
-- [ ] `Loge.Registry.translations/0` lists every edge of OUTLINE §8 with the packages loaded. Each package's tests assert its own edges; no test loads all packages
+- [x] `Loge.Registry.translations/0` lists every edge of OUTLINE §8 with the packages loaded: `loge_verification` asserts the registered translate engines are the ones it checks
 - [x] No change in `loge` or `kino_loge`
-- [ ] `notebooks/demo.livemd`: a DIMACS problem solved as TPTP, SMT-LIB and ASP with the same verdict. Not written
+- [x] `notebooks/translations.livemd`: every edge, with the table of the registry, a chain per language and an input outside a fragment; generated from cell attrs with each cell's `to_source/1`, and its 44 engine cells evaluated in order outside Livebook with Vampire 5.1.0 and z3 5.3.3 on `PATH`, each with the expected status. To be checked in Livebook
 
 ## Cross-cutting (from day one)
 

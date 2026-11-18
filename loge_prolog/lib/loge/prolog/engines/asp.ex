@@ -66,23 +66,20 @@ defmodule Loge.Prolog.Engines.Asp do
     do: Program.render(statements, fn statement, _position -> statement(statement) end)
 
   defp statement({:clause, head, body}) do
-    with :ok <- datalog([head | body]),
-         [] <- Program.variables([head]) -- Program.variables(body) do
-      {:ok, [goal(head), body(" :- ", body), ".\n"]}
-    else
-      {:outside, _sentence} = outside ->
-        outside
-
-      unsafe ->
-        {:outside,
-         "#{Enum.join(unsafe, ", ")} in the head is in no body goal; the rule has no finite grounding."}
+    case Program.not_datalog(head, body) || unwritable([head | body]) do
+      nil -> {:ok, [goal(head), body(" :- ", body), ".\n"]}
+      sentence -> {:outside, sentence}
     end
   end
 
   defp statement({:query, []}), do: {:ok, ":- #true.\n"}
 
-  defp statement({:query, body}),
-    do: with(:ok <- datalog(body), do: {:ok, [body(":- ", body), ".\n"]})
+  defp statement({:query, body}) do
+    case Program.not_datalog(nil, body) || unwritable(body) do
+      nil -> {:ok, [body(":- ", body), ".\n"]}
+      sentence -> {:outside, sentence}
+    end
+  end
 
   defp body(_prefix, []), do: []
   defp body(prefix, goals), do: [prefix, Enum.map_intersperse(goals, ", ", &goal/1)]
@@ -93,27 +90,16 @@ defmodule Loge.Prolog.Engines.Asp do
   defp term({_kind, name, []}), do: name
   defp term({:variable, name}), do: name
 
-  defp datalog(goals) do
-    Enum.find_value(goals, :ok, fn {name, arguments} ->
-      cond do
-        not identifier?(name) ->
-          {:outside, "#{name} is no identifier of ASP, which has no quoted atoms."}
+  defp unwritable(goals) do
+    names =
+      for {name, arguments} <- goals,
+          {:function, name, []} <- [{:function, name, []} | arguments],
+          do: name
 
-        constant = Enum.find(arguments, &match?({:function, _name, [_ | _]}, &1)) ->
-          {:outside,
-           "#{elem(constant, 1)} is a function symbol with arguments; Datalog has none."}
-
-        constant =
-            Enum.find(
-              arguments,
-              &(match?({:function, _, []}, &1) and not identifier?(elem(&1, 1)))
-            ) ->
-          {:outside, "#{elem(constant, 1)} is no identifier of ASP, which has no quoted atoms."}
-
-        true ->
-          nil
-      end
-    end)
+    case Enum.reject(names, &identifier?/1) do
+      [] -> nil
+      [name | _] -> "#{name} is no identifier of ASP, which has no quoted atoms."
+    end
   end
 
   defp identifier?(name), do: name =~ ~r/\A[a-z][A-Za-z0-9_]*\z/ and name != "not"

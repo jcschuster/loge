@@ -101,11 +101,13 @@ defmodule Loge.Turtle.Engines.FactsTest do
             %Outcome{
               status: :inappropriate,
               output: nil,
-              views: [{:diagnostics, [%Diagnostic{code: "fragment", message: message}]}]
+              views: [
+                {:diagnostics, [%Diagnostic{code: "fragment", message: message}, %Diagnostic{}]}
+              ]
             }} =
              Tptp.run("<http://e/a> <http://e/p> \"é\" , \"ü\" .", [])
 
-    assert message =~ "printable ASCII"
+    assert message =~ ~r/printable ASCII, which "[éü]" is not/u
   end
 
   test "an empty graph has no facts" do

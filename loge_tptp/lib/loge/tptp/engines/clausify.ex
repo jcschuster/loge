@@ -13,7 +13,7 @@ defmodule Loge.Tptp.Engines.Clausify do
 
   A statement that is neither `fof` nor `cnf` is outside the fragment: the outcome is
   `:inappropriate` (`Loge.Tptp.Translation`). What Vampire rejects, such as a number
-  among individuals, is the error of its exit status, and an output that is not
+  among individuals, is `{:error, {:rejected, message}}` with its message, and an output that is not
   clauses is `{:error, {:not_clauses, output}}`.
 
   The executable is `vampire` on `PATH` unless the `:executable` setting names
@@ -29,6 +29,7 @@ defmodule Loge.Tptp.Engines.Clausify do
   alias Tptp.Statement.Annotated
 
   @default "vampire"
+  @rejected 4
 
   @impl true
   def id, do: :clausify
@@ -71,6 +72,9 @@ defmodule Loge.Tptp.Engines.Clausify do
   end
 
   @impl true
+  def format_error({:rejected, message}),
+    do: "Vampire does not read the problem:\n" <> message
+
   def format_error({:not_clauses, output}),
     do: "The clausifier did not print clauses:\n" <> output
 
@@ -112,6 +116,8 @@ defmodule Loge.Tptp.Engines.Clausify do
       do: {:ok, Translation.translated(id(), :equi_satisfiable, :tptp, output)},
       else: {:error, {:not_clauses, output}}
   end
+
+  defp outcome(%Exit{status: @rejected, output: output}), do: {:error, {:rejected, output}}
 
   defp outcome(%Exit{status: status, output: output}),
     do: {:error, {:exit_status, status, output}}

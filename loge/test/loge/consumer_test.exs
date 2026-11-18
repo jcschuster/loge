@@ -51,4 +51,24 @@ defmodule Loge.ConsumerTest do
     refute :kino in applications
     assert :tptp in applications
   end
+
+  test "a translation without an output stops the pipeline with its reasons" do
+    {:ok, solver} = Loge.Registry.engine("fake_solver")
+
+    untranslated = %Loge.Outcome{
+      status: :inappropriate,
+      problem: :translation,
+      raw: "",
+      engine: :fake_translator,
+      views: [
+        {:diagnostics,
+         [Loge.Diagnostic.new("fragment", :error, Loge.Range.new(2), "This is no clause.")]}
+      ]
+    }
+
+    assert_raise ArgumentError,
+                 "the input is a translation by :fake_translator that gave no output " <>
+                   "(Inappropriate)\nline 2: This is no clause.",
+                 fn -> Loge.run!(solver, untranslated, []) end
+  end
 end
