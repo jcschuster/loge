@@ -1,6 +1,10 @@
 {
   "name": "loge",
-  "image": "docker.io/library/node:26-trixie",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node",
   "remoteUser": "node",
-  "postCreateCommand": "npm --prefix kino_loge/assets ci"
+  "postCreateCommand": "npm --prefix kino_loge/assets ci",
+  "runArgs": ["--userns=keep-id"],
+  "features": {
+    "ghcr.io/meaningful-ooo/devcontainer-features/fish:2": {}
+  }
 }
