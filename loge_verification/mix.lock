@@ -16,5 +16,5 @@
   "stream_data": {:hex, :stream_data, "1.4.0", "026f929db613aabea6208012ae9b8970d3fd5f88b3bdf26831bc536f98c42036", [:mix], [], "hexpm", "2b0ee3a340dcce1c8cf6302a763ee757d1e01c54d6e16d9069062509d68b1dc9"},
   "swi_elixir": {:git, "https://github.com/davfuenmayor/swi_elixir.git", "cba767d63ec7eda27beed5d7b7a64c102f8a8e4f", [tag: "v0.1.0"]},
   "telemetry": {:hex, :telemetry, "1.4.3", "d0333fa869361e6833d6ff8e806ff4d8553fe1332fcce0af86c7381951a1dc2f", [:rebar3], [], "hexpm", "17a63581cf2e832a238287f5fe6811e8ca1f333249f1376ad653164a3c4770d4"},
-  "tptp": {:hex, :tptp, "0.3.6", "11be99f8cfd3f5ec483af8912938ee963e1fdad6525ddd1ed2e04c0bea18d3ed", [:mix], [], "hexpm", "fec06fae5d3d88df68ff4eea2593a083529c889ab433689b57233ed5a23485b5"},
+  "tptp": {:hex, :tptp, "0.4.0", "c9851ac366c98061355b78547efb3d4adfeecf072a00b5128ce9535cfa0834ea", [:mix], [], "hexpm", "4c94eae5a7a3868d54ba38e611a65f123f80245550a64470903a1e2c23e2bbbf"},
 }

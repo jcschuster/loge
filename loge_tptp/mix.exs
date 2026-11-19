@@ -30,7 +30,7 @@ defmodule Loge.Tptp.MixProject do
   defp deps do
     [
       loge_dep(),
-      {:tptp, "~> 0.3.6"},
+      {:tptp, "~> 0.4.0"},
       {:atp_client, "~> 0.8.1"},
       {:stream_data, "~> 1.1", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},

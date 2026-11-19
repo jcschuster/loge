@@ -414,11 +414,11 @@ and inserted into its editor (OUTLINE §3, §4). Needs phases 5 and 6 only.
 ### `loge_tptp`
 
 - [x] `mix loge.tptp.library ROOT` writes `priv/library.tsv` from the headers of a distribution; run on TPTP v10.0.0: 29,467 files, every one described, none other than UTF-8
-- [x] `Loge.Tptp.Library` over the index, reading through `Tptp.Resolver.Http`; tptp 0.3.6 required, which fetches under `mix run`, reads every name from seetptp.tptp.org, decodes its numeric references and unpacks a file above 10 MiB. Read from tptp.org by hand, each the distribution's bytes: three nested axiom sets, the 12 files with a `"` in a formula and 21 with one in a comment, and large files from 5 MB to 70 MB
+- [x] `Loge.Tptp.Library` over the index, reading through `Tptp.Resolver.Http`; tptp 0.4.0 required, which fetches under `mix run`, reads every name from seetptp.tptp.org, decodes its numeric references and unpacks a file above 10 MiB. Read from tptp.org by hand, each the distribution's bytes: three nested axiom sets, the 12 files with a `"` in a formula and 21 with one in a comment, and large files from 5 MB to 70 MB
 - [x] The 2,101 axiom sets in subdirectories of `Axioms` (`SET007/`, `ITP001/`), in the index since tptp 0.3.4
 - [x] A `"` no longer arrives as `&#34;` (tptp 0.3.5); a file cached by 0.3.4 is fetched again
 - [x] The 104 files larger than 10 MiB, which seetptp.tptp.org offers only as a `.tgz` (tptp 0.3.6); the four above 260 MB time out after the resolver's 30 s here
-- [ ] Six files just under 10 MiB raise `SystemLimitError` in `Tptp.Resolver.Http.contents/1`: wait on tptp (`UPSTREAM.md`)
+- [x] The six files just under 10 MiB that raised `SystemLimitError` in `Tptp.Resolver.Http.contents/1` (tptp 0.4.0): each read in 2 to 3 s, the bytes of v10.0.0
 
 ### `kino_loge`
 

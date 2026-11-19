@@ -304,9 +304,10 @@ v10.0.0 that is 29,467 files, every one described, in 1.9 MB, a 4.2 MB module. A
 is read through `Tptp.Resolver.Http`, as an include is, from seetptp.tptp.org since
 tptp 0.3.4, a file above 10 MiB as the `.tgz` it offers since 0.3.6. Read with tptp
 0.3.6, 33 files with a `"`, among them the 12 with one in a formula, and 20 large
-files of 5 MB to 70 MB were the distribution's bytes, 70 MB in 9 s; six files just
-under 10 MiB raise in the resolver (`UPSTREAM.md`), and the three problems of 266 MB
-and the axiom set of 455 MB do not arrive within its 30 s timeout here. A search scans
+files of 5 MB to 70 MB were the distribution's bytes, 70 MB in 9 s; with tptp 0.4.0
+so are the six files just under 10 MiB that raised in the resolver before, in 2 to 3 s
+each. The three problems of 266 MB and the axiom set of 455 MB do not arrive within
+its 30 s timeout here. A search scans
 the index: under 1 ms to 13 ms for a query with many matches, 47 ms for
 one with none (measured here).
 
