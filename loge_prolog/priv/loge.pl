@@ -48,9 +48,11 @@ term_queries(Term, term_position(_, _, _, _, [Goal]), [query(From, To)|Queries],
     arg(2, Goal, To).
 term_queries(_, _, Queries, Queries).
 
-% Consulting leaves the queries out; the engine asks them one by one after it.
-:- multifile user:term_expansion/2.
+% Consulting leaves the queries out; the engine asks them one by one after it. The
+% compiler warns of singletons as it reads a term, before expanding it.
+:- multifile user:term_expansion/2, user:message_hook/3.
 user:term_expansion((?- _), []).
+user:message_hook(singletons(Term, _), warning, _) :- query(Term).
 
 syntax_error_offset(stream(_, _, _, CharNo), _, _, CharNo) :- !.
 syntax_error_offset(file(_, _, _, CharNo), _, _, CharNo) :- !.

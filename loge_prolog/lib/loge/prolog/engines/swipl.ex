@@ -25,8 +25,9 @@ defmodule Loge.Prolog.Engines.Swipl do
 
   A program with syntax errors is `{:error, {:invalid_program, diagnostics}}`, with the
   diagnostics of `Loge.Prolog.Language`; an exception a query raises is
-  `{:error, {:prolog, message}}`, and the queries after it are not asked. A cancelled
-  run kills `swipl`.
+  `{:error, {:prolog, message}}`, and the queries after it are not asked. A query
+  whose cleanup outlasts the time limit as well is a timeout, and `swipl` is killed, so
+  the queries after it are not asked either. A cancelled run kills `swipl`.
   """
 
   @behaviour Loge.Engine
@@ -78,8 +79,9 @@ defmodule Loge.Prolog.Engines.Swipl do
         {diagnostics, goals} = Swipl.read(swipl, program)
 
         with [] <- errors(diagnostics),
-             :ok <- Swipl.consult(swipl, program, includes, timeout) do
-          ask(swipl, goals, count, timeout)
+             :ok <- Swipl.consult(swipl, program, includes, timeout),
+             {:ok, asked} <- ask(swipl, goals, count, timeout) do
+          {:ok, goals, asked}
         else
           [_ | _] = errors -> {:error, {:invalid_program, errors}}
           {:error, reason} -> {:error, reason}
@@ -104,31 +106,36 @@ defmodule Loge.Prolog.Engines.Swipl do
   defp ask(_swipl, [], _count, _timeout), do: {:ok, []}
 
   defp ask(swipl, [goal | goals], count, timeout) do
-    with {:answers, _answers, _completion} = answers <- Swipl.solve(swipl, goal, count, timeout),
-         {:ok, asked} <- ask(swipl, goals, count, timeout),
+    with {:answers, _answers, completion} = answers <- Swipl.solve(swipl, goal, count, timeout),
+         {:ok, asked} <- ask(swipl, askable(completion, goals), count, timeout),
          do: {:ok, [{goal, answers} | asked]}
   end
 
+  defp askable(:killed, _goals), do: []
+  defp askable(_completion, goals), do: goals
+
   defp outcome({:error, reason}, _output), do: {:error, reason}
 
-  defp outcome({:ok, asked}, output),
-    do: {:ok, %Outcome{status: status(asked), raw: output, engine: id(), views: views(asked)}}
+  defp outcome({:ok, goals, asked}, output) do
+    {:ok,
+     %Outcome{status: status(goals, asked), raw: output, engine: id(), views: views(goals, asked)}}
+  end
 
-  defp status([{_goal, answers}]), do: verdict(answers)
-  defp status(_asked), do: :success
+  defp status([_goal], [{_asked, answers}]), do: verdict(answers)
+  defp status(_goals, _asked), do: :success
 
   defp verdict({:answers, [_ | _], _completion}), do: :yes
   defp verdict({:answers, [], :exhausted}), do: :no
-  defp verdict({:answers, [], :timeout}), do: :timeout
+  defp verdict({:answers, [], completion}) when completion in [:timeout, :killed], do: :timeout
 
-  defp views([{goal, answers}]) do
+  defp views([_goal], [{goal, answers}]) do
     case table(answers) do
       nil -> []
       table -> [titled(goal, table)]
     end
   end
 
-  defp views(asked),
+  defp views(_goals, asked),
     do: for({goal, answers} <- asked, do: titled(goal, table(answers) || badge(answers)))
 
   defp table({:answers, [[_ | _] = first | _] = answers, _completion}) do

@@ -40,6 +40,17 @@ defmodule Loge.Prolog.Engines.SwiplTest do
     assert {:ok, %Outcome{status: :timeout}} = Swipl.run("?- repeat, fail.", time_limit: 1)
   end
 
+  test "a query whose cleanup outlasts the time limit is a timeout, and ends the run" do
+    source = "p(1).\n?- setup_call_cleanup(true, (repeat, fail), sleep(3)).\n?- p(X).\n"
+
+    assert {:ok, %Outcome{status: :success, views: views}} = Swipl.run(source, time_limit: 1)
+
+    assert views == [
+             {:titled, "?- setup_call_cleanup(true, (repeat, fail), sleep(3)).",
+              {:badge, "Timeout", :neutral}}
+           ]
+  end
+
   test "several queries are asked in order; the run is a success and each has its view" do
     source = @family <> "?- parent(tom, X).\n?- parent(ann, _).\n?- parent(tom, bob).\n"
 

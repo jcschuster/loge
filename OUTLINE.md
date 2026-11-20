@@ -620,7 +620,10 @@ Notes:
   query's variables, which are what it asks for. The same reading gives the goal of each
   `?- Goal.` by its position. `SWI.load/3` consults a path, and the bridge cannot skip
   terms of it, so a `user:term_expansion/2` clause in `loge.pl` expands each query to
-  nothing while consulting; the engine then asks the goals one by one. The bridge runs
+  nothing while consulting; the engine then asks the goals one by one. The compiler
+  warns of singletons as it reads a term, before expansion, with
+  `print_message(warning, singletons(Term, Names))` (SWI-Prolog 10.0.1, executed), so a
+  `user:message_hook/3` clause drops that warning for a query. The bridge runs
   each query in a Prolog engine whose stream aliases are its own: output is
   captured by redirecting in the worker thread (a loaded directive) and again in each
   `solve/2`. `SWI.query/3` raises on timeouts and Prolog errors; `Loge.Prolog.Swipl`
@@ -708,6 +711,12 @@ Notes:
   `{:compound, name, arguments}`, a number, a binary for a string, an Elixir list for a
   proper list and `{:cons, head, tail}` for a partial one. A variable has no form of
   its own, so `priv/loge.pl` binds each to `'$VAR'(Name)` before returning a clause.
+- swi_elixir `2d4e10c` (`:port_timeout` executed, the reset read in its tests): Prolog
+  stops a goal at the `:timeout` of `SWI.query/3` or `SWI.load/3` and the session lives
+  on. A cleanup that outlasts it by the `:cleanup_timeout` (1 s) has the Port session
+  killed and the request answered `:port_timeout`; the next request is
+  `:session_reset`, then a `swipl` without the program. `Loge.Prolog.Swipl` reads
+  `:port_timeout` as a timeout, and the engine asks no query after it.
 - rudof 0.3.24 (executed): `Rudof.Session.serialize_data(session, :ntriples)` gives the
   graph read with `read_data/3` a triple per line, blank nodes as `_:b<N>`, a plain
   literal without a datatype, `\"` and `\n` escaped and other characters as they are.

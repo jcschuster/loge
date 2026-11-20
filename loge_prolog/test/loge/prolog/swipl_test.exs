@@ -38,6 +38,23 @@ defmodule Loge.Prolog.SwiplTest do
              end)
   end
 
+  test "a goal whose cleanup outlasts the time limit kills the session, keeping the answers found before" do
+    program = "q(1).\nq(X) :- setup_call_cleanup(true, (repeat, fail), sleep(3)), X = 2."
+
+    assert {:ok, {:answers, [[{"X", "1"}]], :killed}, ""} =
+             Swipl.with_session(fn session ->
+               :ok = Swipl.consult(session, program, %{}, 5_000)
+               Swipl.solve(session, "q(X)", 0, 300)
+             end)
+  end
+
+  test "consulting beyond the time limit is a timeout, though a cleanup outlasts it" do
+    for goal <- ["(repeat, fail)", "setup_call_cleanup(true, (repeat, fail), sleep(3))"] do
+      assert {:ok, {:error, :timeout}, ""} =
+               Swipl.with_session(&Swipl.consult(&1, ":- initialization(#{goal}).", %{}, 300))
+    end
+  end
+
   test "an exception in the goal is an error" do
     assert {:ok, {:error, {:prolog, message}}, _output} =
              Swipl.with_session(&Swipl.solve(&1, "X is foo + 1", 1, 5_000))
@@ -73,6 +90,16 @@ defmodule Loge.Prolog.SwiplTest do
                :ok = Swipl.consult(session, "p(a).\n?- assertz(p(b)), write(ran).\n", %{}, 5_000)
                Swipl.solve(session, "p(X)", 0, 5_000)
              end)
+  end
+
+  test "consulting warns of a clause's singleton variables, not of a query's" do
+    assert {:ok, :ok, output} =
+             Swipl.with_session(
+               &Swipl.consult(&1, "p(1).\n?- p(X).\nq(Y) :- true.\n", %{}, 5_000)
+             )
+
+    assert output =~ "Singleton variables: [Y]"
+    refute output =~ "[X]"
   end
 
   test "what the program prints is the session's output" do

@@ -24,9 +24,11 @@ defmodule Loge.Prolog.Swipl do
 
   @typedoc """
   Whether `solve/4` found every answer, stopped at the requested count, or ran out of
-  time.
+  time: `:timeout` when Prolog stopped the goal, `:killed` when the goal's cleanup
+  outlasted the time limit too and `swi_elixir` killed `swipl`, which leaves the
+  session without the program.
   """
-  @type completion :: :exhausted | :more | :timeout
+  @type completion :: :exhausted | :more | :timeout | :killed
 
   @doc """
   Runs `fun` with a fresh session and stops it. Returns the result with the output
@@ -93,7 +95,8 @@ defmodule Loge.Prolog.Swipl do
   queries. Each of `includes` whose name is a word, of letters, digits and
   underscores, is written beside it as `<name>.pl`, where `swipl` looks for the source
   a directive names (`Loge.Prolog.Includes`); `swipl` resolves other names, such as
-  `library(lists)`, on its own.
+  `library(lists)`, on its own. Consulting beyond `timeout` milliseconds is
+  `{:error, :timeout}`.
   """
   @spec consult(t(), binary(), Loge.Language.includes(), pos_integer()) :: :ok | {:error, term()}
   def consult(%__MODULE__{} = swipl, source, includes, timeout)
@@ -102,8 +105,13 @@ defmodule Loge.Prolog.Swipl do
       File.write!(Path.join(swipl.directory, name <> ".pl"), Loge.Input.to_iodata(input))
     end
 
-    SWI.load(swipl.session, write_program(swipl, source), timeout: timeout)
+    swipl.session
+    |> SWI.load(write_program(swipl, source), timeout: timeout)
+    |> loaded()
   end
+
+  defp loaded({:error, :port_timeout}), do: {:error, :timeout}
+  defp loaded(result), do: result
 
   @doc """
   Solves `goal`, a Prolog goal as text, for at most `count` answers, `0` for all.
@@ -133,6 +141,9 @@ defmodule Loge.Prolog.Swipl do
 
   defp pull({:failed, :timeout, answers}, _remaining),
     do: {:answers, Enum.reverse(answers), :timeout}
+
+  defp pull({:failed, :port_timeout, answers}, _remaining),
+    do: {:answers, Enum.reverse(answers), :killed}
 
   defp pull({:failed, reason, _answers}, _remaining), do: {:error, reason}
 
