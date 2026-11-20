@@ -207,7 +207,7 @@ languages that exist.
 ### `loge_prolog`
 
 - [x] Queries are the `?- Goal.` terms of the source, answered in order; the `goal` control goes; one `{:titled, "?- Goal.", {:table, …}}` view per query with bindings, and with several queries a badge for each without; a source without a query is consulted only. One query gives `:yes`, `:no` or `:timeout`, none or several `:success`; a query that raises ends the run with `{:error, {:prolog, message}}`
-- [x] A query whose cleanup outlasts the time limit: swi_elixir `2d4e10c` (pinned by ref, after v0.1.0) kills `swipl` with `:port_timeout` instead of answering the next query from a fresh `swipl` without the program (`existence_error(procedure, loge:solve/2)` with v0.1.0); the query is `:timeout` (completion `:killed`) and ends the run, the status still that of the program's queries; such a consult is `{:error, :timeout}`
+- [x] A query whose cleanup outlasts the time limit: swi_elixir v0.1.1 (`2d4e10c` and the release) kills `swipl` with `:port_timeout` instead of answering the next query from a fresh `swipl` without the program (`existence_error(procedure, loge:solve/2)` with v0.1.0); the query is `:timeout` (completion `:killed`) and ends the run, the status still that of the program's queries; such a consult is `{:error, :timeout}`
 - [x] `priv/loge.pl` reports the position of each query's goal, so the engine consults the rest and asks each query. The bridge consults paths only and cannot skip terms (`SWI.load/3`, `bridge.pl`), so a `user:term_expansion/2` clause drops the queries while consulting; the lint no longer reports a query's variables as singletons; consulting no longer warns of them in the raw output either, a `user:message_hook/3` clause dropping the `singletons(Term, _)` warning SWI-Prolog prints of a query as it reads it, before expansion
 - [x] Includes from Source cells (the open item of phase 3): `Loge.Prolog.Includes` reads `:- [name].`, `include/1`, `consult/1`, `ensure_loaded/1`; each source of the closure whose name is a word is written as `<name>.pl` beside the program
 
@@ -239,23 +239,24 @@ translation is not done before its record exists.
 - [x] `Loge.Tptp.Engines.Smtlib`: FOF and CNF → SMT-LIB in `UF`. z3 5.3.3 answered the outputs for a theorem and a non-theorem `unsat` and `sat`, by hand, not in the suite
 - [x] Between the dialects: `Fof` (CNF → FOF), `Tff` (FOF, CNF → TF0), `Thf` (FOF, CNF → TH0) and `Untyped` (monomorphic TF0 → FOF by type guards), over `Loge.Tptp.Signature` and `Loge.Tptp.Typing`; `Formula` reads `tff` formulas. Every output parses with `tptp` in its dialect (a property for the first three). Vampire 5.1.0 gave the input and each output the same status on eight problems, by hand, except two satisfiable TH0 outputs it timed out on
 - [x] TF0 → SMT-LIB and TF0 → TH0: `Smtlib` and `Thf` take monomorphic TF0 through `Loge.Tptp.Translation.typed/1`, a type as a sort and as a `$tType` declaration
-- [ ] TPTP arithmetic (`$int`, `$less`, …) ↔ SMT-LIB with `Int` and `Real`: not built; both sides have the syntax, so it is a translation in Elixir
+- [x] TPTP arithmetic ↔ SMT-LIB with `Int` and `Real`, in Elixir: `Loge.Tptp.Engines.Smtlib` takes `$int` and `$real` in `tff` statements (logic `UFNIRA`), `Loge.Smtlib.Engines.Tptp` takes `Int` and `Real`; `$rat` and the operations SMT-LIB lacks are `:inappropriate`. Of the 695 TF0 problems of `Problems/ARI` (v10.0.0), 496 are in the fragment; z3 5.3.3 gave 472 the answer their status predicts, timed out or answered `unknown` on 24 (20 s), and contradicted none (by a script, before the status suite existed). `loge_verification`: the round trip SMT-LIB → TF0 → SMT-LIB agrees with z3 on the input at 100 runs; Vampire 5.1.0 on the TF0 output disagrees, by a fault of Vampire (`UPSTREAM.md`)
 - [ ] THF → a lower dialect, and TF0 with arithmetic → FOF: no engine
 - [x] `Loge.Tptp.Engines.Prolog`: Horn CNF without equality → Prolog. The output was not consulted by SWI-Prolog from `loge_tptp`
 - [x] `:inappropriate` with diagnostics for input outside each fragment
 - [x] Properties with StreamData (a test-only dependency), in `mix test`: the formula round trip, the number and groundness of instances, the clauses of the DIMACS output
-- [ ] Verification suite tagged `:verification`, excluded in `test_helper.exs`: status (TPTP headers), differential (ECNF, EGround)
-- [ ] `loge_tptp/VERIFICATION.md` for the version to be published
+- [x] Verification suite tagged `:verification`, excluded in `test_helper.exs`: status (TPTP headers), differential (ECNF, EGround); `--only status` and `--only differential` run one each. `test/loge/tptp/verification_test.exs` over `test/support/verification.ex`; a translation past 30 s is undecided (`Ground` on a problem with too many instances). Run 2026-11-20 at 20 problems with Vampire 5.1.0 and z3 5.3.3, recorded in `VERIFICATION.md`: no disagreement. It found that `Loge.Tptp.Formula` took a `$o` variable in the place of a formula (TXF, NUM680_8) for an atom, on which `Untyped` raised; now not a first-order formula. EGround printed no clauses for 16 of the 20 `Ground` problems, so that check is mostly undecided
+- [x] `loge_tptp/VERIFICATION.md` for 0.1.0: status and differential, no disagreement; to be run again for the version published
 
 ### Gate
 
 - [ ] `notebooks/demo.livemd`: one FOF problem whose Skolemisation introduces constants only, through Clausify, Ground, Dimacs and clasp in four cells; the SAT verdict agrees with a prover's on the original. Outside Livebook the chain ran on a theorem and on a non-theorem, with `Loge.run!/3` in `loge_tptp` and clasp in `loge_dimacs`: unsatisfiable and satisfiable. The notebook cells are not written
-- [ ] The record shows no disagreement
+- [x] The record shows no disagreement (2026-11-20)
 
 ## Phase 9 — Course formalisms
 
-Goal: modal and description logics (OUTLINE §0). Each is added without a change to
-`loge` or `kino_loge`. The semantic web is phase 10.
+Goal: modal logic (OUTLINE §0), added without a change to `loge` or `kino_loge`.
+Description logics are out of scope until davfuenmayor provides an Elixir binding of a
+DL reasoner (decided 2026-11-20). The semantic web is phase 10.
 
 ### Modal logic (`loge_tptp`)
 
@@ -265,8 +266,9 @@ Goal: modal and description logics (OUTLINE §0). Each is added without a change
 
 ### Description logics
 
-- [ ] Decide the concrete syntax and the reasoner (open question below)
-- [ ] Translations between description logic, modal logic and first-order logic as the course states them
+Not planned until a binding of a DL reasoner exists; then its concrete syntax decides
+the language, and the translations between description logic, modal logic and
+first-order logic follow as the course states them.
 
 ### Gate
 
@@ -394,6 +396,7 @@ language. Needs phase 5 only.
 
 - [x] `loge_verification`: a mix project of tests only. For every translate engine, on generated inputs, the answer of a solver on the input against that of another on the output: clasp, clingo, SWI-Prolog and egglog in every run, z3 and Vampire tagged. It found three faults the unit tests had not: a query of a predicate without clauses raised in the Prolog output of `Loge.Tptp.Engines.Prolog` (now declared `dynamic`), a clause stated twice made the egglog output invalid (now one rule), and the generator's own Prolog needed the same declaration
 - [x] Run with Vampire 5.1.0 and z3 5.3.3 on `PATH`: all 19 checks (17 properties, 2 tests) passed at 100 runs per property, in 25 minutes
+- [x] 2026-11-20, the z3 properties at 100 runs: "bit-vectors blasted to SAT" found a fault of `Loge.Smtlib.Engines.Dimacs`, which read a `true` or `false` that z3's simplification leaves in a clause (`(not true)`) as a variable; now a literal that holds or fails. Two arithmetic properties added: the round trip SMT-LIB → TF0 → SMT-LIB of integer and real scripts (`Generators.arithmetic/0`) agrees with z3 on the input at 100 runs; Vampire 5.1.0 on the TF0 output refutes satisfiable problems over `$int`, `$real` and `$rat` (`UPSTREAM.md`), so Princess (snapshot-2026-05-20, one static executable) judges the TF0 of integer scripts without `abs` (`Generators.integer_arithmetic/0`), which it decided for 29 of 60 and agreed on each; passed at 100 runs. No judge here reads TPTP real arithmetic soundly: cvc5's release builds have no TPTP reader, Zipperposition 2.1 gives up, Princess times out. The Vampire properties not rerun
 - [x] `Loge.run!/3` raises for an input that is a translation without an output, with its status and reasons (`loge`); a name used in two ways is reported on each statement that uses it; Vampire's rejection is `{:rejected, message}` in its words; a z3 output without a goal asks whether the executable is z3
 - [ ] Status and differential suites on the TPTP library (OUTLINE §9), and `VERIFICATION.md` per package: not written
 
@@ -460,7 +463,7 @@ and inserted into its editor (OUTLINE §3, §4). Needs phases 5 and 6 only.
 - [x] Loge's own statuses: a status type, `Loge.Status`, holding the ontology's values and Loge's own; every outcome has one (OUTLINE §3, phase 10)
 - [ ] Rules for carrying a verdict back along a translation: not written, not scheduled
 - [ ] Equality in `Dimacs`: rejected as `:inappropriate`; adding the ground instances of the equality axioms is open. `Ground` keeps equations
-- [ ] Description logics: concrete syntax (OWL functional syntax, Manchester syntax, a TPTP encoding) and reasoner
+- [x] Description logics: out of scope until an Elixir binding of a DL reasoner exists (davfuenmayor); its syntax is then the binding's
 - [x] ShEx shape map: the source of the ShEx engine and a language of `loge_shex`; schema and data are its roles (OUTLINE §3)
 - [x] Semantic web packages: one per language, `loge_turtle`, `loge_sparql`, `loge_shex`; SHACL is an engine of `loge_turtle`, and `loge_shex` holds ShExC with its shape maps
 - [x] SPARQL on an endpoint: an engine of its own with an `endpoint` control, no role

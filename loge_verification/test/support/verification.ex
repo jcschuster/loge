@@ -49,30 +49,41 @@ defmodule Loge.Verification do
   """
   @spec vampire(Loge.Input.t()) :: answer()
   def vampire(problem) do
-    text = Loge.Input.to_iodata(problem)
-
     Enum.find_value(
       [["--mode", "casc"], ["--saturation_algorithm", "fmb"]],
       :undecided,
-      fn strategy ->
-        {:ok, exit} =
-          Loge.Executable.run("vampire", strategy ++ ["--input_syntax", "tptp", "-t", "5"], text,
-            extension: ".p",
-            stderr: :merge,
-            timeout: 15_000
-          )
-
-        case Regex.run(~r/SZS status (\w+)/, exit.output, capture: :all_but_first) do
-          [status] when status in ["Satisfiable", "CounterSatisfiable"] ->
-            :satisfiable
-
-          [status] when status in ["Unsatisfiable", "Theorem", "ContradictoryAxioms"] ->
-            :unsatisfiable
-
-          _other ->
-            nil
-        end
-      end
+      &szs("vampire", &1 ++ ["--input_syntax", "tptp", "-t", "5"], problem)
     )
+  end
+
+  @doc """
+  Princess's answer to a TPTP problem. It is the judge of integer arithmetic, on which
+  Vampire 5.1.0 refutes satisfiable problems (`UPSTREAM.md`); it decides no problem
+  with reals.
+  """
+  @spec princess(Loge.Input.t()) :: answer()
+  def princess(problem),
+    do:
+      szs("princess", ["-logo", "-runtime", "-inputFormat=tptp", "-timeout=5000"], problem) ||
+        :undecided
+
+  defp szs(prover, arguments, problem) do
+    {:ok, exit} =
+      Loge.Executable.run(prover, arguments, Loge.Input.to_iodata(problem),
+        extension: ".p",
+        stderr: :merge,
+        timeout: 15_000
+      )
+
+    case Regex.run(~r/SZS status (\w+)/, exit.output, capture: :all_but_first) do
+      [status] when status in ["Satisfiable", "CounterSatisfiable"] ->
+        :satisfiable
+
+      [status] when status in ["Unsatisfiable", "Theorem", "ContradictoryAxioms"] ->
+        :unsatisfiable
+
+      _other ->
+        nil
+    end
   end
 end

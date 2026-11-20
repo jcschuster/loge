@@ -80,7 +80,7 @@ defmodule Loge.Tptp.Engines.Thf do
   def format_error(reason), do: Translation.format_error(reason)
 
   defp statement(statement) do
-    with {:ok, {:formula, formula}} <- Translation.typed(statement),
+    with {:ok, {:formula, formula}} <- Translation.typed(statement, ["$i"]),
          uses = Signature.uses(formula),
          nil <- Enum.find_value(uses, &outside/1) do
       {:ok, %{statement: statement, formula: formula, uses: uses}}

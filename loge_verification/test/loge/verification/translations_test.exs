@@ -252,6 +252,27 @@ defmodule Loge.Verification.TranslationsTest do
       end
     end
 
+    property "integer and real arithmetic as TF0 and back" do
+      check all(script <- Generators.arithmetic(), max_runs: @runs) do
+        agrees_if_decided(
+          solve(script, [Smtlib.Tptp, Tptp.Smtlib, {Smtlib.Z3, time_limit: 5}]),
+          solve(script, [{Smtlib.Z3, time_limit: 5}]),
+          script
+        )
+      end
+    end
+
+    @tag :princess
+    property "integer arithmetic as TF0 under Princess" do
+      check all(script <- Generators.integer_arithmetic(), max_runs: @runs) do
+        agrees_if_decided(
+          princess(pipe(script, [Smtlib.Tptp])),
+          solve(script, [{Smtlib.Z3, time_limit: 5}]),
+          script
+        )
+      end
+    end
+
     @tag :vampire
     property "uninterpreted functions as TF0 under Vampire" do
       check all(script <- Generators.script(), max_runs: @runs) do

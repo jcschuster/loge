@@ -34,7 +34,7 @@ defmodule Loge.Tptp.Engines.Untyped do
 
   @behaviour Loge.Engine
 
-  alias Loge.Tptp.{Formula, Signature, Translation}
+  alias Loge.Tptp.{Formula, Signature, Translation, Typing}
   alias Tptp.Node
   alias Tptp.Printer.Canonical
 
@@ -85,7 +85,7 @@ defmodule Loge.Tptp.Engines.Untyped do
   def format_error(reason), do: Translation.format_error(reason)
 
   defp statement(statement) do
-    with {:ok, {:formula, formula}} <- Translation.typed(statement),
+    with {:ok, {:formula, formula}} <- Translation.typed(statement, ["$i"]),
          nil <- Enum.find_value(Signature.uses(formula), &outside/1) do
       {:ok, {:formula, statement, formula}}
     else
@@ -125,7 +125,7 @@ defmodule Loge.Tptp.Engines.Untyped do
     types =
       Enum.uniq(
         for({name, :type} <- typings, do: {:plain, name}) ++
-          Enum.flat_map(typings, fn {_name, declared} -> mentioned(declared) end) ++
+          Enum.flat_map(typings, fn {_name, declared} -> Typing.types(declared) end) ++
           Enum.map(functions, &elem(&1, 2)) ++
           Enum.flat_map(formulas, fn {_statement, formula} -> Signature.types(formula) end)
       )
@@ -146,10 +146,6 @@ defmodule Loge.Tptp.Engines.Untyped do
       end)
     ]
   end
-
-  defp mentioned(:type), do: []
-  defp mentioned({:function, arguments, result}), do: [result | arguments]
-  defp mentioned({:predicate, arguments}), do: arguments
 
   defp guards(types, symbols) do
     {guards, _symbols} =

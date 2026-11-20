@@ -51,7 +51,7 @@ representations ("if this can be a satisfiability problem, translate it and solv
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
 | Propositional logic, SAT                                | DIMACS CNF and SAT solving, WCNF (MaxSAT), QDIMACS (QBF), the other DIMACS dialects as each gets a solver; TPTP to CNF to DIMACS | clasp, CaDiCaL, Kissat, DepQBF; translations phases 8 and 12 |
 | Predicate logic, Horn logic, Datalog, logic programming | TPTP provers, Prolog, egglog; clausification, grounding                               | engines exist; translations phases 8 and 12 |
-| Modal and description logics, correspondences           | non-classical TPTP; embedding into THF; translations between DL, modal logic and FOL  | phase 9                                  |
+| Modal and description logics, correspondences           | non-classical TPTP; embedding into THF; translations between DL, modal logic and FOL  | phase 9; description logics out of scope until an Elixir binding of a DL reasoner exists (davfuenmayor) |
 | TPTP infrastructure                                     | provers, verifiers (GDV, AGMV), problem tools                                         | provers and verifiers exist              |
 | Semantic web                                            | RDF (Turtle), SPARQL, SHACL, ShEx                                                     | `loge_turtle`, `loge_sparql`, `loge_shex` exist |
 
@@ -711,7 +711,7 @@ Notes:
   `{:compound, name, arguments}`, a number, a binary for a string, an Elixir list for a
   proper list and `{:cons, head, tail}` for a partial one. A variable has no form of
   its own, so `priv/loge.pl` binds each to `'$VAR'(Name)` before returning a clause.
-- swi_elixir `2d4e10c` (`:port_timeout` executed, the reset read in its tests): Prolog
+- swi_elixir v0.1.1, its code that of `2d4e10c` (`:port_timeout` executed, the reset read in its tests): Prolog
   stops a goal at the `:timeout` of `SWI.query/3` or `SWI.load/3` and the session lives
   on. A cleanup that outlasts it by the `:cleanup_timeout` (1 s) has the Port session
   killed and the request answered `:port_timeout`; the next request is
@@ -895,10 +895,10 @@ dialect before it where the package has several languages.
 | `Loge.Tptp.Engines.Clausify`        | FOF → CNF                                                  | Vampire, `--mode clausify`                                          | `:equi_satisfiable` |
 | `Loge.Tptp.Engines.Ground`          | CNF with no function symbol of arity above 0 → ground CNF, equations kept | Elixir                                               | `:equi_satisfiable` |
 | `Loge.Tptp.Engines.Dimacs`          | ground CNF without equality → DIMACS                       | Elixir; an atom per variable, the table in `details.atoms` and as `c` comment lines | `:equi_satisfiable` |
-| `Loge.Tptp.Engines.Smtlib`          | FOF, CNF and monomorphic TF0 without defined symbols → SMT-LIB (`UF`), a sort per type, the conjecture negated | Elixir, on `Loge.Tptp.Formula` | `:equivalent` |
+| `Loge.Tptp.Engines.Smtlib`          | FOF, CNF and monomorphic TF0 with `$int` and `$real` arithmetic → SMT-LIB (`UF`, `UFNIRA` with arithmetic), a sort per type, the conjecture negated | Elixir, on `Loge.Tptp.Formula` | `:equivalent` |
 | `Loge.Tptp.Engines.Prolog`          | Horn CNF without equality → Prolog, a predicate without clauses declared `dynamic` | Elixir                                      | `:equivalent`       |
 | `Loge.Prolog.Engines.Egglog`        | definite clauses without function symbols → egglog: relations over strings, a `?- G.` as a relation of its answers, printed and checked | as `Loge.Prolog.Engines.Asp` | `:equivalent` |
-| `Loge.Smtlib.Engines.Tptp`          | SMT-LIB core with uninterpreted sorts and functions → TF0  | Elixir, on `Loge.Smtlib.Sexp`                                       | `:equivalent`       |
+| `Loge.Smtlib.Engines.Tptp`          | SMT-LIB core with uninterpreted sorts and functions, `Int` and `Real` → TF0 with `$int` and `$real` | Elixir, on `Loge.Smtlib.Sexp`              | `:equivalent`       |
 | `Loge.Smtlib.Engines.Dimacs`        | propositional and bit-vector SMT-LIB → DIMACS              | z3 bit-blasts and encodes; Elixir reads the goal and prints DIMACS  | `:equi_satisfiable` |
 | `Loge.Prolog.Engines.Tptp`          | definite clauses → TPTP Horn `cnf`, a `?- G.` as the negated conjecture | Elixir, on terms the package's `swipl` reads (`Loge.Prolog.Program`) | `:equivalent` |
 | `Loge.Prolog.Engines.Asp`           | definite clauses without function symbols → ASP, a `?- G.` as the constraint `:- G.` | as above                                  | `:equivalent`       |
@@ -906,16 +906,18 @@ dialect before it where the package has several languages.
 | `Loge.Turtle.Engines.Tptp`, `Prolog`, `Asp` | Turtle → `triple(S, P, O)` facts, a blank node as a name | Elixir, on the N-Triples rudof serialises (`Loge.Turtle.NTriples`, `Facts`) | `:equi_satisfiable` |
 
 No edge exists into Turtle, SPARQL or ShEx, out of egglog, out of THF, from ASP that
-is not tight (loop formulas, or lp2sat, a binary Loge does not have), for TPTP
-arithmetic or from SMT-LIB with a theory into TPTP. A pair of languages without an
+is not tight (loop formulas, or lp2sat, a binary Loge does not have), for `$rat` and
+the TPTP arithmetic SMT-LIB lacks (`$floor`, `$quotient_t`, …), or from SMT-LIB with a
+theory other than integers and reals into TPTP. A pair of languages without an
 engine has no edge in
 `Loge.Registry.translations/0`. No function finds a path of edges: that needs the rules
 for composing `preserves`, which are not written.
 
 Later, by course topic (phase 9): non-classical TPTP → THF (ATFLET 1.9.5, the logic
-embedding tool) and the standard translations between
-description logic, modal logic and first-order logic. Tool names and versions are those
-SystemB4TPTP listed on 2026-11-14.
+embedding tool) and the standard translation of modal logic into first-order logic.
+Tool names and versions are those SystemB4TPTP listed on 2026-11-14. Description logics
+and their translations wait for an Elixir binding of a DL reasoner (davfuenmayor), as
+rudof_elixir and swi_elixir are; until then they are out of scope.
 
 ## 9. Verifying translations
 
@@ -925,7 +927,7 @@ and never in CI: they need the network, the TPTP library and minutes to hours.
 
 | Check        | What it establishes                                                                                                                                                                                              | With                                                                                                             |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Semantic     | On generated inputs, for every translate engine: an independent solver's answer to the input is the answer another gives to the output, as the relation predicts. clasp, clingo, SWI-Prolog and egglog judge in every run; z3 and Vampire where installed (tagged). A translate engine without a check fails the suite | `loge_verification`: StreamData, `mix test` there; `LOGE_VERIFICATION_RUNS` sets the runs per property |
+| Semantic     | On generated inputs, for every translate engine: an independent solver's answer to the input is the answer another gives to the output, as the relation predicts. clasp, clingo, SWI-Prolog and egglog judge in every run; z3, Vampire and Princess where installed (tagged). Vampire 5.1.0 is unsound on arithmetic and judges none; Princess judges TPTP integer arithmetic. A translate engine without a check fails the suite | `loge_verification`: StreamData, `mix test` there; `LOGE_VERIFICATION_RUNS` sets the runs per property |
 | Properties   | On generated small inputs: the output is in the target fragment, introduced symbols are fresh, and for propositional inputs the relation holds by truth table (input and output are equisatisfiable, and each model of the output restricted to the input's atoms is a model of the input) | StreamData, in `mix test`                                                                 |
 | Derivation   | Each step of `details.derivation` has the status it claims, and the derivation is well-formed                                                                                                                    | GDV through `AtpClient.verify/2`: trusted ATP systems discharge an obligation per step                           |
 | Status       | On problems whose status is recorded, solving the output gives the status the relation predicts                                                                                                                  | TPTP library headers (`Tptp.Header.status/1`); a reference prover through the engines of `loge_tptp`; clasp for DIMACS |
@@ -939,7 +941,17 @@ does not apply to it; its differential check uses a reference other than its too
 for `Clausify`, which runs Vampire).
 
 The three later checks are ExUnit tests tagged `:verification`, excluded in
-`test_helper.exs` and run with `mix test --only verification`. The figures of a run are
+`test_helper.exs` and run with `mix test --only verification`; each check is a tag of
+its own too (`:status`, `:differential`), so `mix test --only status` runs the one that
+needs no network. They read the TPTP library from `$TPTP`. A selection is the first
+`LOGE_VERIFICATION_PROBLEMS` (20) problems of the forms an engine reads that it
+translates, in the order of a hash of their names, so spread across the domains: with a
+status that fixes whether the axioms with the negated conjecture are satisfiable
+(Theorem, Unsatisfiable, ContradictoryAxioms; CounterSatisfiable, Satisfiable), a
+rating of at most 0.5 in the last release and at most 200 kB with their includes. The
+judges run as executables, not through an engine: Vampire for a TPTP output, z3 for
+SMT-LIB and for DIMACS (`-dimacs`). The Prolog output has no status check: SWI-Prolog's
+depth-first search does not decide a problem. The figures of a run are
 recorded in the package's `VERIFICATION.md`: date, package version, TPTP version and the
 selection of problems, the versions of the tools, and per check the counts of agreeing,
 disagreeing and undecided cases, with every disagreement listed. A reference prover's

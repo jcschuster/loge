@@ -159,22 +159,24 @@ defmodule Loge.Smtlib.Engines.Dimacs do
     )
   end
 
-  defp clause({:symbol, "true", _span}), do: {:ok, :holds}
-  defp clause({:symbol, "false", _span}), do: {:ok, []}
+  defp clause({:list, [{:symbol, "or", _} | literals], _span} = formula),
+    do: literals |> Enum.map(&literal/1) |> clause(formula)
 
-  defp clause({:list, [{:symbol, "or", _} | literals], _span} = formula) do
-    read = Enum.map(literals, &literal/1)
-    if :error in read, do: {:outside, formula}, else: {:ok, read}
-  end
+  defp clause(formula), do: clause([literal(formula)], formula)
 
-  defp clause(formula) do
-    case literal(formula) do
-      :error -> {:outside, formula}
-      literal -> {:ok, [literal]}
+  defp clause(read, formula) do
+    cond do
+      :error in read -> {:outside, formula}
+      true in read -> {:ok, :holds}
+      true -> {:ok, Enum.reject(read, &(&1 == false))}
     end
   end
 
-  defp literal({:symbol, name, _span}) when name not in ["true", "false"], do: {:positive, name}
+  defp literal({:symbol, "true", _span}), do: true
+  defp literal({:symbol, "false", _span}), do: false
+  defp literal({:list, [{:symbol, "not", _}, {:symbol, "true", _}], _span}), do: false
+  defp literal({:list, [{:symbol, "not", _}, {:symbol, "false", _}], _span}), do: true
+  defp literal({:symbol, name, _span}), do: {:positive, name}
   defp literal({:list, [{:symbol, "not", _}, {:symbol, name, _}], _span}), do: {:negative, name}
   defp literal(_term), do: :error
 

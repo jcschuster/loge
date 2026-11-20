@@ -69,31 +69,32 @@ defmodule Loge.Tptp.Translation do
     do: {:outside, "A #{language} statement is not a first-order formula."}
 
   @doc """
-  What a statement of a typed first-order problem is: the typing of a `tff` statement
-  with the role `type` (`Loge.Tptp.Typing`), else the formula of a `tff`, `fof` or
-  `cnf` statement, closed over its free variables. Outside are a statement of another
-  TPTP language, a typing that is not monomorphic over declared types and `$i`, and a
-  variable of a defined type such as `$int`.
+  What a statement of a typed first-order problem is, over declared types and the
+  defined types `defined`, such as `["$i"]`: the typing of a `tff` statement with the
+  role `type` (`Loge.Tptp.Typing`), else the formula of a `tff`, `fof` or `cnf`
+  statement, closed over its free variables. Outside are a statement of another TPTP
+  language, a typing that is not monomorphic over those types, and a variable of
+  another defined type.
   """
-  @spec typed(Annotated.t()) ::
+  @spec typed(Annotated.t(), [String.t(), ...]) ::
           reading({:typing, String.t(), Typing.t()} | {:formula, Formula.t()})
-  def typed(%Annotated{language: :tff, formula: node} = statement) do
-    case {Annotated.role_word(statement), Typing.from_node(node)} do
-      {"type", {:ok, {name, declared}}} ->
-        {:ok, {:typing, name, declared}}
-
-      {"type", {:error, _node}} ->
-        {:outside, "This declaration is not monomorphic over declared types and $i."}
-
-      {_role, _no_typing} ->
-        typed_formula(node)
+  def typed(%Annotated{language: :tff, formula: node} = statement, defined) do
+    with {"type", {:ok, {name, declared}}} <-
+           {Annotated.role_word(statement), Typing.from_node(node)},
+         [] <- Enum.reject(Typing.types(declared), &over?(&1, defined)) do
+      {:ok, {:typing, name, declared}}
+    else
+      {"type", {:error, _node}} -> not_monomorphic(defined)
+      [_ | _] -> not_monomorphic(defined)
+      {_role, _no_typing} -> typed_formula(node, defined)
     end
   end
 
-  def typed(%Annotated{language: language, formula: node}) when language in [:fof, :cnf],
-    do: typed_formula(node)
+  def typed(%Annotated{language: language, formula: node}, defined)
+      when language in [:fof, :cnf],
+      do: typed_formula(node, defined)
 
-  def typed(%Annotated{language: language}),
+  def typed(%Annotated{language: language}, _defined),
     do: {:outside, "A #{language} statement is not first-order."}
 
   @doc "The clause of a `cnf` statement."
@@ -203,16 +204,23 @@ defmodule Loge.Tptp.Translation do
 
   def format_error(reason), do: inspect(reason, pretty: true, width: 80)
 
-  defp typed_formula(node) do
+  defp typed_formula(node, defined) do
     with {:ok, formula} <- Formula.from_node(node),
          formula = Formula.closure(formula),
-         nil <-
-           Enum.find(Signature.types(formula), &match?({:defined, name} when name != "$i", &1)) do
+         nil <- Enum.find(Signature.types(formula), &(not over?(&1, defined))) do
       {:ok, {:formula, formula}}
     else
       {:error, _node} -> {:outside, "This statement is not a first-order formula."}
       {:defined, name} -> {:outside, "A variable of the defined type #{name} is not translated."}
     end
+  end
+
+  defp over?({:plain, _name}, _defined), do: true
+  defp over?({:defined, name}, defined), do: name in defined
+
+  defp not_monomorphic(defined) do
+    {last, types} = List.pop_at(["declared types" | defined], -1)
+    {:outside, "This declaration is not monomorphic over #{Enum.join(types, ", ")} and #{last}."}
   end
 
   defp outside(file, statement, message) do

@@ -77,8 +77,8 @@ defmodule Loge.Tptp.Formula do
 
   @doc """
   Reads the formula of a `fof`, `cnf` or `tff` statement. A node that is no first-order
-  formula, such as a sequent, a type declaration or a statement of another TPTP
-  language, is the error.
+  formula, such as a sequent, a type declaration, a variable of type `$o` in the place
+  of a formula or a statement of another TPTP language, is the error.
   """
   @spec from_node(Node.t()) :: {:ok, t()} | {:error, Node.t()}
   def from_node(%Node{kind: :defined_constant, text: "$true"}), do: {:ok, true}
@@ -129,8 +129,11 @@ defmodule Loge.Tptp.Formula do
   end
 
   def from_node(%Node{} = node) do
-    with {:ok, {:function, symbol, arguments}} <- term(node),
-         do: {:ok, {:predicate, symbol, arguments}}
+    case term(node) do
+      {:ok, {:function, symbol, arguments}} -> {:ok, {:predicate, symbol, arguments}}
+      {:ok, _term} -> {:error, node}
+      {:error, _node} = error -> error
+    end
   end
 
   @doc """

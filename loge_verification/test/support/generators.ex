@@ -283,6 +283,93 @@ defmodule Loge.Verification.Generators do
     end)
   end
 
+  @doc """
+  An SMT-LIB script over integers: two constants, a function, the operations the TF0
+  of `Loge.Smtlib.Engines.Tptp` has on them but `abs`, and a quantifier. It is judged by
+  Princess, whose TPTP reader does not know `$abs`.
+  """
+  @spec integer_arithmetic() :: StreamData.t(String.t())
+  def integer_arithmetic do
+    [integer_atom(integer_term([], [])), constant("(forall ((k Int)) (>= (h k) k))")]
+    |> one_of()
+    |> assertions("UFLIA", [
+      "(declare-const n Int)",
+      "(declare-const m Int)",
+      "(declare-fun h (Int) Int)"
+    ])
+  end
+
+  @doc """
+  An SMT-LIB script over integers and reals: a constant and a function of each, the
+  operations the TF0 of `Loge.Smtlib.Engines.Tptp` has, and a quantifier over each.
+  """
+  @spec arithmetic() :: StreamData.t(String.t())
+  def arithmetic do
+    real =
+      tree(member_of(["x", "y", "0.5", "(- 1.5)", "(to_real n)", "(g x)"]), fn inner ->
+        one_of([
+          map({member_of(["+", "-", "*"]), inner, inner}, fn {o, l, r} -> "(#{o} #{l} #{r})" end),
+          map(inner, &"(/ #{&1} 2.0)"),
+          map(inner, &"(- #{&1})")
+        ])
+      end)
+
+    [
+      integer_atom(integer_term(["(to_int x)"], ["abs"])),
+      map({member_of(["<", "<=", "="]), real, real}, fn {r, s, t} -> "(#{r} #{s} #{t})" end),
+      map(real, &"(is_int #{&1})"),
+      constant("(forall ((k Int)) (>= (h k) k))"),
+      constant("(exists ((z Real)) (= (g z) (* 2.0 z)))")
+    ]
+    |> one_of()
+    |> assertions("UFLIRA", [
+      "(declare-const n Int)",
+      "(declare-const m Int)",
+      "(declare-const x Real)",
+      "(declare-const y Real)",
+      "(declare-fun h (Int) Int)",
+      "(declare-fun g (Real) Real)"
+    ])
+  end
+
+  defp integer_term(leaves, unary) do
+    tree(member_of(["n", "m", "0", "2", "(- 3)", "(h n)"] ++ leaves), fn inner ->
+      one_of(
+        [
+          map({member_of(["+", "-", "*"]), inner, inner}, fn {o, l, r} -> "(#{o} #{l} #{r})" end),
+          map({member_of(["div", "mod"]), inner}, fn {o, l} -> "(#{o} #{l} 3)" end)
+        ] ++ Enum.map(unary, fn operator -> map(inner, &"(#{operator} #{&1})") end)
+      )
+    end)
+  end
+
+  defp integer_atom(integer) do
+    map({member_of(["<", "<=", ">", ">=", "="]), integer, integer}, fn {r, s, t} ->
+      "(#{r} #{s} #{t})"
+    end)
+  end
+
+  defp assertions(atom, logic, declarations) do
+    formula =
+      tree(atom, fn inner ->
+        one_of([
+          map(inner, &"(not #{&1})"),
+          map({member_of(["and", "or", "=>"]), inner, inner}, fn {c, l, r} ->
+            "(#{c} #{l} #{r})"
+          end)
+        ])
+      end)
+
+    map(list_of(formula, min_length: 1, max_length: 3), fn assertions ->
+      """
+      (set-logic #{logic})
+      #{Enum.join(declarations, "\n")}
+      #{Enum.map_join(assertions, "\n", &"(assert #{&1})")}
+      (check-sat)
+      """
+    end)
+  end
+
   @doc "A propositional SMT-LIB script with bit-vectors of width two."
   @spec bit_vectors() :: StreamData.t(String.t())
   def bit_vectors do

@@ -11,7 +11,7 @@ defmodule Loge.Tptp.Typing do
   alias Loge.Tptp.Formula
   alias Tptp.Node
 
-  @typedoc "A type: a declared one by its word, or `$i`."
+  @typedoc "A type: a declared one by its word, or `$i`, `$int`, `$rat` or `$real`."
   @type type :: Formula.symbol()
 
   @typedoc """
@@ -21,8 +21,8 @@ defmodule Loge.Tptp.Typing do
   @type t :: :type | {:function, [type()], type()} | {:predicate, [type()]}
 
   @doc """
-  Reads the formula of a `type` statement. A typing outside monomorphic TF0 over
-  declared types and `$i`, such as one with `$int` or a type variable, is the error.
+  Reads the formula of a `type` statement. A typing outside monomorphic TF0, such as
+  one with a type variable, is the error.
   """
   @spec from_node(Node.t()) :: {:ok, {String.t(), t()}} | {:error, Node.t()}
   def from_node(%Node{kind: :tff_atom_typing, children: [%Node{kind: :tff_atom_typing} = inner]}),
@@ -32,6 +32,17 @@ defmodule Loge.Tptp.Typing do
     do: with({:ok, declared} <- declared(type), do: {:ok, {Node.value(name), declared}})
 
   def from_node(%Node{} = node), do: {:error, node}
+
+  @doc """
+  The types a typing names: those of the arguments, then that of the result.
+
+      iex> Loge.Tptp.Typing.types({:function, [{:plain, "human"}, {:defined, "$int"}], {:plain, "human"}})
+      [{:plain, "human"}, {:defined, "$int"}, {:plain, "human"}]
+  """
+  @spec types(t()) :: [type()]
+  def types(:type), do: []
+  def types({:function, arguments, result}), do: arguments ++ [result]
+  def types({:predicate, arguments}), do: arguments
 
   defp declared(%Node{kind: :defined_type, text: "$tType"}), do: {:ok, :type}
 
@@ -69,6 +80,9 @@ defmodule Loge.Tptp.Typing do
   defp factors(%Node{} = leaf), do: [leaf]
 
   defp type(%Node{kind: :type_constant} = leaf), do: {:ok, {:plain, Node.value(leaf)}}
-  defp type(%Node{kind: :defined_type, text: "$i"}), do: {:ok, {:defined, "$i"}}
+
+  defp type(%Node{kind: :defined_type, text: name}) when name in ~w($i $int $rat $real),
+    do: {:ok, {:defined, name}}
+
   defp type(%Node{} = node), do: {:error, node}
 end

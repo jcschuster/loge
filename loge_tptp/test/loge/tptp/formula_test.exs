@@ -96,6 +96,10 @@ defmodule Loge.Tptp.FormulaTest do
     assert {:error, %Tptp.Node{kind: :fof_sequent}} = read("[p] --> [q]")
   end
 
+  test "a variable in the place of a formula is not first-order" do
+    assert {:error, %Tptp.Node{kind: :variable}} = read("tff", "![X: $o]: (~ X)")
+  end
+
   property "a formula is read back from the text of its tree" do
     check all(formula <- formula()) do
       assert formula |> Formula.to_node() |> Canonical.to_string() |> read() == {:ok, formula}

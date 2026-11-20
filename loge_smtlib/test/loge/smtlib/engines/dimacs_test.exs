@@ -69,6 +69,17 @@ defmodule Loge.Smtlib.Engines.DimacsTest do
              )
   end
 
+  test "true and false in a clause are no variables", %{tmp_dir: directory} do
+    goal =
+      "(goals (goal u (not true) (or p false) (or q (not false)) :precision precise :depth 3))"
+
+    assert {:ok, %Outcome{output: %Source{text: text}, details: %{atoms: atoms}}} =
+             Dimacs.run("", executable: printing(directory, goal))
+
+    assert text == "c 1 u\nc 2 p\np cnf 2 3\n1 0\n0\n2 0\n"
+    assert atoms == %{1 => "u", 2 => "p"}
+  end
+
   test "what z3 leaves that is no clause is outside the fragment", %{tmp_dir: directory} do
     assert {:ok,
             %Outcome{

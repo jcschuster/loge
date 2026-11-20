@@ -256,10 +256,52 @@ defmodule Loge.Tptp.Engines.TranslationsTest do
       assert {:ok, %Outcome{status: :inappropriate}} = Smtlib.run("thf(a, axiom, p).", [])
 
       assert {:ok, %Outcome{status: :inappropriate}} =
-               Smtlib.run("tff(a, axiom, ![X: $int]: p(X)).", [])
+               Smtlib.run("tff(a, axiom, ![X: $rat]: p(X)).", [])
 
       assert {:ok, %Outcome{status: :inappropriate}} =
                Smtlib.run("tff(u, type, 'U': $tType).", [])
+    end
+
+    test "arithmetic over $int and $real is that of SMT-LIB, in the logic UFNIRA" do
+      assert text(Smtlib, """
+             tff(f_type, type, f: $int > $real).
+             tff(a, axiom, ![X: $int]: $less($uminus(X), $sum(X, 1))).
+             tff(b, axiom, ![Y: $real]: $quotient(Y, 2.5) = f($quotient_e($remainder_e(3, -2), $abs(-7)))).
+             tff(c, conjecture, ?[Z: $real]: ($is_int(Z) & $greatereq($to_int(Z), +0) & $to_real(1) = $difference($product(Z, 1.5E1), -0.25e-1))).
+             tff(d, axiom, $lesseq(0.05E1, 7e0) & $greater(1.0e+2, 1.5) & $less(-0.0, 15e-3)).
+             """) == """
+             (set-logic UFNIRA)
+             (declare-sort U 0)
+             (declare-fun f (Int) Real)
+             (assert (forall ((X Int)) (< (- X) (+ X 1))))
+             (assert (forall ((Y Real)) (= (/ Y 2.5) (f (div (mod 3 (- 2)) (abs (- 7)))))))
+             (assert (and (and (<= 0.5 7.0) (> 100.0 1.5)) (< (- 0.0) 0.015)))
+             (assert (not (exists ((Z Real)) (and (and (is_int Z) (>= (to_int Z) 0)) (= (to_real 1) (- (* Z 15.0) (- 0.025)))))))
+             (check-sat)
+             """
+    end
+
+    test "arithmetic SMT-LIB has no counterpart for is outside, with a sentence" do
+      for {problem, sentence} <- [
+            {"tff(a, axiom, p(1/2)).", "rational number 1/2"},
+            {"tff(a, axiom, ![X: $rat]: p(X)).", "defined type $rat"},
+            {"tff(f, type, f: $rat > $int).", "over declared types, $i, $int and $real"},
+            {"tff(a, axiom, ![X: $real]: $quotient_e(X, X) = X).",
+             "no counterpart of $quotient_e on $real and $real"},
+            {"tff(a, axiom, ![X: $int]: $to_int(X) = X).", "no counterpart of $to_int on $int"},
+            {"tff(a, axiom, ![X: $real]: $floor(X) = X).", "$floor has no counterpart"},
+            {"tff(a, axiom, ![X: $real]: $less(X, 1)).",
+             "no counterpart of $less on $real and $int"},
+            {"fof(a, axiom, $less(1, 2)).", "in tff statements only"}
+          ] do
+        assert {:ok,
+                %Outcome{
+                  status: :inappropriate,
+                  views: [{:diagnostics, [%Diagnostic{message: message}]}]
+                }} = Smtlib.run(problem, [])
+
+        assert message =~ sentence
+      end
     end
 
     test "a type is a sort and a typed symbol is declared with its sorts" do

@@ -1,7 +1,7 @@
 defmodule Loge.Smtlib.Engines.Tptp do
   @moduledoc """
-  A script over uninterpreted sorts and functions as a TPTP problem in TF0, the typed
-  first-order form.
+  A script over uninterpreted sorts and functions, integers and reals as a TPTP problem
+  in TF0, the typed first-order form.
 
   A sort is a type (`tff(t1, type, s: $tType).`), a function, constant or predicate a
   typed symbol (`f: (s * s) > s`, `c: s`, `p: s > $o`), in the order declared, and an
@@ -10,6 +10,16 @@ defmodule Loge.Smtlib.Engines.Tptp do
   and `=` and `!=` between terms, a chain as the conjunction of its pairs; `ite` between
   formulas is two implications. A bound variable is named `V1`, `V2`, … by the depth
   of its binder, and a symbol that is no lower word of TPTP is quoted.
+
+  `Int` and `Real` are `$int` and `$real`, and their symbols those of TPTP's arithmetic:
+  `+`, `-`, `*`, `/` and `div` are `$sum`, `$difference` (`$uminus` with one argument),
+  `$product`, `$quotient` and `$quotient_e`, applied from the left; `mod`, `abs`,
+  `to_real`, `to_int` and `is_int` are `$remainder_e`, `$abs`, `$to_real`, `$to_int` and
+  `$is_int`; `<`, `<=`, `>` and `>=` are `$less`, `$lesseq`, `$greater` and
+  `$greatereq`, a chain as the conjunction of its pairs. A decimal is a real, and a
+  numeral an integer, or a real (`1.0`) where the logic of `set-logic` has reals and no
+  integers: its name ends in `LRA`, `NRA` or `RDL`. A symbol the script declares is
+  read as declared, not as the theory's.
 
   The axioms are the assertions over the same symbols and a sort has an element as a
   type does, so the problem has the models of the script: the status is `:equivalent`.
@@ -20,11 +30,12 @@ defmodule Loge.Smtlib.Engines.Tptp do
   Outside the fragment, with the outcome `:inappropriate`
   (`Loge.Smtlib.Translation`): a command that declares otherwise or changes the
   assertions other than by asserting (`define-fun`, `push`); a sort that is not
-  declared in the script with arity 0, so every sort of a theory but `Bool`; `Bool` as
-  the sort of an argument or of a bound variable, and `ite` between terms, which TF0
-  does not have; `let`, annotations and indexed or qualified identifiers; a name
-  declared as a sort and as a symbol, since TPTP has one name space; and a term that
-  is not well-sorted by the script's declarations.
+  declared in the script with arity 0, `Int` or `Real`, so every sort of another theory
+  but `Bool`; `Bool` as the sort of an argument or of a bound variable, and `ite`
+  between terms, which TF0 does not have; `let`, annotations, hexadecimals, binaries,
+  strings and indexed or qualified identifiers; a name declared as a sort and as a
+  symbol, since TPTP has one name space; and a term that is not well-sorted by the
+  script's declarations and the theory's signatures.
 
       iex> script = "(declare-sort S 0) (declare-fun f (S) S) (declare-const p Bool) (assert (forall ((x S)) (or p (= (f x) x))))"
       iex> {:ok, outcome} = Loge.Smtlib.Engines.Tptp.run(script, [])
@@ -41,9 +52,26 @@ defmodule Loge.Smtlib.Engines.Tptp do
 
   alias Loge.Smtlib.{Solver, Translation}
 
-  @ignored ~w(set-logic set-option set-info check-sat get-assertions get-assignment get-info
+  @ignored ~w(set-option set-info check-sat get-assertions get-assignment get-info
               get-model get-option get-proof get-unsat-assumptions get-unsat-core get-value
               echo exit)
+
+  @numeric ["Int", "Real"]
+  @associative %{
+    "+" => {"$sum", @numeric},
+    "-" => {"$difference", @numeric},
+    "*" => {"$product", @numeric},
+    "/" => {"$quotient", ["Real"]},
+    "div" => {"$quotient_e", ["Int"]}
+  }
+  @chainable %{"<" => "$less", "<=" => "$lesseq", ">" => "$greater", ">=" => "$greatereq"}
+  @theory %{
+    "mod" => {"$remainder_e", {["Int", "Int"], "Int"}},
+    "abs" => {"$abs", {["Int"], "Int"}},
+    "to_real" => {"$to_real", {["Int"], "Real"}},
+    "to_int" => {"$to_int", {["Real"], "Int"}},
+    "is_int" => {"$is_int", {["Real"], "Bool"}}
+  }
 
   @impl true
   def id, do: :smtlib_tptp
@@ -78,7 +106,14 @@ defmodule Loge.Smtlib.Engines.Tptp do
       state =
         Enum.reduce(
           commands,
-          %{sorts: MapSet.new(), symbols: %{}, types: [], axioms: [], outside: []},
+          %{
+            sorts: MapSet.new(),
+            symbols: %{},
+            numeral: "Int",
+            types: [],
+            axioms: [],
+            outside: []
+          },
           &command/2
         )
 
@@ -110,6 +145,9 @@ defmodule Loge.Smtlib.Engines.Tptp do
 
   defp statement(prefix, role, {formula, position}),
     do: ["tff(", prefix, Integer.to_string(position), ", ", role, ", ", formula, ").\n"]
+
+  defp command({:list, [{:symbol, "set-logic", _}, {:symbol, logic, _}], _span}, state),
+    do: %{state | numeral: if(logic =~ ~r/(LRA|NRA|RDL)\z/, do: "Real", else: "Int")}
 
   defp command({:list, [{:symbol, name, _} | _arguments], _span}, state) when name in @ignored,
     do: state
@@ -190,7 +228,7 @@ defmodule Loge.Smtlib.Engines.Tptp do
     do: {:outside, term, "TF0 has no Boolean arguments or variables."}
 
   defp sort({:symbol, name, _span} = term, state) do
-    if name in state.sorts,
+    if name in @numeric or name in state.sorts,
       do: {:ok, name},
       else: {:outside, term, "The sort #{name} is not declared in the script with arity 0."}
   end
@@ -199,16 +237,25 @@ defmodule Loge.Smtlib.Engines.Tptp do
     do: {:outside, term, "This sort is not declared in the script with arity 0."}
 
   defp type([], result), do: type(result)
-  defp type([parameter], result), do: [word(parameter), " > ", type(result)]
+  defp type([parameter], result), do: [type(parameter), " > ", type(result)]
 
   defp type(parameters, result),
-    do: [?(, Enum.map_intersperse(parameters, " * ", &word/1), ") > ", type(result)]
+    do: [?(, Enum.map_intersperse(parameters, " * ", &type/1), ") > ", type(result)]
 
   defp type("Bool"), do: "$o"
+  defp type("Int"), do: "$int"
+  defp type("Real"), do: "$real"
   defp type(sort), do: word(sort)
 
   defp formula({:symbol, "true", _span}, _state, _scope), do: {:ok, "$true", "Bool"}
   defp formula({:symbol, "false", _span}, _state, _scope), do: {:ok, "$false", "Bool"}
+
+  defp formula({:numeral, text, _span}, %{numeral: "Int"}, _scope), do: {:ok, text, "Int"}
+
+  defp formula({:numeral, text, _span}, %{numeral: "Real"}, _scope),
+    do: {:ok, [text, ".0"], "Real"}
+
+  defp formula({:decimal, text, _span}, _state, _scope), do: {:ok, text, "Real"}
 
   defp formula({:symbol, name, _span} = term, state, scope) do
     case {scope.variables, state.symbols} do
@@ -262,20 +309,52 @@ defmodule Loge.Smtlib.Engines.Tptp do
     end
   end
 
+  defp formula({:list, [{:symbol, "-", _}, argument], _span}, state, scope)
+       when not is_map_key(state.symbols, "-") do
+    with {:ok, [text], sort} <- numeric([argument], @numeric, state, scope),
+         do: {:ok, ["$uminus(", text, ?)], sort}
+  end
+
+  defp formula({:list, [{:symbol, name, _} | [_, _ | _] = arguments], _span}, state, scope)
+       when is_map_key(@associative, name) and not is_map_key(state.symbols, name) do
+    {function, sorts} = @associative[name]
+
+    with {:ok, [first | rest], sort} <- numeric(arguments, sorts, state, scope),
+         do: {:ok, Enum.reduce(rest, first, &application(function, [&2, &1])), sort}
+  end
+
+  defp formula({:list, [{:symbol, name, _} | [_, _ | _] = arguments], _span}, state, scope)
+       when is_map_key(@chainable, name) and not is_map_key(state.symbols, name) do
+    with {:ok, texts, _sort} <- numeric(arguments, @numeric, state, scope) do
+      {:ok,
+       connected(
+         "and",
+         Enum.zip_with(texts, tl(texts), &application(@chainable[name], [&1, &2]))
+       ), "Bool"}
+    end
+  end
+
   defp formula({:list, [{:symbol, name, _} | [_ | _] = arguments], _span} = term, state, scope)
        when name not in ["let", "!", "_", "as", "match", "forall", "exists"] do
-    case state.symbols do
-      %{^name => {parameters, result}} when length(parameters) == length(arguments) ->
+    case signature(name, state) do
+      {function, {parameters, result}} when length(parameters) == length(arguments) ->
         with {:ok, texts} <- arguments(arguments, parameters, state, scope),
-             do: {:ok, [word(name), ?(, Enum.intersperse(texts, ", "), ?)], result}
+             do: {:ok, application(function, texts), result}
 
-      %{} ->
+      _undeclared ->
         {:outside, term, "#{name} is not declared with #{length(arguments)} arguments."}
     end
   end
 
   defp formula(term, _state, _scope),
     do: {:outside, term, "This term has no counterpart in TF0 over uninterpreted symbols."}
+
+  defp signature(name, state) do
+    case state.symbols do
+      %{^name => signature} -> {word(name), signature}
+      %{} -> @theory[name]
+    end
+  end
 
   defp arguments(terms, sorts, state, scope) do
     terms
@@ -294,6 +373,20 @@ defmodule Loge.Smtlib.Engines.Tptp do
     end)
   end
 
+  defp numeric([first | _] = terms, sorts, state, scope) do
+    with {:ok, _text, sort} <- formula(first, state, scope) do
+      if sort in sorts,
+        do:
+          with(
+            {:ok, texts} <- arguments(terms, List.duplicate(sort, length(terms)), state, scope),
+            do: {:ok, texts, sort}
+          ),
+        else: {:outside, first, "This term is of sort #{sort}, not #{Enum.join(sorts, " or ")}."}
+    end
+  end
+
+  defp application(function, texts), do: [function, ?(, Enum.intersperse(texts, ", "), ?)]
+
   defp bind(bound, state, scope) do
     Enum.reduce_while(bound, {:ok, [], scope}, fn
       {:list, [{:symbol, name, _}, sort], _span}, {:ok, variables, scope} ->
@@ -302,7 +395,7 @@ defmodule Loge.Smtlib.Engines.Tptp do
             variable = "V#{scope.depth + 1}"
 
             {:cont,
-             {:ok, variables ++ [[variable, ": ", word(sort)]],
+             {:ok, variables ++ [[variable, ": ", type(sort)]],
               %{
                 variables: Map.put(scope.variables, name, {variable, sort}),
                 depth: scope.depth + 1
